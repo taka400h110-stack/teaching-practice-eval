@@ -1,6 +1,6 @@
 /**
  * EvaluationResultPage.tsx
- * AI評価結果ページ - 23項目詳細、因子別スコア、総合コメント
+ * AI評価結果ページ - 23項目詳細、因子別スコア、recharts レーダーチャート
  */
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -17,6 +17,11 @@ import CheckCircleIcon    from "@mui/icons-material/CheckCircle";
 import InfoIcon           from "@mui/icons-material/Info";
 import StarIcon           from "@mui/icons-material/Star";
 import LightbulbIcon      from "@mui/icons-material/Lightbulb";
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, Legend, ReferenceLine,
+} from "recharts";
 import { useQuery }       from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { EvaluationItem } from "../types";
@@ -27,29 +32,29 @@ const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
 
 // 23項目のラベル
 const ITEM_LABELS: string[] = [
-  /* F1 1-7  */ "学習目標の明確化と板書",
-  "教材・教具の準備と活用",
-  "発問の質と配置",
-  "授業の流れと時間管理",
-  "ICT・視覚的資料の活用",
-  "個別最適化の工夫",
-  "評価活動の組み込み",
-  /* F2 8-13 */ "児童・生徒理解と支援",
-  "特別支援への配慮",
-  "多様な学習形態の活用",
-  "言葉かけ・フィードバック",
-  "学習意欲の引き出し",
-  "つまずきへの即時対応",
-  /* F3 14-19*/ "学級規律と生活指導",
-  "人間関係の構築支援",
-  "安全・安心な環境整備",
-  "健康観察と保健対応",
-  "学校行事・特別活動",
-  "保護者・地域連携",
-  /* F4 20-23*/ "授業後の省察の深さ",
-  "SMART目標の設定",
-  "指導技術の改善行動",
-  "継続的成長への意欲",
+  /* F1 1-7  */ "特別支援が必要な児童への適切な対応",
+  "母語が異なる児童への対応・指導",
+  "特別支援が必要な児童への対応理解",
+  "母語が異なる児童への対応理解",
+  "性別に関わる心理的・行動的差異の理解",
+  "社会的・文化的影響への理解",
+  "教科の特性に基づいた授業設計",
+  /* F2 8-13 */ "実習経験と教員としての仕事の関連付け",
+  "教育活動を評価する能力",
+  "積極的な価値・態度の実践",
+  "フィードバックの受容と活用",
+  "実践を振り返り専門的成長に責任を持つ",
+  "自己評価能力の維持",
+  /* F3 14-17*/ "学級運営と生徒指導",
+  "安全で効果的な学習環境の構築",
+  "学習における秩序と社会的に許容される行動の確立",
+  "個別対応と集団への関わり",
+  /* F4 18-23*/ "同僚としての役割認識",
+  "職責の遂行と専門的責任",
+  "学習困難の早期発見と対応",
+  "行動・学習特性の理解",
+  "知的発達段階の理解",
+  "発達と学習方法の理解",
 ];
 
 function ScoreChip({ score }: { score: number | null }) {
@@ -75,64 +80,6 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
         "& .MuiLinearProgress-bar": { bgcolor: color, borderRadius: 5 },
       }}
     />
-  );
-}
-
-// レーダーチャート（SVG実装）
-function RadarChart({ scores, size = 200 }: { scores: number[]; size?: number }) {
-  const cx = size / 2, cy = size / 2;
-  const r  = size * 0.38;
-  const n  = scores.length;
-  const points = scores.map((s, i) => {
-    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
-    const ratio = s / 5;
-    return { x: cx + r * ratio * Math.cos(angle), y: cy + r * ratio * Math.sin(angle) };
-  });
-  const gridLevels = [1,2,3,4,5];
-  const labels = ["授業設計", "学習支援", "学級経営", "省察"];
-  const labelRadius = r * 1.22;
-
-  return (
-    <svg width={size} height={size} style={{ display: "block", margin: "0 auto" }}>
-      {/* グリッド */}
-      {gridLevels.map((lv) => {
-        const pts = Array.from({ length: n }, (_, i) => {
-          const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
-          return `${cx + r * (lv/5) * Math.cos(angle)},${cy + r * (lv/5) * Math.sin(angle)}`;
-        });
-        return <polygon key={lv} points={pts.join(" ")} fill="none" stroke="#e0e0e0" strokeWidth={1} />;
-      })}
-      {/* 軸 */}
-      {Array.from({ length: n }, (_, i) => {
-        const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
-        return <line key={i} x1={cx} y1={cy} x2={cx + r * Math.cos(angle)} y2={cy + r * Math.sin(angle)} stroke="#bdbdbd" strokeWidth={1} />;
-      })}
-      {/* スコア領域 */}
-      <polygon
-        points={points.map((p) => `${p.x},${p.y}`).join(" ")}
-        fill="rgba(25,118,210,0.25)"
-        stroke="#1976d2"
-        strokeWidth={2}
-      />
-      {/* 点 */}
-      {points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={4} fill={FACTOR_COLORS[i]} />
-      ))}
-      {/* ラベル */}
-      {labels.map((lb, i) => {
-        const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
-        return (
-          <text key={i}
-            x={cx + labelRadius * Math.cos(angle)}
-            y={cy + labelRadius * Math.sin(angle)}
-            textAnchor="middle" dominantBaseline="central"
-            fontSize={11} fontWeight="bold" fill={FACTOR_COLORS[i]}
-          >
-            {lb}
-          </text>
-        );
-      })}
-    </svg>
   );
 }
 
@@ -222,12 +169,27 @@ export default function EvaluationResultPage() {
   if (isLoading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh"><CircularProgress /></Box>;
   if (isError || !result) return <Box p={3}><Alert severity="error">評価結果の取得に失敗しました。</Alert></Box>;
 
-  const factorScores = [
-    result.factor_scores.factor1,
-    result.factor_scores.factor2,
-    result.factor_scores.factor3,
-    result.factor_scores.factor4,
-  ];
+  const factorScores = FACTOR_KEYS.map((fk) => result.factor_scores[fk]);
+
+  // レーダーチャート用データ
+  const radarData = FACTOR_LABELS.map((label, i) => ({
+    factor: label.slice(0, 6),
+    スコア: factorScores[i],
+    基準値: 3.0,
+  }));
+
+  // 因子別バーチャート用データ
+  const barData = FACTOR_LABELS.map((label, i) => ({
+    name: label,
+    スコア: factorScores[i],
+  }));
+
+  // 23項目スコア棒グラフ用データ
+  const itemBarData = result.evaluation_items.map((item) => ({
+    name: `${item.item_number}`,
+    スコア: item.score ?? 0,
+    因子: item.factor,
+  }));
 
   return (
     <Box maxWidth={1000} mx="auto">
@@ -242,46 +204,60 @@ export default function EvaluationResultPage() {
 
       {/* サマリカード */}
       <Grid container spacing={2} mb={3}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ textAlign: "center", bgcolor: "#e3f2fd", p: 1 }}>
+        <Grid size={{ xs: 12, sm: 3 }}>
+          <Card sx={{ textAlign: "center", bgcolor: "#e3f2fd", height: "100%" }}>
             <CardContent>
               <Typography variant="h2" fontWeight="bold" color="primary">
                 {result.total_score.toFixed(2)}
               </Typography>
-              <Typography variant="body2" color="text.secondary">総合スコア / 5.0</Typography>
+              <Typography variant="body2" color="text.secondary" mb={1}>総合スコア / 5.0</Typography>
               <LinearProgress
                 variant="determinate"
                 value={(result.total_score / 5) * 100}
-                sx={{ mt: 1, height: 8, borderRadius: 4 }}
+                sx={{ height: 8, borderRadius: 4 }}
               />
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "#e8f5e9" }}>
-            <CardContent>
-              <Box display="flex" justifyContent="center" mb={1}>
-                <RadarChart scores={factorScores} size={180} />
+              <Box mt={1.5}>
+                <Typography variant="caption" color="text.secondary">
+                  評価項目数: {result.evaluated_item_count}
+                </Typography>
+                <br />
+                <Typography variant="caption" color="text.secondary">
+                  トークン: {result.tokens_used.toLocaleString()}
+                </Typography>
               </Box>
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "#f3e5f5" }}>
+        <Grid size={{ xs: 12, sm: 5 }}>
+          <Card sx={{ bgcolor: "#e8f5e9", height: "100%" }}>
             <CardContent>
+              <Typography variant="subtitle2" fontWeight="bold" mb={1} textAlign="center">因子別レーダー</Typography>
+              <ResponsiveContainer width="100%" height={200}>
+                <RadarChart data={radarData}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="factor" tick={{ fontSize: 11 }} />
+                  <Radar name="スコア" dataKey="スコア" stroke="#1976d2" fill="#1976d2" fillOpacity={0.35} />
+                  <Radar name="基準値" dataKey="基準値" stroke="#bdbdbd" fill="#bdbdbd" fillOpacity={0.15} strokeDasharray="4 2" />
+                  <Legend />
+                  <Tooltip />
+                </RadarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Card sx={{ bgcolor: "#f3e5f5", height: "100%" }}>
+            <CardContent>
+              <Typography variant="subtitle2" fontWeight="bold" mb={1.5}>因子別スコア</Typography>
               {FACTOR_KEYS.map((fk, i) => (
                 <Box key={fk} mb={1.5}>
                   <Box display="flex" justifyContent="space-between" mb={0.3}>
-                    <Typography variant="caption" fontWeight={600} color={FACTOR_COLORS[i]}>{FACTOR_LABELS[i]}</Typography>
-                    <Typography variant="caption" fontWeight="bold">{result.factor_scores[fk].toFixed(2)}</Typography>
+                    <Typography variant="caption" fontWeight={600} color={FACTOR_COLORS[i]}>{FACTOR_LABELS[i].slice(0, 6)}</Typography>
+                    <Typography variant="caption" fontWeight="bold">{result.factor_scores[fk].toFixed(2)}/5.0</Typography>
                   </Box>
                   <ScoreBar value={result.factor_scores[fk]} color={FACTOR_COLORS[i]} />
                 </Box>
               ))}
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="caption" color="text.secondary">
-                評価項目数: {result.evaluated_item_count} / トークン使用: {result.tokens_used.toLocaleString()}
-              </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -300,16 +276,18 @@ export default function EvaluationResultPage() {
         </CardContent>
       </Card>
 
-      {/* 評価項目詳細 */}
+      {/* タブ */}
       <Card>
         <CardContent>
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
             <Tab label="全項目" />
             {FACTOR_LABELS.map((l, i) => (
-              <Tab key={l} label={l} sx={{ color: FACTOR_COLORS[i], minWidth: 0 }} />
+              <Tab key={l} label={l.slice(0,4)} sx={{ color: FACTOR_COLORS[i], minWidth: 0, fontSize: 12 }} />
             ))}
+            <Tab label="グラフ" />
           </Tabs>
 
+          {/* 全項目 + 因子別 */}
           {[null, ...FACTOR_KEYS].map((fk, tabIdx) => {
             if (tab !== tabIdx) return null;
             const items = fk
@@ -343,6 +321,38 @@ export default function EvaluationResultPage() {
               </TableContainer>
             );
           })}
+
+          {/* グラフタブ */}
+          {tab === 5 && (
+            <Grid container spacing={3}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="subtitle2" fontWeight="bold" mb={1}>因子別スコア比較</Typography>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={barData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" domain={[0, 5]} ticks={[0,1,2,3,4,5]} />
+                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <ReferenceLine x={3} stroke="#e0e0e0" strokeDasharray="4 2" />
+                    <Bar dataKey="スコア" fill="#1976d2" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="subtitle2" fontWeight="bold" mb={1}>23項目スコア分布</Typography>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={itemBarData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} label={{ value: "項目番号", position: "insideBottom", offset: -2, fontSize: 11 }} />
+                    <YAxis domain={[0, 5]} ticks={[0,1,2,3,4,5]} />
+                    <Tooltip formatter={(v, n) => [v, "スコア"]} labelFormatter={(l) => `項目${l}: ${ITEM_LABELS[+l - 1] ?? ""}`} />
+                    <ReferenceLine y={3} stroke="#e0e0e0" strokeDasharray="4 2" />
+                    <Bar dataKey="スコア" fill="#1976d2" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Grid>
+            </Grid>
+          )}
         </CardContent>
       </Card>
     </Box>

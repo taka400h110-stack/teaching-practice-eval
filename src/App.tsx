@@ -39,6 +39,8 @@ const Spinner = () => (
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   if (!mockApi.isAuthenticated()) return <Navigate to="/login" replace />;
+  // 初回ログイン時はオンボーディングへリダイレクト
+  if (mockApi.requiresOnboarding()) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;
 }
 
