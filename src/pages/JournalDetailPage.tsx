@@ -1,29 +1,86 @@
 /**
  * src/pages/JournalDetailPage.tsx
- * 日誌詳細 — 時限ブロックは「教科」+「内容」のみ表示
+ * 実習日誌詳細 — 日誌本文 / AI評価レーダー / 23項目スコア / 成長曲線 / AIフィードバック
  */
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Collapse, Divider, Paper, Stack, Typography, IconButton,
+  Collapse, Divider, Grid, Paper, Stack, Typography, IconButton,
+  Accordion, AccordionSummary, AccordionDetails, LinearProgress,
+  Table, TableBody, TableCell, TableHead, TableRow,
 } from "@mui/material";
-import ArrowBackIcon   from "@mui/icons-material/ArrowBack";
-import EditIcon        from "@mui/icons-material/Edit";
-import AssessmentIcon  from "@mui/icons-material/Assessment";
-import MenuBookIcon    from "@mui/icons-material/MenuBook";
-import PsychologyIcon  from "@mui/icons-material/Psychology";
-import CommentIcon     from "@mui/icons-material/Comment";
-import SchoolIcon      from "@mui/icons-material/School";
-import AccessTimeIcon  from "@mui/icons-material/AccessTime";
-import ExpandMoreIcon  from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon  from "@mui/icons-material/ExpandLess";
-import TrackChangesIcon from "@mui/icons-material/TrackChanges";
-import { useQuery } from "@tanstack/react-query";
+import ArrowBackIcon      from "@mui/icons-material/ArrowBack";
+import EditIcon           from "@mui/icons-material/Edit";
+import AssessmentIcon     from "@mui/icons-material/Assessment";
+import MenuBookIcon       from "@mui/icons-material/MenuBook";
+import PsychologyIcon     from "@mui/icons-material/Psychology";
+import CommentIcon        from "@mui/icons-material/Comment";
+import SchoolIcon         from "@mui/icons-material/School";
+import AccessTimeIcon     from "@mui/icons-material/AccessTime";
+import ExpandMoreIcon     from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon     from "@mui/icons-material/ExpandLess";
+import TrackChangesIcon   from "@mui/icons-material/TrackChanges";
+import ShowChartIcon      from "@mui/icons-material/ShowChart";
+import SmartToyIcon       from "@mui/icons-material/SmartToy";
+import LightbulbIcon      from "@mui/icons-material/Lightbulb";
+import StarIcon           from "@mui/icons-material/Star";
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ReferenceLine,
+} from "recharts";
+import { useQuery }       from "@tanstack/react-query";
 import mockApi from "../api/client";
-import type { JournalEntry, JournalStatus, HourRecord } from "../types";
+import type { JournalEntry, JournalStatus, HourRecord, EvaluationResult, GrowthData } from "../types";
 
-// ── パーサ ──
+// ─────────────────────────────────────────────
+// 定数（論文確定版 4因子23項目）
+// ─────────────────────────────────────────────
+const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"] as const;
+const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"] as const;
+const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
+const FACTOR_ALPHA  = [0.87, 0.87, 0.91, 0.91] as const;
+
+// 23項目ラベル（rubric.tsと同一内容）
+const ITEM_LABELS = [
+  /* F1  1 */ "特別支援対応力（実践）",
+  /* F1  2 */ "外国語児童への指導実践",
+  /* F1  3 */ "特別支援対応力（理解）",
+  /* F1  4 */ "外国語児童への対応理解",
+  /* F1  5 */ "性差・多様性への理解",
+  /* F1  6 */ "文化的多様性への理解",
+  /* F1  7 */ "教科特性を踏まえた授業設計",
+  /* F2  8 */ "体験と成長の接続",
+  /* F2  9 */ "指導姿勢の検証能力",
+  /* F2 10 */ "模範的姿勢の実践",
+  /* F2 11 */ "フィードバック受容力",
+  /* F2 12 */ "実践省察と改善責任",
+  /* F2 13 */ "専門性向上のための自己評価",
+  /* F3 14 */ "生徒指導力",
+  /* F3 15 */ "学級管理能力",
+  /* F3 16 */ "リーダーシップ発揮",
+  /* F3 17 */ "児童の困難支援",
+  /* F4 18 */ "同僚の学習支援役割理解",
+  /* F4 19 */ "特別責任を有する同僚役割の理解",
+  /* F4 20 */ "人間関係・専門的期待への対応",
+  /* F4 21 */ "教師役割の多様性理解",
+  /* F4 22 */ "教師の権威の意味理解",
+  /* F4 23 */ "職業倫理と連帯責任",
+];
+
+// 項目→因子インデックスのマッピング
+function itemFactorIdx(itemNum: number): number {
+  if (itemNum <= 7)  return 0;
+  if (itemNum <= 13) return 1;
+  if (itemNum <= 17) return 2;
+  return 3;
+}
+
+// ─────────────────────────────────────────────
+// 時限ブロック用ユーティリティ
+// ─────────────────────────────────────────────
 function parseHourRecords(content: string): HourRecord[] | null {
   if (!content) return null;
   try {
@@ -35,7 +92,6 @@ function parseHourRecords(content: string): HourRecord[] | null {
   return null;
 }
 
-// ── 色 ──
 function blockAccent(label: string) {
   if (label.includes("朝")) return "#FF9800";
   if (label.includes("休み")) return "#4CAF50";
@@ -53,15 +109,46 @@ function blockBg(label: string) {
   return "#F5F5F5";
 }
 
-// ── 時限ブロック（教科＋内容のみ）──
+// ─────────────────────────────────────────────
+// スコアバー
+// ─────────────────────────────────────────────
+function ScoreBar({ value, color }: { value: number; color: string }) {
+  return (
+    <LinearProgress
+      variant="determinate"
+      value={(value / 5) * 100}
+      sx={{
+        height: 7, borderRadius: 4,
+        bgcolor: "grey.200",
+        "& .MuiLinearProgress-bar": { bgcolor: color, borderRadius: 4 },
+      }}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────
+// スコアチップ
+// ─────────────────────────────────────────────
+function ScoreChip({ score }: { score: number }) {
+  const color = score >= 4 ? "#2e7d32" : score >= 3 ? "#1565c0" : score >= 2 ? "#e65100" : "#c62828";
+  const bg    = score >= 4 ? "#e8f5e9" : score >= 3 ? "#e3f2fd" : score >= 2 ? "#fff3e0" : "#ffebee";
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", bgcolor: bg, border: `2px solid ${color}`, fontWeight: "bold", fontSize: 14, color }}>
+      {score.toFixed(1)}
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────
+// 時限ブロック
+// ─────────────────────────────────────────────
 function HourBlockView({ rec, index }: { rec: HourRecord; index: number }) {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = useState(true);
   const accent = blockAccent(rec.time_label);
   const bg     = blockBg(rec.time_label);
 
   return (
     <Card sx={{ mb: 2, borderLeft: `5px solid ${accent}`, bgcolor: bg }}>
-      {/* ヘッダー：コマ名・時刻・教科 */}
       <Box
         sx={{ display: "flex", alignItems: "center", gap: 1, px: 2, py: 1, cursor: "pointer", borderBottom: open ? "1px solid" : "none", borderColor: "divider" }}
         onClick={() => setOpen((v) => !v)}
@@ -73,36 +160,31 @@ function HourBlockView({ rec, index }: { rec: HourRecord; index: number }) {
         {(rec.time_start || rec.time_end) && (
           <Chip icon={<AccessTimeIcon style={{ fontSize: 12 }} />} label={`${rec.time_start}〜${rec.time_end}`} size="small" variant="outlined" sx={{ fontSize: 11, height: 20 }} />
         )}
-        {rec.subject && (
-          <Chip label={rec.subject} size="small" color="primary" variant="outlined" sx={{ fontSize: 11, height: 20 }} />
-        )}
+        {rec.subject && <Chip label={rec.subject} size="small" color="primary" variant="outlined" sx={{ fontSize: 11, height: 20 }} />}
         <Box sx={{ ml: "auto" }}>
           <IconButton size="small">{open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
         </Box>
       </Box>
-
-      {/* 内容のみ */}
       <Collapse in={open}>
         <CardContent sx={{ pt: 1.5, pb: "12px !important" }}>
-          {rec.body ? (
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.9 }}>{rec.body}</Typography>
-          ) : (
-            <Typography variant="body2" color="text.disabled">（記録なし）</Typography>
-          )}
+          {rec.body
+            ? <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.9 }}>{rec.body}</Typography>
+            : <Typography variant="body2" color="text.disabled">（記録なし）</Typography>}
         </CardContent>
       </Collapse>
     </Card>
   );
 }
 
-// ── ステータス ──
+// ─────────────────────────────────────────────
+// セクションラッパー
+// ─────────────────────────────────────────────
 const STATUS_CONFIG: Record<JournalStatus, { label: string; color: "default" | "primary" | "success" }> = {
-  draft:     { label: "下書き",   color: "default"  },
-  submitted: { label: "提出済み", color: "primary"  },
-  evaluated: { label: "評価済み", color: "success"  },
+  draft:     { label: "下書き",   color: "default" },
+  submitted: { label: "提出済み", color: "primary" },
+  evaluated: { label: "評価済み", color: "success" },
 };
 
-// ── セクション ──
 interface SectionProps { icon: React.ReactNode; title: string; color?: string; bgcolor?: string; borderColor?: string; children: React.ReactNode; }
 const Section: React.FC<SectionProps> = ({ icon, title, color = "text.primary", bgcolor = "grey.50", borderColor, children }) => (
   <Card sx={{ mb: 2.5, ...(borderColor ? { border: "1.5px solid", borderColor } : {}) }}>
@@ -116,43 +198,368 @@ const Section: React.FC<SectionProps> = ({ icon, title, color = "text.primary", 
     </CardContent>
   </Card>
 );
-
 const BodyText: React.FC<{ text?: string | null; fallback?: string }> = ({ text, fallback = "（記述なし）" }) => (
   <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 2 }}>{text?.trim() || fallback}</Typography>
 );
 
-// ── クエリ ──
+// ─────────────────────────────────────────────
+// AI評価パネル（レーダー + 項目スコア + 成長曲線 + フィードバック）
+// ─────────────────────────────────────────────
+interface EvalPanelProps {
+  evalData: EvaluationResult;
+  growthData: GrowthData | undefined;
+  weekNumber: number;
+}
+
+const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekNumber }) => {
+  const fs = evalData.factor_scores;
+
+  // レーダーチャート用データ
+  const radarData = FACTOR_LABELS.map((label, i) => ({
+    factor: label,
+    score:  fs[FACTOR_KEYS[i]],
+    fullMark: 5,
+  }));
+
+  // 成長曲線（現在の週まで）
+  const growthUntilNow = (growthData?.weekly_scores ?? []).filter((w) => w.week <= weekNumber);
+
+  // 因子別にitem群を分割
+  const factorGroups: Record<string, typeof evalData.evaluation_items> = { factor1: [], factor2: [], factor3: [], factor4: [] };
+  evalData.evaluation_items.forEach((item) => {
+    const key = item.factor as keyof typeof factorGroups;
+    if (factorGroups[key]) factorGroups[key].push(item);
+  });
+
+  return (
+    <Box>
+      {/* ─── ① レーダーチャート ─── */}
+      <Card sx={{ mb: 2.5, border: "1.5px solid #1976d2" }}>
+        <CardContent>
+          <Box display="flex" alignItems="center" gap={1} mb={1}>
+            <AssessmentIcon sx={{ color: "#1976d2" }} />
+            <Typography variant="subtitle1" fontWeight="bold" color="#1565c0">AI評価 — 因子別レーダーチャート</Typography>
+            <Box ml="auto">
+              <Chip label={`総合: ${evalData.total_score.toFixed(2)} / 5.0`} size="small" color="primary" />
+            </Box>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <Grid container spacing={2}>
+            {/* レーダー */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <ResponsiveContainer width="100%" height={280}>
+                <RadarChart data={radarData} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
+                  <PolarGrid />
+                  <PolarAngleAxis
+                    dataKey="factor"
+                    tick={{ fontSize: 11, fill: "#333" }}
+                    tickFormatter={(v: string) => v.length > 8 ? v.slice(0, 8) + "…" : v}
+                  />
+                  <PolarRadiusAxis domain={[0, 5]} tickCount={6} tick={{ fontSize: 9 }} />
+                  <Radar name="スコア" dataKey="score" stroke="#1976d2" fill="#1976d2" fillOpacity={0.35} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </Grid>
+            {/* 因子別バー */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box sx={{ pt: 1 }}>
+                {FACTOR_KEYS.map((key, i) => (
+                  <Box key={key} mb={2}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                      <Box display="flex" alignItems="center" gap={0.5}>
+                        <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: FACTOR_COLORS[i], flexShrink: 0 }} />
+                        <Typography variant="body2" fontWeight={600} sx={{ fontSize: 12 }}>
+                          {FACTOR_LABELS[i]}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          (α={FACTOR_ALPHA[i]})
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" fontWeight="bold" color={FACTOR_COLORS[i]}>
+                        {fs[key].toFixed(2)} / 5.0
+                      </Typography>
+                    </Box>
+                    <ScoreBar value={fs[key]} color={FACTOR_COLORS[i]} />
+                  </Box>
+                ))}
+              </Box>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* ─── ② 23項目スコア（因子別アコーディオン）─── */}
+      <Card sx={{ mb: 2.5 }}>
+        <CardContent>
+          <Box display="flex" alignItems="center" gap={1} mb={1}>
+            <StarIcon sx={{ color: "#f57c00" }} />
+            <Typography variant="subtitle1" fontWeight="bold">AI評価 — 23項目得点（因子別）</Typography>
+          </Box>
+          <Divider sx={{ mb: 1.5 }} />
+          {FACTOR_KEYS.map((key, fi) => {
+            const items = factorGroups[key];
+            const avg   = items.length > 0 ? items.reduce((s, it) => s + it.score, 0) / items.length : 0;
+            return (
+              <Accordion key={key} disableGutters sx={{ mb: 1, border: `1px solid ${FACTOR_COLORS[fi]}30`, borderRadius: "8px !important", "&:before": { display: "none" } }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: `${FACTOR_COLORS[fi]}08`, borderRadius: 2 }}>
+                  <Box display="flex" alignItems="center" gap={1} width="100%">
+                    <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: FACTOR_COLORS[fi], flexShrink: 0 }} />
+                    <Typography variant="body2" fontWeight={700} color={FACTOR_COLORS[fi]}>
+                      因子{["Ⅰ","Ⅱ","Ⅲ","Ⅳ"][fi]}　{FACTOR_LABELS[fi]}
+                    </Typography>
+                    <Chip label={`平均 ${avg.toFixed(2)}`} size="small" sx={{ ml: "auto", mr: 1, bgcolor: `${FACTOR_COLORS[fi]}20`, color: FACTOR_COLORS[fi], fontWeight: "bold" }} />
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails sx={{ p: 0 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: "grey.50" }}>
+                        <TableCell sx={{ width: 40, fontWeight: 700, fontSize: 11 }}>#</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>評価項目</TableCell>
+                        <TableCell sx={{ width: 60, fontWeight: 700, fontSize: 11, textAlign: "center" }}>得点</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>エビデンス・フィードバック</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {items.map((item) => {
+                        const itemLabel = ITEM_LABELS[item.item_number - 1] ?? `項目${item.item_number}`;
+                        const scoreColor = FACTOR_COLORS[fi];
+                        return (
+                          <TableRow key={item.item_number} sx={{ "&:hover": { bgcolor: `${scoreColor}05` } }}>
+                            <TableCell sx={{ fontSize: 11, color: "text.secondary", fontWeight: 600 }}>
+                              {item.item_number}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: 12 }}>{itemLabel}</TableCell>
+                            <TableCell sx={{ textAlign: "center" }}>
+                              <ScoreChip score={item.score} />
+                            </TableCell>
+                            <TableCell sx={{ fontSize: 11 }}>
+                              {item.evidence && (
+                                <Box mb={0.5}>
+                                  <Typography variant="caption" color="text.secondary" fontWeight={600}>根拠：</Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                                    {item.evidence}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {item.feedback && (
+                                <Box mb={0.5}>
+                                  <Typography variant="caption" color="text.secondary" fontWeight={600}>評価：</Typography>
+                                  <Typography variant="caption">{item.feedback}</Typography>
+                                </Box>
+                              )}
+                              {item.next_level_advice && (
+                                <Box>
+                                  <Typography variant="caption" color="primary" fontWeight={600}>次のステップ：</Typography>
+                                  <Typography variant="caption" color="primary">{item.next_level_advice}</Typography>
+                                </Box>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </AccordionDetails>
+              </Accordion>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* ─── ③ この日誌までの成長曲線 ─── */}
+      {growthUntilNow.length > 1 && (
+        <Card sx={{ mb: 2.5, border: "1.5px solid #388e3c" }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" gap={1} mb={1}>
+              <ShowChartIcon sx={{ color: "#388e3c" }} />
+              <Typography variant="subtitle1" fontWeight="bold" color="#2e7d32">
+                成長曲線（Week 1 〜 Week {weekNumber}）
+              </Typography>
+              <Chip
+                label={`今週 総合 ${growthUntilNow.at(-1)?.total.toFixed(2) ?? "—"}`}
+                size="small"
+                sx={{ ml: "auto", bgcolor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold" }}
+              />
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={growthUntilNow} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis dataKey="week" tickFormatter={(v: number) => `W${v}`} tick={{ fontSize: 11 }} />
+                <YAxis domain={[1, 5]} tickCount={5} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  formatter={(val: number, name: string) => [val.toFixed(2), name]}
+                  labelFormatter={(l: number) => `Week ${l}`}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <ReferenceLine y={weekNumber > 0 ? evalData.total_score : undefined} stroke="#888" strokeDasharray="4 2" />
+                {FACTOR_KEYS.map((key, i) => (
+                  <Line
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    name={FACTOR_LABELS[i]}
+                    stroke={FACTOR_COLORS[i]}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                ))}
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  name="総合"
+                  stroke="#333"
+                  strokeWidth={2.5}
+                  strokeDasharray="6 2"
+                  dot={{ r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, textAlign: "right" }}>
+              点線: 現週の総合スコア基準線
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── ④ AIフィードバック（総合コメント） ─── */}
+      <Card sx={{ mb: 2.5, border: "1.5px solid #7b1fa2" }}>
+        <CardContent>
+          <Box display="flex" alignItems="center" gap={1} mb={1}>
+            <SmartToyIcon sx={{ color: "#7b1fa2" }} />
+            <Typography variant="subtitle1" fontWeight="bold" color="#6a1b9a">AIフィードバック（総合）</Typography>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <Paper variant="outlined" sx={{ p: 2.5, bgcolor: "#f3e5f5", borderRadius: 2, mb: 2 }}>
+            <Box display="flex" alignItems="flex-start" gap={1}>
+              <LightbulbIcon sx={{ color: "#7b1fa2", mt: 0.3, flexShrink: 0 }} />
+              <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 2 }}>
+                {evalData.overall_comment}
+              </Typography>
+            </Box>
+          </Paper>
+
+          {/* 改善提案サマリ（上位3項目） */}
+          <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: "block", mb: 1 }}>
+            次のステップ（得点の低い項目より）
+          </Typography>
+          {evalData.evaluation_items
+            .slice()
+            .sort((a, b) => a.score - b.score)
+            .slice(0, 3)
+            .map((item, rank) => {
+              const fi = itemFactorIdx(item.item_number);
+              return (
+                <Paper
+                  key={item.item_number}
+                  variant="outlined"
+                  sx={{ p: 1.5, mb: 1, borderLeft: `4px solid ${FACTOR_COLORS[fi]}`, bgcolor: "white" }}
+                >
+                  <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                    <Chip
+                      label={`${rank + 1}位 項目${item.item_number}`}
+                      size="small"
+                      sx={{ bgcolor: `${FACTOR_COLORS[fi]}20`, color: FACTOR_COLORS[fi], fontWeight: 700, fontSize: 10 }}
+                    />
+                    <Typography variant="caption" fontWeight={700}>{ITEM_LABELS[item.item_number - 1]}</Typography>
+                    <ScoreChip score={item.score} />
+                  </Box>
+                  {item.next_level_advice && (
+                    <Typography variant="caption" color="primary">
+                      → {item.next_level_advice}
+                    </Typography>
+                  )}
+                </Paper>
+              );
+            })}
+
+          <Box mt={1.5} display="flex" justifyContent="flex-end">
+            <Typography variant="caption" color="text.disabled">
+              評価項目数: {evalData.evaluated_item_count} / 23　トークン使用量: {evalData.tokens_used?.toLocaleString() ?? "—"}
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+};
+
+// ─────────────────────────────────────────────
+// クエリフック
+// ─────────────────────────────────────────────
 const useJournalQuery = (id: string) => useQuery<JournalEntry>({
   queryKey: ["journal", id],
   queryFn:  () => mockApi.getJournal(id) as Promise<JournalEntry>,
   enabled:  !!id,
 });
 
-// ── メイン ──
+// ─────────────────────────────────────────────
+// メインコンポーネント
+// ─────────────────────────────────────────────
 const JournalDetailPage: React.FC = () => {
   const { journalId } = useParams<{ journalId: string }>();
   const navigate = useNavigate();
+
   const { data: journal, isLoading, isError } = useJournalQuery(journalId ?? "");
 
-  if (isLoading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh"><CircularProgress /></Box>;
-  if (isError || !journal) return <Box p={3}><Alert severity="error">日誌の取得に失敗しました。</Alert></Box>;
+  const { data: evalData } = useQuery<EvaluationResult>({
+    queryKey: ["evaluation", journalId],
+    queryFn:  () => mockApi.getEvaluation(journalId ?? ""),
+    enabled:  !!journalId && journal?.status === "evaluated",
+  });
+
+  const { data: growthData } = useQuery<GrowthData>({
+    queryKey: ["growth"],
+    queryFn:  () => mockApi.getGrowthData(),
+    enabled:  !!journalId,
+  });
+
+  if (isLoading) return (
+    <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+      <CircularProgress />
+    </Box>
+  );
+  if (isError || !journal) return (
+    <Box p={3}><Alert severity="error">日誌の取得に失敗しました。</Alert></Box>
+  );
 
   const statusConfig = STATUS_CONFIG[journal.status];
-  const formattedDate = new Date(journal.entry_date).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
-  const hourRecords   = parseHourRecords(journal.content);
-  const isNewFormat   = hourRecords !== null;
+  const formattedDate = new Date(journal.entry_date).toLocaleDateString("ja-JP", {
+    year: "numeric", month: "long", day: "numeric", weekday: "long",
+  });
+  const hourRecords = parseHourRecords(journal.content);
+  const isNewFormat = hourRecords !== null;
 
   return (
-    <Box p={0} maxWidth={960} mx="auto">
+    <Box maxWidth={960} mx="auto">
       {/* ヘッダーボタン */}
       <Box display="flex" alignItems="center" gap={1} mb={3}>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/journals")} variant="outlined" size="small">一覧に戻る</Button>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/journals")} variant="outlined" size="small">
+          一覧に戻る
+        </Button>
         <Box flex={1} />
         {journal.status !== "evaluated" && (
-          <Button startIcon={<EditIcon />} variant="outlined" color="secondary" size="small" onClick={() => navigate(`/journals/${journal.id}/edit`)}>編集</Button>
+          <Button
+            startIcon={<EditIcon />}
+            variant="outlined"
+            color="secondary"
+            size="small"
+            onClick={() => navigate(`/journals/${journal.id}/edit`)}
+          >
+            編集
+          </Button>
         )}
         {journal.status === "evaluated" && (
-          <Button startIcon={<AssessmentIcon />} variant="contained" size="small" onClick={() => navigate(`/evaluations/${journal.id}`)}>AI評価結果を見る</Button>
+          <Button
+            startIcon={<AssessmentIcon />}
+            variant="contained"
+            size="small"
+            onClick={() => navigate(`/evaluations/${journal.id}`)}
+          >
+            評価詳細ページへ
+          </Button>
         )}
       </Box>
 
@@ -171,10 +578,10 @@ const JournalDetailPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* 時限別記録（新形式）*/}
-      {isNewFormat && (
-        <Box sx={{ mb: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+      {/* ════ 日誌本文 ════ */}
+      {isNewFormat ? (
+        <Box mb={2}>
+          <Box display="flex" alignItems="center" gap={1} mb={1.5}>
             <MenuBookIcon sx={{ color: "text.secondary" }} />
             <Typography variant="subtitle1" fontWeight="bold">時限別記録</Typography>
             <Chip label={`${hourRecords!.length} コマ`} size="small" color="primary" variant="outlined" />
@@ -182,16 +589,12 @@ const JournalDetailPage: React.FC = () => {
           </Box>
           {hourRecords!.map((rec, idx) => <HourBlockView key={rec.id} rec={rec} index={idx} />)}
         </Box>
-      )}
-
-      {/* 授業記録（旧形式）*/}
-      {!isNewFormat && (
+      ) : (
         <Section icon={<MenuBookIcon />} title="授業記録">
           <BodyText text={journal.content} />
         </Section>
       )}
 
-      {/* 授業目標（旧形式のみ）*/}
       {!isNewFormat && journal.lesson_goal && (
         <Section icon={<TrackChangesIcon />} title="授業目標" color="primary.main" bgcolor="#E3F2FD" borderColor="primary.light">
           <BodyText text={journal.lesson_goal} />
@@ -202,7 +605,9 @@ const JournalDetailPage: React.FC = () => {
       <Section icon={<PsychologyIcon />} title="省察・振り返り" color="secondary.main" bgcolor="#F3E5F5" borderColor="#CE93D8">
         <BodyText text={journal.reflection_text} fallback="（省察テキストなし）" />
         {journal.reflection_text && (
-          <Typography variant="caption" color="text.disabled" display="block" textAlign="right" mt={1}>{journal.reflection_text.length} 文字</Typography>
+          <Typography variant="caption" color="text.disabled" display="block" textAlign="right" mt={1}>
+            {journal.reflection_text.length} 文字
+          </Typography>
         )}
       </Section>
 
@@ -219,6 +624,34 @@ const JournalDetailPage: React.FC = () => {
           <BodyText text={journal.teacher_comment} />
         </Section>
       )}
+
+      {/* ════ AI評価セクション（評価済み日誌のみ）════ */}
+      {journal.status === "evaluated" && evalData ? (
+        <Box>
+          <Divider sx={{ my: 3 }}>
+            <Chip
+              icon={<SmartToyIcon />}
+              label="AI評価結果"
+              sx={{ bgcolor: "#1a237e", color: "white", fontWeight: "bold", px: 1 }}
+            />
+          </Divider>
+          <EvaluationPanel
+            evalData={evalData}
+            growthData={growthData}
+            weekNumber={journal.week_number}
+          />
+        </Box>
+      ) : journal.status !== "evaluated" ? (
+        <Paper
+          variant="outlined"
+          sx={{ p: 3, textAlign: "center", bgcolor: "grey.50", borderRadius: 2, mt: 2, mb: 3 }}
+        >
+          <AssessmentIcon sx={{ fontSize: 40, color: "grey.400", mb: 1, display: "block", mx: "auto" }} />
+          <Typography variant="body2" color="text.secondary">
+            AI評価はまだ実行されていません。提出後に自動評価が行われます。
+          </Typography>
+        </Paper>
+      ) : null}
     </Box>
   );
 };

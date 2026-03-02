@@ -32,13 +32,13 @@ const ITEMS = [
   { num: 14, factor: "F3", label: "学級運営と生徒指導" },
   { num: 15, factor: "F3", label: "安全で効果的な学習環境の構築" },
   { num: 16, factor: "F3", label: "秩序と社会的規範の確立" },
-  { num: 17, factor: "F3", label: "参加・動機・自律性の促進" },
-  { num: 18, factor: "F3", label: "社会情動的発達の支援" },
-  { num: 19, factor: "F3", label: "個別ケアと尊重" },
-  { num: 20, factor: "F4", label: "学習困難の早期発見" },
-  { num: 21, factor: "F4", label: "行動・学習特性の理解" },
-  { num: 22, factor: "F4", label: "知的発達段階の理解" },
-  { num: 23, factor: "F4", label: "発達と学習方法の理解" },
+  { num: 17, factor: "F3", label: "児童の困難支援" },
+  { num: 18, factor: "F4", label: "同僚の学習支援役割理解" },
+  { num: 19, factor: "F4", label: "特別責任を有する同僚役割の理解" },
+  { num: 20, factor: "F4", label: "人間関係・専門的期待への対応" },
+  { num: 21, factor: "F4", label: "教師役割の多様性理解" },
+  { num: 22, factor: "F4", label: "教師の権威の意味理解" },
+  { num: 23, factor: "F4", label: "職業倫理と連帯責任" },
 ];
 
 // モック人間評価データ生成
@@ -53,7 +53,7 @@ function genHumanScores() {
 const compData = genHumanScores();
 
 const factorLabels: Record<string, string> = {
-  F1: "指導技術", F2: "自己評価", F3: "学級経営", F4: "学習者理解",
+  F1: "児童生徒への指導力", F2: "自己評価力", F3: "学級経営力", F4: "職務を理解して行動する力",
 };
 
 // 因子別平均

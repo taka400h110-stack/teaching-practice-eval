@@ -17,7 +17,7 @@ const FACTOR_COLORS = {
   factor1: "#1976d2", factor2: "#43a047", factor3: "#fb8c00", factor4: "#8e24aa",
 };
 const FACTOR_LABELS = {
-  factor1: "指導技術(F1)", factor2: "自己評価(F2)", factor3: "学級経営(F3)", factor4: "学習者理解(F4)",
+  factor1: "児童生徒への指導力", factor2: "自己評価力", factor3: "学級経営力", factor4: "職務を理解して行動する力",
 };
 
 // モック縦断統計（週別グループ平均 + SD）

@@ -14,9 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import mockApi from "../api/client";
 
 const COLORS = ["#1976d2", "#43a047", "#fb8c00", "#8e24aa", "#e53935"];
-const FACTOR_LABELS = [
-  "指導技術(F1)", "自己評価(F2)", "学級経営(F3)", "学習者理解(F4)",
-];
+const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
 
 interface TabPanelProps { children: React.ReactNode; value: number; index: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) =>

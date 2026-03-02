@@ -22,7 +22,7 @@ import { useQuery }    from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { JournalEntry, WeeklyScore } from "../types";
 
-const FACTOR_LABELS = ["授業設計", "学習支援", "学級経営", "省察・成長"];
+const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
 const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"];
 
 function ScoreBar({ value, max = 5, color }: { value: number; max?: number; color: string }) {
