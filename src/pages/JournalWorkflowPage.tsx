@@ -814,7 +814,7 @@ export default function JournalWorkflowPage() {
 
                 {/* 因子別詳細 */}
                 {FACTOR_KEYS.map((key, fi) => {
-                  const items = evalData.items.filter((it) => it.factor === fi + 1);
+                  const items = (evalData.evaluation_items ?? []).filter((it) => it.factor === FACTOR_KEYS[fi]);
                   if (items.length === 0) return null;
                   return (
                     <Accordion key={key} sx={{ mb: 1 }}>
@@ -830,10 +830,10 @@ export default function JournalWorkflowPage() {
                         {items.slice(0, 4).map((it) => (
                           <Box key={it.item_number} sx={{ mb: 1 }}>
                             <Box display="flex" justifyContent="space-between" mb={0.3}>
-                              <Typography variant="caption" color="text.secondary">{it.item_number}. {it.item_label}</Typography>
-                              <Typography variant="caption" fontWeight="bold">{it.score}/4</Typography>
+                              <Typography variant="caption" color="text.secondary">{it.item_number}. {it.feedback?.slice(0, 30) ?? `項目${it.item_number}`}</Typography>
+                              <Typography variant="caption" fontWeight="bold">{(it.score ?? 0).toFixed(1)}/4</Typography>
                             </Box>
-                            <LinearProgress variant="determinate" value={(it.score / 4) * 100}
+                            <LinearProgress variant="determinate" value={((it.score ?? 0) / 4) * 100}
                               sx={{ height: 6, borderRadius: 3, bgcolor: "grey.200",
                                 "& .MuiLinearProgress-bar": { bgcolor: FACTOR_COLORS[fi] } }} />
                             {it.feedback && (
@@ -898,9 +898,9 @@ export default function JournalWorkflowPage() {
                       size="small" sx={{ bgcolor: FACTOR_COLORS[i] + "20", color: FACTOR_COLORS[i], fontSize: 10, height: 20 }} />
                   ))}
                 </Box>
-                {evalData.advice && (
+                {evalData.overall_comment && (
                   <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                    💡 {evalData.advice}
+                    💡 {evalData.overall_comment.slice(0, 80)}…
                   </Typography>
                 )}
               </Paper>
