@@ -4,14 +4,17 @@
  * ルーブリック4因子23項目に基づく対話支援
  */
 import React, { useState, useRef, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Box, Button, Card, Chip, CircularProgress, Divider,
   IconButton, Paper, TextField, Typography, Avatar, Tooltip,
   LinearProgress, Accordion, AccordionSummary, AccordionDetails,
-  Alert,
+  Alert, Dialog, DialogTitle, DialogContent, List, ListItem,
+  ListItemButton, ListItemText, ListItemIcon, Badge,
 } from "@mui/material";
 import ChatIcon           from "@mui/icons-material/Chat";
+import HistoryIcon        from "@mui/icons-material/History";
+import MenuBookIcon       from "@mui/icons-material/MenuBook";
 import SendIcon           from "@mui/icons-material/Send";
 import SmartToyIcon       from "@mui/icons-material/SmartToy";
 import PersonIcon         from "@mui/icons-material/Person";
@@ -203,19 +206,38 @@ function MessageBubble({ msg, rdLevel }: { msg: ChatMessage; rdLevel?: number })
 // メインコンポーネント
 // ────────────────────────────────────────────
 export default function ChatBotPage() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const journalId = params.get("journalId") ?? "journal-004";
   const [messages, setMessages]    = useState<ChatMessage[]>([]);
   const [rdHistory, setRdHistory]  = useState<number[]>([]);
   const [input, setInput]          = useState("");
   const [loading, setLoading]      = useState(false);
   const [showRubric, setShowRubric] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: session } = useQuery({
     queryKey: ["chat", journalId],
     queryFn:  () => mockApi.getChatSession(journalId),
   });
+
+  // 全チャットセッション一覧
+  const { data: allSessions = [] } = useQuery({
+    queryKey: ["allChatSessions"],
+    queryFn:  () => (mockApi as unknown as { getAllChatSessions: () => Promise<import("../types").ChatSession[]> }).getAllChatSessions(),
+  });
+
+  // 日誌一覧（セッションに対応する日誌タイトルを表示するため）
+  const { data: allJournals = [] } = useQuery({
+    queryKey: ["journals"],
+    queryFn:  () => mockApi.getJournals(),
+  });
+
+  useEffect(() => {
+    setMessages([]);
+    setRdHistory([]);
+  }, [journalId]);
 
   useEffect(() => {
     if (session && messages.length === 0) {
@@ -226,6 +248,12 @@ export default function ChatBotPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 過去セッション切り替え
+  const switchSession = (jId: string) => {
+    setParams({ journalId: jId });
+    setHistoryOpen(false);
+  };
 
   const sendMessage = async (text?: string) => {
     const content = text ?? input.trim();
@@ -284,6 +312,19 @@ export default function ChatBotPage() {
         <Typography variant="h5" fontWeight="bold">省察支援チャットBot</Typography>
         <Chip label={phaseCfg.label} size="small" color={phaseCfg.color}
           icon={<AutoAwesomeIcon sx={{ fontSize: "14px !important" }} />} />
+        {/* 現在の日誌 */}
+        {(() => {
+          const j = allJournals.find((j) => j.id === journalId);
+          return j ? (
+            <Chip
+              icon={<MenuBookIcon sx={{ fontSize: "14px !important" }} />}
+              label={`Week ${j.week_number}: ${j.title.slice(0, 20)}...`}
+              size="small"
+              variant="outlined"
+              color="primary"
+            />
+          ) : null;
+        })()}
         {avgRd !== "-" && (
           <Chip
             label={`省察深さ: RD-${avgRd}`}
@@ -293,6 +334,13 @@ export default function ChatBotPage() {
           />
         )}
         <Box ml="auto" display="flex" gap={0.5}>
+          <Tooltip title="チャット履歴">
+            <Badge badgeContent={allSessions.length} color="primary" max={99}>
+              <IconButton size="small" color="primary" onClick={() => setHistoryOpen(true)}>
+                <HistoryIcon fontSize="small" />
+              </IconButton>
+            </Badge>
+          </Tooltip>
           <Tooltip title="ルーブリック参照">
             <IconButton size="small" onClick={() => setShowRubric((p) => !p)} color={showRubric ? "primary" : "default"}>
               <TrackChangesIcon fontSize="small" />
@@ -305,6 +353,66 @@ export default function ChatBotPage() {
           </Tooltip>
         </Box>
       </Box>
+
+      {/* 過去チャット履歴ダイアログ */}
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <HistoryIcon color="primary" />
+            <Typography fontWeight="bold">チャット履歴</Typography>
+            <Chip label={`${allSessions.length}件`} size="small" color="primary" sx={{ ml: "auto" }} />
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {allSessions.length === 0 ? (
+            <Box p={3} textAlign="center">
+              <Typography color="text.secondary">チャット履歴がありません</Typography>
+            </Box>
+          ) : (
+            <List dense>
+              {allSessions.map((s) => {
+                const j = allJournals.find((j) => j.id === s.journal_id);
+                const lastMsg = s.messages[s.messages.length - 1];
+                const isActive = s.journal_id === journalId;
+                return (
+                  <ListItem key={s.id} disablePadding sx={{ borderLeft: isActive ? "3px solid #1976d2" : "3px solid transparent" }}>
+                    <ListItemButton onClick={() => switchSession(s.journal_id)} selected={isActive}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <ChatIcon sx={{ color: isActive ? "#1976d2" : "text.secondary", fontSize: 20 }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Typography variant="body2" fontWeight={isActive ? "bold" : "normal"}>
+                              {j ? `Week ${j.week_number}: ${j.title.slice(0, 25)}` : s.journal_id}
+                            </Typography>
+                            {isActive && <Chip label="現在" size="small" color="primary" sx={{ height: 16, fontSize: 10 }} />}
+                          </Box>
+                        }
+                        secondary={
+                          <Typography variant="caption" color="text.secondary" noWrap>
+                            {lastMsg ? lastMsg.content.slice(0, 60) + "..." : "メッセージなし"} ・ {s.messages.length}件
+                          </Typography>
+                        }
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                );
+              })}
+            </List>
+          )}
+          <Box p={1.5} borderTop="1px solid" borderColor="divider">
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<MenuBookIcon />}
+              onClick={() => { setHistoryOpen(false); navigate("/journals"); }}
+            >
+              日誌一覧から選ぶ
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
 
       {/* CoTシステム説明 */}
       <Alert severity="info" sx={{ mb: 1, py: 0.5 }} icon={<AutoAwesomeIcon />}>

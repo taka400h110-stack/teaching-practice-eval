@@ -624,7 +624,17 @@ const JournalDetailPage: React.FC = () => {
         </Box>
       ) : (
         <Section icon={<MenuBookIcon />} title="授業記録">
-          <BodyText text={journal.content} />
+          {/* contentがJSON形式の場合は内部のreflectionを表示、それ以外はそのまま */}
+          <BodyText text={(() => {
+            try {
+              const p = JSON.parse(journal.content);
+              // version:2形式だがrecordsが空の場合
+              if (p.version === 2) return p.reflection || journal.reflection_text || null;
+              return journal.content;
+            } catch {
+              return journal.content;
+            }
+          })()} />
         </Section>
       )}
 

@@ -442,6 +442,16 @@ const mockApi = {
   },
 
   // ── チャット ──
+  // 全チャットセッション一覧（journal-004のデモセッション含む）
+  getAllChatSessions: async (): Promise<ChatSession[]> => {
+    await delay();
+    const sessions = getChatSessions();
+    // journal-004 のデモセッションがない場合は追加
+    if (!sessions["journal-004"]) {
+      sessions["journal-004"] = { ...MOCK_CHAT_SESSION, journal_id: "journal-004" };
+    }
+    return Object.values(sessions).filter((s) => s.messages.length > 0);
+  },
   getChatSession: async (journalId: string): Promise<ChatSession> => {
     await delay();
     const sessions = getChatSessions();

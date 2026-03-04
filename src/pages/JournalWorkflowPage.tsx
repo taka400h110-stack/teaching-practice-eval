@@ -358,7 +358,7 @@ export default function JournalWorkflowPage() {
     queryFn:  () => mockApi.getChatSession(savedJournalId ?? "journal-004"),
   });
 
-  // 既存データ復元
+  // 既存データ復元（URLパラメータで日誌を開いた時）
   useEffect(() => {
     if (!existing) return;
     const { records: recs, reflection: ref } = contentToRecords(existing.content);
@@ -366,6 +366,9 @@ export default function JournalWorkflowPage() {
     setReflection(existing.reflection_text || ref);
     setEntryDate(existing.entry_date);
     setWeekNumber(existing.week_number ?? 1);
+    // 評価済みの場合はAI評価タブ、提出済みの場合は日誌タブを表示
+    if (existing.status === "evaluated") setStep(1);
+    else if (existing.status === "submitted") setStep(0);
   }, [existing]);
 
   // チャット初期メッセージ（journalId切り替え時もリセット）

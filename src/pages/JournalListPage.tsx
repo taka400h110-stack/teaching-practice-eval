@@ -67,8 +67,8 @@ export default function JournalListPage() {
                   </Typography>
                 </Box>
                 <Chip label={cfg.label} color={cfg.color} size="small" />
-                <Tooltip title="詳細">
-                  <IconButton size="small" onClick={() => navigate(`/journals/${j.id}`)}>
+                <Tooltip title="詳細・AI評価・チャット">
+                  <IconButton size="small" color="primary" onClick={() => navigate(`/journal-workflow/${j.id}`)}>
                     <VisibilityIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -81,7 +81,7 @@ export default function JournalListPage() {
                 )}
                 {j.status === "evaluated" && (
                   <Tooltip title="AI評価結果">
-                    <IconButton size="small" color="primary" onClick={() => navigate(`/evaluations/${j.id}`)}>
+                    <IconButton size="small" color="success" onClick={() => navigate(`/journal-workflow/${j.id}`)}>
                       <AssessmentIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
