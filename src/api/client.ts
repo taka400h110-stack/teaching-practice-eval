@@ -3,13 +3,13 @@
  * モックAPIクライアント（将来的に実際のバックエンドに差し替え可能）
  */
 import {
-  MOCK_JOURNALS, MOCK_EVALUATION_RESULT, MOCK_GROWTH_DATA,
+  MOCK_JOURNALS, MOCK_EVALUATION_RESULT, MOCK_ALL_EVALUATIONS, MOCK_GROWTH_DATA,
   MOCK_SELF_EVALUATIONS, MOCK_LPS_DATA, MOCK_GOAL_HISTORY,
-  MOCK_CHAT_SESSION, MOCK_COHORT_PROFILES,
+  MOCK_CHAT_SESSION, MOCK_COHORT_PROFILES, MOCK_HUMAN_EVALUATIONS,
 } from "../mocks/mockData";
 import type {
   JournalEntry, EvaluationResult, GrowthData, SelfEvaluation,
-  LpsWeek, GoalEntry, ChatSession, UserRole,
+  LpsWeek, GoalEntry, ChatSession, UserRole, ChatMessage, User,
 } from "../types";
 
 const delay = (ms = 300) => new Promise((r) => setTimeout(r, ms));
@@ -26,6 +26,83 @@ function saveJournals(journals: JournalEntry[]): void {
   localStorage.setItem("mock_journals", JSON.stringify(journals));
 }
 
+// 人間評価のローカルストレージ管理
+type HumanEvalEntry = {
+  evaluator_id: string;
+  evaluator_name: string;
+  journal_id: string;
+  week: number;
+  items: Array<{ item_number: number; score: number }>;
+};
+function getHumanEvals(): HumanEvalEntry[] {
+  try {
+    const raw = localStorage.getItem("mock_human_evals");
+    if (raw) return JSON.parse(raw) as HumanEvalEntry[];
+  } catch {}
+  return [...MOCK_HUMAN_EVALUATIONS];
+}
+function saveHumanEvals(evals: HumanEvalEntry[]): void {
+  localStorage.setItem("mock_human_evals", JSON.stringify(evals));
+}
+
+// 登録ユーザーのローカルストレージ管理
+const DEFAULT_REGISTERED_USERS: User[] = [
+  { id: "user-001", email: "student@teaching-eval.jp",      name: "山田 太郎",   role: "student",        student_number: "2023A001", grade: 3 },
+  { id: "user-002", email: "teacher@teaching-eval.jp",      name: "佐藤 花子",   role: "univ_teacher" },
+  { id: "user-003", email: "mentor@teaching-eval.jp",       name: "鈴木 一郎",   role: "school_mentor" },
+  { id: "user-004", email: "admin@teaching-eval.jp",        name: "田中 管理者", role: "admin" },
+  { id: "user-005", email: "researcher@teaching-eval.jp",   name: "伊藤 研究者", role: "researcher" },
+  { id: "user-006", email: "collaborator@teaching-eval.jp", name: "渡辺 協力者", role: "collaborator" },
+  { id: "user-007", email: "board@teaching-eval.jp",        name: "中村 委員",   role: "board_observer" },
+  { id: "user-008", email: "evaluator@teaching-eval.jp",    name: "小林 評価者", role: "evaluator" },
+];
+function getRegisteredUsers(): User[] {
+  try {
+    const raw = localStorage.getItem("mock_registered_users");
+    if (raw) return JSON.parse(raw) as User[];
+  } catch {}
+  return [...DEFAULT_REGISTERED_USERS];
+}
+function saveRegisteredUsers(users: User[]): void {
+  localStorage.setItem("mock_registered_users", JSON.stringify(users));
+}
+
+// ローカルストレージで自己評価を永続化
+function getSelfEvals(): SelfEvaluation[] {
+  try {
+    const raw = localStorage.getItem("mock_self_evaluations");
+    if (raw) return JSON.parse(raw) as SelfEvaluation[];
+  } catch {}
+  return [...MOCK_SELF_EVALUATIONS];
+}
+function saveSelfEvals(evals: SelfEvaluation[]): void {
+  localStorage.setItem("mock_self_evaluations", JSON.stringify(evals));
+}
+
+// ローカルストレージでゴール履歴を永続化
+function getGoals(): GoalEntry[] {
+  try {
+    const raw = localStorage.getItem("mock_goal_history");
+    if (raw) return JSON.parse(raw) as GoalEntry[];
+  } catch {}
+  return [...MOCK_GOAL_HISTORY];
+}
+function saveGoals(goals: GoalEntry[]): void {
+  localStorage.setItem("mock_goal_history", JSON.stringify(goals));
+}
+
+// ローカルストレージでチャットセッションを永続化
+function getChatSessions(): Record<string, ChatSession> {
+  try {
+    const raw = localStorage.getItem("mock_chat_sessions");
+    if (raw) return JSON.parse(raw) as Record<string, ChatSession>;
+  } catch {}
+  return {};
+}
+function saveChatSessions(sessions: Record<string, ChatSession>): void {
+  localStorage.setItem("mock_chat_sessions", JSON.stringify(sessions));
+}
+
 // 役割ごとのデモユーザー定義
 const DEMO_USERS: Record<string, { id: string; name: string; role: UserRole; firstLogin: boolean }> = {
   "student@teaching-eval.jp":      { id: "user-001", name: "山田 太郎",    role: "student",        firstLogin: true },
@@ -37,6 +114,18 @@ const DEMO_USERS: Record<string, { id: string; name: string; role: UserRole; fir
   "board@teaching-eval.jp":        { id: "user-007", name: "中村 委員",    role: "board_observer", firstLogin: false },
   "evaluator@teaching-eval.jp":    { id: "user-008", name: "小林 評価者",  role: "evaluator",      firstLogin: false },
 };
+
+// デモアカウント一覧（LoginPageで表示用）
+export const DEMO_ACCOUNT_LIST = [
+  { email: "student@teaching-eval.jp",      password: "demo1234", role: "実習生（3年生・小学校）",     name: "山田 太郎" },
+  { email: "teacher@teaching-eval.jp",      password: "demo1234", role: "大学教員（指導教官）",         name: "佐藤 花子" },
+  { email: "mentor@teaching-eval.jp",       password: "demo1234", role: "校内指導教員（メンター）",     name: "鈴木 一郎" },
+  { email: "admin@teaching-eval.jp",        password: "demo1234", role: "管理者",                      name: "田中 管理者" },
+  { email: "researcher@teaching-eval.jp",   password: "demo1234", role: "研究者",                      name: "伊藤 研究者" },
+  { email: "collaborator@teaching-eval.jp", password: "demo1234", role: "研究協力者",                  name: "渡辺 協力者" },
+  { email: "board@teaching-eval.jp",        password: "demo1234", role: "教育委員会（閲覧者）",         name: "中村 委員" },
+  { email: "evaluator@teaching-eval.jp",    password: "demo1234", role: "外部評価者",                  name: "小林 評価者" },
+];
 
 const mockApi = {
   // ── 認証 ──
@@ -119,10 +208,74 @@ const mockApi = {
     saveJournals(journals);
   },
 
+  // ── コメント保存（教員・メンター用）──
+  saveComment: async (journalId: string, commentType: "univ_teacher_comment" | "school_mentor_comment" | "teacher_comment", comment: string): Promise<JournalEntry> => {
+    await delay();
+    const journals = getJournals();
+    const idx = journals.findIndex((j) => j.id === journalId);
+    if (idx === -1) throw new Error(`Journal ${journalId} not found`);
+    journals[idx] = { ...journals[idx], [commentType]: comment };
+    saveJournals(journals);
+    return journals[idx];
+  },
+
   // ── 評価 ──
   getEvaluation: async (journalId: string): Promise<EvaluationResult> => {
     await delay(500);
-    return { ...MOCK_EVALUATION_RESULT, journal_id: journalId };
+    // journalId に対応する週を判定してリアルなスコアを返す
+    const weekMatch = journalId.match(/journal-0*(\d+)/);
+    const week = weekMatch ? parseInt(weekMatch[1]) : 4;
+    const found = MOCK_ALL_EVALUATIONS.find((e) => e.journal_id === journalId);
+    if (found) return found;
+    return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, id: `eval-${week}` };
+  },
+
+  // 全週分の評価結果を取得
+  getAllEvaluations: async (): Promise<EvaluationResult[]> => {
+    await delay(300);
+    return MOCK_ALL_EVALUATIONS;
+  },
+
+  // ── 人間評価 ──
+  getHumanEvaluations: async (journalId?: string) => {
+    await delay();
+    const evals = getHumanEvals();
+    return journalId ? evals.filter((e) => e.journal_id === journalId) : evals;
+  },
+  saveHumanEvaluation: async (
+    journalId: string,
+    week: number,
+    items: Array<{ item_number: number; score: number }>
+  ) => {
+    await delay(600);
+    const user = JSON.parse(localStorage.getItem("user_info") ?? "{}");
+    const evals = getHumanEvals();
+    const existingIdx = evals.findIndex(
+      (e) => e.journal_id === journalId && e.evaluator_id === (user.id ?? "user-008")
+    );
+    const entry: HumanEvalEntry = {
+      evaluator_id:   user.id ?? "user-008",
+      evaluator_name: user.name ?? "評価者",
+      journal_id:     journalId,
+      week,
+      items,
+    };
+    if (existingIdx >= 0) evals[existingIdx] = entry;
+    else evals.push(entry);
+    saveHumanEvals(evals);
+    return entry;
+  },
+
+  // AI評価実行（ステータスを evaluated に更新）
+  runEvaluation: async (journalId: string): Promise<EvaluationResult> => {
+    await delay(1500); // AI処理をシミュレート
+    const journals = getJournals();
+    const idx = journals.findIndex((j) => j.id === journalId);
+    if (idx !== -1) {
+      journals[idx] = { ...journals[idx], status: "evaluated" };
+      saveJournals(journals);
+    }
+    return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, status: "completed" };
   },
 
   // ── 成長データ ──
@@ -134,7 +287,25 @@ const mockApi = {
   // ── 自己評価 ──
   getSelfEvaluations: async (): Promise<SelfEvaluation[]> => {
     await delay();
-    return MOCK_SELF_EVALUATIONS;
+    return getSelfEvals();
+  },
+  saveSelfEvaluation: async (data: Omit<SelfEvaluation, "id">): Promise<SelfEvaluation> => {
+    await delay();
+    const evals = getSelfEvals();
+    const newEval: SelfEvaluation = {
+      id: `self-eval-${Date.now()}`,
+      ...data,
+    };
+    // 同じ週のデータがあれば更新
+    const idx = evals.findIndex((e) => e.week === data.week);
+    if (idx !== -1) {
+      evals[idx] = newEval;
+    } else {
+      evals.push(newEval);
+      evals.sort((a, b) => a.week - b.week);
+    }
+    saveSelfEvals(evals);
+    return newEval;
   },
 
   // ── LPS ──
@@ -146,19 +317,162 @@ const mockApi = {
   // ── ゴール履歴 ──
   getGoalHistory: async (): Promise<GoalEntry[]> => {
     await delay();
-    return MOCK_GOAL_HISTORY;
+    return getGoals();
+  },
+  createGoal: async (data: { week: number; goal_text: string; is_smart: boolean }): Promise<GoalEntry> => {
+    await delay();
+    const goals = getGoals();
+    const newGoal: GoalEntry = {
+      id:         `goal-${Date.now()}`,
+      week:       data.week,
+      goal_text:  data.goal_text,
+      is_smart:   data.is_smart,
+      achieved:   false,
+      created_at: new Date().toISOString(),
+    };
+    goals.unshift(newGoal);
+    saveGoals(goals);
+    return newGoal;
+  },
+  updateGoal: async (id: string, data: Partial<GoalEntry>): Promise<GoalEntry> => {
+    await delay();
+    const goals = getGoals();
+    const idx = goals.findIndex((g) => g.id === id);
+    if (idx === -1) throw new Error(`Goal ${id} not found`);
+    goals[idx] = { ...goals[idx], ...data };
+    saveGoals(goals);
+    return goals[idx];
   },
 
   // ── チャット ──
   getChatSession: async (journalId: string): Promise<ChatSession> => {
     await delay();
-    return { ...MOCK_CHAT_SESSION, journal_id: journalId };
+    const sessions = getChatSessions();
+    if (sessions[journalId]) return sessions[journalId];
+    // journal-004 はリッチなデモセッション
+    if (journalId === "journal-004") return { ...MOCK_CHAT_SESSION, journal_id: journalId };
+    // それ以外は初期状態のセッションを返す
+    const newSession: ChatSession = {
+      id:         `chat-${Date.now()}`,
+      journal_id: journalId,
+      phase:      "phase0",
+      messages:   [
+        {
+          id:        "init-1",
+          role:      "assistant",
+          content:   "【Phase 0: 出来事の記述】\n今週の実習日誌を読みました。今週特に印象に残った出来事を、できるだけ具体的に教えてください。どんな小さなことでも構いません。",
+          timestamp: new Date().toISOString(),
+        },
+      ],
+      created_at: new Date().toISOString(),
+    };
+    sessions[journalId] = newSession;
+    saveChatSessions(sessions);
+    return newSession;
+  },
+  sendChatMessage: async (journalId: string, content: string): Promise<{ session: ChatSession; reply: ChatMessage }> => {
+    await delay(800);
+    const sessions = getChatSessions();
+    const session = sessions[journalId] || await mockApi.getChatSession(journalId);
+
+    const userMsg: ChatMessage = {
+      id:        `msg-${Date.now()}`,
+      role:      "user",
+      content,
+      timestamp: new Date().toISOString(),
+    };
+
+    // フェーズに応じた返答を生成
+    const phaseReplies: Record<string, string[]> = {
+      phase0: [
+        "それは具体的な場面ですね。その時、あなたはどんな気持ちでしたか？また、その場面でどんな判断をしましたか？",
+        "詳しく教えてくれてありがとうございます。その経験の中で、特に難しかったことは何でしたか？",
+      ],
+      phase1: [
+        "【Phase 1: 省察・分析】\nその判断の背景には、どんな考えがありましたか？もし同じ場面がもう一度あったとしたら、どうしますか？",
+        "なぜそう感じたのか、もう少し深く考えてみましょう。その経験はあなたの教育観とどう結びついていますか？",
+      ],
+      bridge: [
+        "【Bridge】\n実習全体を振り返って、今週の経験と他の週の経験に共通することはありますか？",
+        "これまでの省察を踏まえて、教師としての自分の強みと課題を整理してみましょう。",
+      ],
+      phase2: [
+        "【Phase 2: 概念化・一般化】\nその経験から、教育に関するどんな原則や考え方を導き出せますか？",
+        "✅ 素晴らしい省察です！来週の実践目標をSMART形式で設定してみましょう。\n- Specific（具体的）\n- Measurable（測定可能）\n- Achievable（達成可能）\n- Relevant（関連性）\n- Time-bound（期限あり）",
+      ],
+    };
+
+    const replies = phaseReplies[session.phase] || phaseReplies.phase0;
+    const replyContent = replies[Math.floor(Math.random() * replies.length)];
+
+    const replyMsg: ChatMessage = {
+      id:        `msg-${Date.now() + 1}`,
+      role:      "assistant",
+      content:   replyContent,
+      timestamp: new Date().toISOString(),
+    };
+
+    // フェーズ進行ロジック
+    const msgCount = session.messages.length;
+    let nextPhase = session.phase;
+    if (msgCount >= 3 && session.phase === "phase0") nextPhase = "phase1";
+    else if (msgCount >= 7 && session.phase === "phase1") nextPhase = "bridge";
+    else if (msgCount >= 9 && session.phase === "bridge") nextPhase = "phase2";
+    else if (msgCount >= 13 && session.phase === "phase2") nextPhase = "completed";
+
+    const updatedSession: ChatSession = {
+      ...session,
+      phase:    nextPhase as ChatSession["phase"],
+      messages: [...session.messages, userMsg, replyMsg],
+    };
+    sessions[journalId] = updatedSession;
+    saveChatSessions(sessions);
+
+    return { session: updatedSession, reply: replyMsg };
   },
 
   // ── コーホート ──
   getCohortProfiles: async () => {
     await delay();
     return MOCK_COHORT_PROFILES;
+  },
+
+  // ── ユーザー管理（管理者用）──
+  getRegisteredUsers: async (): Promise<User[]> => {
+    await delay();
+    return getRegisteredUsers();
+  },
+  registerUser: async (userData: Omit<User, "id"> & { password?: string }): Promise<User> => {
+    await delay(500);
+    const users = getRegisteredUsers();
+    const newUser: User = { ...userData, id: `user-${Date.now()}` };
+    users.push(newUser);
+    saveRegisteredUsers(users);
+    return newUser;
+  },
+  updateUser: async (id: string, data: Partial<User>): Promise<User> => {
+    await delay(400);
+    const users = getRegisteredUsers();
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx === -1) throw new Error(`User ${id} not found`);
+    users[idx] = { ...users[idx], ...data };
+    saveRegisteredUsers(users);
+    return users[idx];
+  },
+  deleteUser: async (id: string): Promise<void> => {
+    await delay(300);
+    const users = getRegisteredUsers().filter((u) => u.id !== id);
+    saveRegisteredUsers(users);
+  },
+
+  // ── データリセット（デモ用）──
+  resetDemoData: () => {
+    localStorage.removeItem("mock_journals");
+    localStorage.removeItem("mock_self_evaluations");
+    localStorage.removeItem("mock_goal_history");
+    localStorage.removeItem("mock_chat_sessions");
+    localStorage.removeItem("mock_human_evals");
+    localStorage.removeItem("mock_registered_users");
   },
 };
 

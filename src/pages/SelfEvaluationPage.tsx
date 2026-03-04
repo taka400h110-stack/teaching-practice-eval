@@ -10,7 +10,7 @@ import {
 import SelfImprovementIcon from "@mui/icons-material/SelfImprovement";
 import SaveIcon            from "@mui/icons-material/Save";
 import HistoryIcon         from "@mui/icons-material/History";
-import { useQuery }        from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { SelfEvaluation } from "../types";
 
@@ -116,9 +116,24 @@ export default function SelfEvaluationPage() {
   const total    = +(FACTOR_KEYS.reduce((s, fk) => s + scores[fk], 0) / 4).toFixed(2);
   const historyLatest: SelfEvaluation | undefined = history[history.length - 1];
 
+  const queryClient = useQueryClient();
+  const saveMutation = useMutation({
+    mutationFn: () => mockApi.saveSelfEvaluation({
+      week:    historyLatest ? historyLatest.week + 1 : 1,
+      factor1: scores.factor1,
+      factor2: scores.factor2,
+      factor3: scores.factor3,
+      factor4: scores.factor4,
+      total,
+    }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["selfEvals"] });
+      setSnack(true);
+    },
+  });
+
   const handleSave = () => {
-    setSnack(true);
-    // 実際のAPIに送信する場合はここに追加
+    saveMutation.mutate();
   };
 
   return (

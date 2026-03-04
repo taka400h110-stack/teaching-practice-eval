@@ -32,26 +32,31 @@ export default function EvaluationsPage() {
     queryFn: () => mockApi.getJournals(),
   });
 
+  const { data: allEvals = [] } = useQuery({
+    queryKey: ["allEvaluations"],
+    queryFn: () => mockApi.getAllEvaluations(),
+  });
+
   // 評価対象は submitted / evaluated ステータスの日誌
   const evalJournals = journals.filter((j) =>
     j.status !== "draft" &&
     (statusFilter === "all" || j.status === statusFilter)
   );
 
-  // 仮想評価結果（モック）
-  const evalResults = evalJournals.map((j, idx) => {
-    const base = 2.5 + idx * 0.1;
+  // MOCK_ALL_EVALUATIONSから実際のスコアを取得
+  const evalResults = evalJournals.map((j) => {
+    const evalResult = allEvals.find((e) => e.journal_id === j.id);
     return {
       journalId: j.id,
       title:     j.title,
       date:      j.entry_date,
       week:      j.week_number,
       status:    j.status === "evaluated" ? "completed" : "pending",
-      total:     j.status === "evaluated" ? +(base).toFixed(2) : null,
-      f1: j.status === "evaluated" ? +(base - 0.1).toFixed(2) : null,
-      f2: j.status === "evaluated" ? +(base + 0.2).toFixed(2) : null,
-      f3: j.status === "evaluated" ? +(base - 0.2).toFixed(2) : null,
-      f4: j.status === "evaluated" ? +(base + 0.1).toFixed(2) : null,
+      total:     evalResult ? evalResult.total_score : null,
+      f1: evalResult ? evalResult.factor_scores.factor1 : null,
+      f2: evalResult ? evalResult.factor_scores.factor2 : null,
+      f3: evalResult ? evalResult.factor_scores.factor3 : null,
+      f4: evalResult ? evalResult.factor_scores.factor4 : null,
     };
   });
 

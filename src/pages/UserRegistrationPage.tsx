@@ -108,13 +108,30 @@ interface RegisteredUser {
 
 // ── ローカルストレージで登録ユーザーを管理（本番ではAPIに差し替え） ──
 const STORAGE_KEY = "registered_users";
+
+// デモ用初期ユーザー
+const DEMO_INITIAL_USERS: RegisteredUser[] = [
+  { id: "user-001", email: "student@teaching-eval.jp",      name: "山田 太郎",   role: "student",        extra: { student_number: "2023A001", grade: "3年" }, created_at: "2026-04-01T09:00:00Z" },
+  { id: "user-002", email: "teacher@teaching-eval.jp",      name: "佐藤 花子",   role: "univ_teacher",   extra: { department: "教育学部", position: "准教授" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-003", email: "mentor@teaching-eval.jp",       name: "鈴木 一郎",   role: "school_mentor",  extra: { school_name: "○○市立東小学校", school_type: "elementary", position: "担任教諭" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-004", email: "admin@teaching-eval.jp",        name: "田中 管理者", role: "admin",          extra: {}, created_at: "2026-01-01T09:00:00Z" },
+  { id: "user-005", email: "researcher@teaching-eval.jp",   name: "伊藤 研究者", role: "researcher",     extra: { institution: "△△大学", research_field: "教育評価学" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-006", email: "collaborator@teaching-eval.jp", name: "渡辺 協力者", role: "collaborator",   extra: { organization: "□□教育センター" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-007", email: "board@teaching-eval.jp",        name: "中村 委員",   role: "board_observer", extra: { board_name: "〇〇市教育委員会" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-008", email: "evaluator@teaching-eval.jp",    name: "小林 評価者", role: "evaluator",      extra: { affiliation: "教員養成評価機構" }, created_at: "2026-03-01T09:00:00Z" },
+];
+
 function loadUsers(): RegisteredUser[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as RegisteredUser[]) : [];
-  } catch {
-    return [];
-  }
+    if (raw) {
+      const parsed = JSON.parse(raw) as RegisteredUser[];
+      if (parsed.length > 0) return parsed;
+    }
+  } catch {}
+  // 初回はデモデータを返してlocalStorageに保存
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO_INITIAL_USERS));
+  return [...DEMO_INITIAL_USERS];
 }
 function saveUsers(users: RegisteredUser[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(users));

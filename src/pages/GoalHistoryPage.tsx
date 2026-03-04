@@ -14,7 +14,7 @@ import CheckCircleIcon   from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import HelpOutlineIcon   from "@mui/icons-material/HelpOutline";
 import StarIcon          from "@mui/icons-material/Star";
-import { useQuery }      from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { GoalEntry } from "../types";
 
@@ -26,7 +26,7 @@ const SMART_CRITERIA = [
   { key: "T", label: "Time-bound（期限）",    desc: "期限や時間枠があるか？" },
 ];
 
-function GoalCard({ goal }: { goal: GoalEntry }) {
+function GoalCard({ goal, onToggle }: { goal: GoalEntry; onToggle?: () => void }) {
   const date = new Date(goal.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
   return (
     <Paper
@@ -36,7 +36,10 @@ function GoalCard({ goal }: { goal: GoalEntry }) {
         borderLeft: "4px solid",
         borderColor: goal.achieved ? "success.main" : "warning.main",
         bgcolor: goal.achieved ? "#f1f8e9" : "#fff8e1",
+        cursor: onToggle ? "pointer" : "default",
+        "&:hover": onToggle ? { boxShadow: 2 } : {},
       }}
+      onClick={onToggle}
     >
       <Box display="flex" alignItems="flex-start" gap={1.5}>
         {goal.achieved
@@ -77,10 +80,25 @@ export default function GoalHistoryPage() {
   const smartGoals  = goals.filter((g) => g.is_smart).length;
   const achieveRate = goals.length > 0 ? Math.round((achieved / goals.length) * 100) : 0;
 
+  const queryClient = useQueryClient();
+
+  const addMutation = useMutation({
+    mutationFn: () => mockApi.createGoal({ week: weekNum, goal_text: newGoal.trim(), is_smart: isSmart }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["goals"] });
+      setSnack(true);
+      setNewGoal("");
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (goal: GoalEntry) => mockApi.updateGoal(goal.id, { achieved: !goal.achieved }),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["goals"] }); },
+  });
+
   const handleAdd = () => {
     if (!newGoal.trim()) return;
-    setSnack(true);
-    setNewGoal("");
+    addMutation.mutate();
   };
 
   return (
@@ -206,7 +224,7 @@ export default function GoalHistoryPage() {
                   <Typography color="text.secondary">目標がまだありません</Typography>
                 </Box>
               ) : (
-                goals.map((g: GoalEntry) => <GoalCard key={g.id} goal={g} />)
+                goals.map((g: GoalEntry) => <GoalCard key={g.id} goal={g} onToggle={() => toggleMutation.mutate(g)} />)
               )}
             </CardContent>
           </Card>
