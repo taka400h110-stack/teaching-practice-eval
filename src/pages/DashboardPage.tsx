@@ -232,11 +232,11 @@ export default function DashboardPage() {
                       {idx > 0 && <Divider />}
                       <ListItem
                         sx={{ py: 0.8, px: 0, cursor: "pointer", "&:hover": { bgcolor: "grey.50" }, borderRadius: 1 }}
-                        onClick={() => navigate(`/journals/${j.id}`)}
+                        onClick={() => navigate(`/journal-workflow/${j.id}`)}
                         secondaryAction={
                           <Box display="flex" gap={0.5}>
                             <Chip label={cfg.label} color={cfg.color} size="small" sx={{ fontSize: 10 }} />
-                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/journals/${j.id}`); }}>
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/journal-workflow/${j.id}`); }}>
                               <VisibilityIcon fontSize="small" />
                             </IconButton>
                           </Box>

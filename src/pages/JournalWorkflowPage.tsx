@@ -749,6 +749,112 @@ export default function JournalWorkflowPage() {
            ════════════════════════════════ */}
         {step === 1 && (
           <Box>
+
+            {/* ════ 日誌記入内容（常に表示） ════ */}
+            <Card sx={{ mb: 2.5, border: "1.5px solid #1976d2" }}>
+              <CardContent>
+                <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+                  <MenuBookIcon sx={{ color: "#1976d2" }} />
+                  <Typography variant="subtitle1" fontWeight="bold" color="#1565c0">
+                    日誌記入内容
+                  </Typography>
+                  {entryDate && (
+                    <Chip
+                      label={new Date(entryDate).toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" })}
+                      size="small" variant="outlined"
+                    />
+                  )}
+                  <Chip label={`Week ${weekNumber}`} size="small" color="primary" variant="outlined" />
+                </Box>
+                <Divider sx={{ mb: 1.5 }} />
+
+                {/* 時限別記録 */}
+                {records.length > 0 ? (
+                  <Box>
+                    {records.map((rec, idx) => {
+                      const accent =
+                        rec.time_label.includes("朝")    ? "#FF9800" :
+                        rec.time_label.includes("休み")  ? "#4CAF50" :
+                        rec.time_label.includes("給食") || rec.time_label.includes("昼") ? "#E91E63" :
+                        rec.time_label.includes("帰り") || rec.time_label.includes("清掃") ? "#7B1FA2" :
+                        rec.time_label.includes("放課後") ? "#1976D2" : "#455A64";
+                      const bg =
+                        rec.time_label.includes("朝")    ? "#FFF3E0" :
+                        rec.time_label.includes("休み")  ? "#E8F5E9" :
+                        rec.time_label.includes("給食") || rec.time_label.includes("昼") ? "#FCE4EC" :
+                        rec.time_label.includes("帰り") || rec.time_label.includes("清掃") ? "#EDE7F6" :
+                        rec.time_label.includes("放課後") ? "#E3F2FD" : "#F5F5F5";
+                      return (
+                        <Box key={rec.id} sx={{ mb: 1.5, borderLeft: `4px solid ${accent}`, bgcolor: bg, borderRadius: "0 8px 8px 0", p: 1.5 }}>
+                          {/* ヘッダー行 */}
+                          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                            <Box sx={{ minWidth: 22, height: 22, borderRadius: "50%", bgcolor: accent, color: "#fff",
+                              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                              {idx + 1}
+                            </Box>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: accent }}>{rec.time_label}</Typography>
+                            {(rec.time_start || rec.time_end) && (
+                              <Typography variant="caption" color="text.secondary">
+                                {rec.time_start}〜{rec.time_end}
+                              </Typography>
+                            )}
+                            {rec.subject && (
+                              <Chip label={rec.subject} size="small" color="primary" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+                            )}
+                          </Box>
+                          {/* 授業目標 */}
+                          {rec.lesson_goal && (
+                            <Typography variant="caption" color="text.secondary" display="block" mb={0.5} sx={{ pl: 3.5 }}>
+                              🎯 授業目標: {rec.lesson_goal}
+                            </Typography>
+                          )}
+                          {/* 本文 */}
+                          {rec.body ? (
+                            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.9, pl: 3.5 }}>
+                              {rec.body}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.disabled" sx={{ pl: 3.5 }}>（記録なし）</Typography>
+                          )}
+                          {/* 難しさ・工夫 */}
+                          {rec.difficulty && (
+                            <Typography variant="caption" color="error.main" display="block" mt={0.5} sx={{ pl: 3.5 }}>
+                              😰 難しかったこと: {rec.difficulty}
+                            </Typography>
+                          )}
+                          {rec.devise && (
+                            <Typography variant="caption" color="success.main" display="block" mt={0.3} sx={{ pl: 3.5 }}>
+                              💡 工夫したこと: {rec.devise}
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.disabled" sx={{ py: 2, textAlign: "center" }}>
+                    日誌の記録がありません
+                  </Typography>
+                )}
+
+                {/* 総合振り返り */}
+                {reflection && (
+                  <Box mt={1.5} sx={{ borderLeft: "4px solid #9c27b0", bgcolor: "#F3E5F5", borderRadius: "0 8px 8px 0", p: 1.5 }}>
+                    <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                      <PsychologyIcon sx={{ color: "#9c27b0", fontSize: 18 }} />
+                      <Typography variant="subtitle2" fontWeight={700} color="#7b1fa2">
+                        総合振り返り
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled">{reflection.length} 文字</Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.9 }}>
+                      {reflection}
+                    </Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
             {!evalData ? (
               <Alert severity="info" sx={{ mb: 2 }}>
                 日誌を提出するとAI評価が生成されます。まず「① 日誌記入」タブで日誌を提出してください。
