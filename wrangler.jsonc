@@ -1,34 +1,36 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webapp",
+  "name": "teaching-practice-eval",
   "compatibility_date": "2026-03-02",
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  // 環境変数（シークレットは wrangler secret put で設定）
   // "vars": {
-  //   "MY_VAR": "my-variable"
+  //   "APP_ENV": "production"
   // },
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "MY_KV_NAMESPACE",
-  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  //   }
-  // ],
-  // "r2_buckets": [
-  //   {
-  //     "binding": "MY_BUCKET",
-  //     "bucket_name": "my-bucket"
-  //   }
-  // ],
+  
+  // Cloudflare D1 データベース
+  // 作成方法: npx wrangler d1 create teaching-practice-eval-db
   // "d1_databases": [
   //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
+  //     "binding": "DB",
+  //     "database_name": "teaching-practice-eval-db",
+  //     "database_id": "YOUR_DATABASE_ID_HERE"
   //   }
   // ],
-  // "ai": {
-  //   "binding": "AI"
-  // }
+  
+  // Cloudflare KV（セッション・キャッシュ用）
+  // 作成方法: npx wrangler kv:namespace create teaching_eval_KV
+  // "kv_namespaces": [
+  //   {
+  //     "binding": "KV",
+  //     "id": "YOUR_KV_ID_HERE"
+  //   }
+  // ]
+  
+  // シークレット（本番環境）:
+  // npx wrangler pages secret put OPENAI_API_KEY
+  // npx wrangler pages secret put GOOGLE_CLOUD_VISION_API_KEY
 }

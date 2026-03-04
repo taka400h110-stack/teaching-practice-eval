@@ -272,16 +272,72 @@ export default function ChatBotPage() {
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
-    await new Promise((r) => setTimeout(r, 800 + Math.random() * 700));
+    try {
+      // OpenAI API 経由で応答を生成（CoT-B + CoT-C）
+      const journalData = allJournals.find((j) => j.id === journalId);
+      const journalContent = (journalData as unknown as { content?: string })?.content ?? "";
 
-    const botMsg: ChatMessage = {
-      id:        `b-${Date.now()}`,
-      role:      "assistant",
-      content:   generateCoTResponse(content, rdLevel),
-      timestamp: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, botMsg]);
-    setLoading(false);
+      const [chatResp, cotBResp] = await Promise.allSettled([
+        fetch("/api/ai/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
+            phase: phase,
+            journal_content: journalContent,
+            week_number: journalData?.week_number ?? 1,
+            reflection_depth: rdLevel,
+            session_id: journalId,
+          }),
+        }).then((r) => r.json()),
+
+        fetch("/api/ai/reflection-depth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_message: content,
+            journal_content: journalContent,
+            session_id: journalId,
+          }),
+        }).then((r) => r.json()),
+      ]);
+
+      let botContent: string;
+
+      if (chatResp.status === "fulfilled" && (chatResp.value as { success?: boolean; message?: string }).success) {
+        botContent = (chatResp.value as { message: string }).message;
+
+        // CoT-B の省察深さ情報を付加
+        if (cotBResp.status === "fulfilled" && (cotBResp.value as { success?: boolean }).success) {
+          const rd = cotBResp.value as { reflection: { reflection_level: string; category: string; next_action: string } };
+          botContent += `\n\n📊 省察レベル: **${rd.reflection.reflection_level}**（${rd.reflection.category}）`;
+        }
+      } else {
+        // フォールバック: ローカルCoT応答
+        await new Promise((r) => setTimeout(r, 800 + Math.random() * 700));
+        botContent = generateCoTResponse(content, rdLevel);
+      }
+
+      const botMsg: ChatMessage = {
+        id:        `b-${Date.now()}`,
+        role:      "assistant",
+        content:   botContent,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, botMsg]);
+    } catch {
+      // エラー時フォールバック
+      await new Promise((r) => setTimeout(r, 600));
+      const botMsg: ChatMessage = {
+        id:        `b-${Date.now()}`,
+        role:      "assistant",
+        content:   generateCoTResponse(content, rdLevel),
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, botMsg]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const phase    = session?.phase ?? "phase1";

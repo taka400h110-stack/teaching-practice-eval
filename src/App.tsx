@@ -36,6 +36,12 @@ const GoalHistoryPage         = lazy(() => import("./pages/GoalHistoryPage"));
 const ChatBotPage             = lazy(() => import("./pages/ChatBotPage"));
 // ユーザー登録
 const UserRegistrationPage    = lazy(() => import("./pages/UserRegistrationPage"));
+// OCR
+const JournalOCRPage          = lazy(() => import("./pages/JournalOCRPage"));
+// 教員統計
+const TeacherStatisticsPage   = lazy(() => import("./pages/TeacherStatisticsPage"));
+// 国際比較
+const InternationalComparisonPage = lazy(() => import("./pages/InternationalComparisonPage"));
 
 const Spinner = () => (
   <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
@@ -101,6 +107,15 @@ export default function App() {
 
           {/* ユーザー登録 */}
           <Route path="register"          element={<UserRegistrationPage />} />
+
+          {/* OCR読み込み */}
+          <Route path="ocr"               element={<JournalOCRPage />} />
+
+          {/* 教員統計 */}
+          <Route path="teacher-statistics" element={<TeacherStatisticsPage />} />
+
+          {/* 国際比較（RQ1） */}
+          <Route path="international"     element={<InternationalComparisonPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

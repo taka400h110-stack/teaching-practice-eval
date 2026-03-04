@@ -70,6 +70,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         items: [
           { label: "ダッシュボード",              path: "/dashboard",        icon: <DashboardIcon /> },
           { label: "実習日誌ワークフロー",        path: "/journal-workflow", icon: <MenuBookIcon /> },
+          { label: "手書き日誌OCR読み込み",       path: "/ocr",              icon: <AssessmentIcon /> },
           { label: "過去の日誌一覧",              path: "/journals",         icon: <AssessmentIcon /> },
           { label: "チャット履歴",                path: "/chat",             icon: <ChatIcon /> },
         ],
@@ -174,9 +175,15 @@ function getNavGroups(role: UserRole): NavGroup[] {
         ],
       },
       {
+        group: "国際比較（RQ1）",
+        items: [
+          { label: "国際比較（4カ国）",  path: "/international", icon: <SchoolIcon /> },
+        ],
+      },
+      {
         group: "データエクスポート",
         items: [
-          { label: "データ出力（CSV/JSON）", path: "/statistics", icon: <DownloadIcon /> },
+          { label: "データ出力（CSV/R/Mplus）", path: "/statistics", icon: <DownloadIcon /> },
         ],
       },
     ];
