@@ -70,6 +70,8 @@ function getNavGroups(role: UserRole): NavGroup[] {
         items: [
           { label: "ダッシュボード",              path: "/dashboard",        icon: <DashboardIcon /> },
           { label: "実習日誌ワークフロー",        path: "/journal-workflow", icon: <MenuBookIcon /> },
+          { label: "過去の日誌一覧",              path: "/journals",         icon: <AssessmentIcon /> },
+          { label: "チャット履歴",                path: "/chat",             icon: <ChatIcon /> },
         ],
       },
       {

@@ -11,7 +11,9 @@ import {
   Tab, Tabs, Stepper, Step, StepLabel, StepButton,
   Alert, Snackbar, Tooltip, Collapse, LinearProgress,
   Accordion, AccordionSummary, AccordionDetails,
-  Grid,
+  Grid, Select, MenuItem, FormControl, InputLabel, Dialog,
+  DialogTitle, DialogContent, List, ListItemButton, ListItemText,
+  ListItemAvatar,
 } from "@mui/material";
 // icons
 import MenuBookIcon        from "@mui/icons-material/MenuBook";
@@ -20,6 +22,7 @@ import ChatIcon            from "@mui/icons-material/Chat";
 import SaveIcon            from "@mui/icons-material/Save";
 import SendIcon            from "@mui/icons-material/Send";
 import ArrowBackIcon       from "@mui/icons-material/ArrowBack";
+import HistoryIcon         from "@mui/icons-material/History";
 import AddCircleIcon       from "@mui/icons-material/AddCircle";
 import DeleteOutlineIcon   from "@mui/icons-material/DeleteOutline";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -310,6 +313,7 @@ export default function JournalWorkflowPage() {
 
   // ── 共通 ──
   const [step, setStep] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // ── ① 日誌記入 ──
   const isEditMode = !!journalId;
@@ -338,6 +342,12 @@ export default function JournalWorkflowPage() {
     enabled:  !!journalId,
   });
 
+  // 全日誌一覧（過去日誌選択用）
+  const { data: allJournals = [] } = useQuery({
+    queryKey: ["journals"],
+    queryFn:  () => mockApi.getJournals(),
+  });
+
   const { data: allEvals = [] } = useQuery({
     queryKey: ["allEvaluations"],
     queryFn:  () => mockApi.getAllEvaluations(),
@@ -358,7 +368,12 @@ export default function JournalWorkflowPage() {
     setWeekNumber(existing.week_number ?? 1);
   }, [existing]);
 
-  // チャット初期メッセージ
+  // チャット初期メッセージ（journalId切り替え時もリセット）
+  useEffect(() => {
+    setMessages([]);
+    setRdHistory([]);
+  }, [savedJournalId]);
+
   useEffect(() => {
     if (chatSession && messages.length === 0) setMessages(chatSession.messages);
   }, [chatSession]);
@@ -457,6 +472,18 @@ export default function JournalWorkflowPage() {
 
   // ── 評価データ ──
   const targetJournalId = savedJournalId ?? "journal-004";
+  // 過去日誌を選択してワークフローに読み込む
+  const loadPastJournal = (j: JournalEntry) => {
+    const { records: recs, reflection: ref } = contentToRecords(j.content);
+    setRecords(recs.length > 0 ? recs : [makeEmpty(0)]);
+    setReflection(j.reflection_text || ref);
+    setEntryDate(j.entry_date);
+    setWeekNumber(j.week_number ?? 1);
+    setSavedJournalId(j.id);
+    setHistoryOpen(false);
+    setStep(j.status === "evaluated" ? 1 : 0);
+  };
+
   const evalData = allEvals.find((e) => e.journal_id === targetJournalId) ?? allEvals[0];
   const radarData = evalData ? FACTOR_KEYS.map((k, i) => ({
     factor: FACTOR_LABELS[i],
@@ -484,14 +511,31 @@ export default function JournalWorkflowPage() {
       <Box sx={{
         display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.2,
         bgcolor: "white", borderBottom: "1px solid #e0e0e0", flexShrink: 0,
+        flexWrap: "wrap",
       }}>
         <IconButton size="small" onClick={() => navigate("/journals")}>
           <ArrowBackIcon fontSize="small" />
         </IconButton>
         <MenuBookIcon sx={{ color: "#1976d2" }} />
-        <Typography variant="subtitle1" fontWeight="bold" sx={{ flex: 1 }}>
-          第{weekNumber}週 実習日誌ワークフロー
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ flex: "1 1 160px" }}>
+          {savedJournalId
+            ? `第${weekNumber}週 実習日誌`
+            : "新しい実習日誌"}
         </Typography>
+
+        {/* 過去の日誌を選ぶボタン */}
+        <Tooltip title="過去の日誌を選択して確認・続きを書く">
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<HistoryIcon />}
+            onClick={() => setHistoryOpen(true)}
+            sx={{ fontSize: 11, flexShrink: 0 }}
+          >
+            過去の日誌
+          </Button>
+        </Tooltip>
+
         <Chip
           label={`進捗 ${doneCount}/4`}
           size="small"
@@ -499,6 +543,78 @@ export default function JournalWorkflowPage() {
           icon={doneCount === 4 ? <CheckCircleIcon /> : undefined}
         />
       </Box>
+
+      {/* ── 過去の日誌選択ダイアログ ── */}
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, pb: 1 }}>
+          <HistoryIcon color="primary" />
+          過去の日誌を選択
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+            選択するとAI評価・チャット履歴も切り替わります
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {allJournals.length === 0 ? (
+            <Box p={3} textAlign="center">
+              <Typography color="text.secondary">日誌がまだありません</Typography>
+            </Box>
+          ) : (
+            <List dense>
+              {allJournals.map((j) => {
+                const statusColors = { draft: "#9e9e9e", submitted: "#1976d2", evaluated: "#388e3c" };
+                const statusLabels = { draft: "下書き", submitted: "提出済み", evaluated: "評価済み" };
+                const isSelected   = savedJournalId === j.id;
+                return (
+                  <ListItemButton
+                    key={j.id}
+                    onClick={() => loadPastJournal(j)}
+                    selected={isSelected}
+                    sx={{
+                      borderLeft: isSelected ? `4px solid #1976d2` : "4px solid transparent",
+                      bgcolor: isSelected ? "#e3f2fd" : undefined,
+                    }}
+                  >
+                    <ListItemAvatar>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: statusColors[j.status], fontSize: 12 }}>
+                        W{j.week_number}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Typography variant="body2" fontWeight={600} noWrap sx={{ flex: 1 }}>
+                            {j.title}
+                          </Typography>
+                          <Chip
+                            label={statusLabels[j.status]}
+                            size="small"
+                            sx={{ height: 18, fontSize: 10, bgcolor: statusColors[j.status] + "20", color: statusColors[j.status] }}
+                          />
+                        </Box>
+                      }
+                      secondary={
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(j.entry_date).toLocaleDateString("ja-JP")} ・
+                          {j.status === "evaluated" ? " AI評価あり ✓" :
+                           j.status === "submitted" ? " 提出済み" : " 下書き"}
+                        </Typography>
+                      }
+                    />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          )}
+          <Box sx={{ p: 1.5, borderTop: "1px solid #e0e0e0" }}>
+            <Button
+              fullWidth variant="outlined" size="small"
+              onClick={() => { setHistoryOpen(false); setStep(0); setSavedJournalId(null); setRecords([makeEmpty(0)]); setReflection(""); }}
+            >
+              ＋ 新しい日誌を作成する
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
 
       {/* ── ステッパー ── */}
       <Box sx={{ px: 2, py: 1, bgcolor: "#f8f9fa", borderBottom: "1px solid #e0e0e0", flexShrink: 0 }}>
