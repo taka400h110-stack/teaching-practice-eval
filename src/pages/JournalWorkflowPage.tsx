@@ -38,6 +38,7 @@ import CheckCircleIcon     from "@mui/icons-material/CheckCircle";
 import LightbulbIcon       from "@mui/icons-material/Lightbulb";
 import AutoAwesomeIcon     from "@mui/icons-material/AutoAwesome";
 import RefreshIcon         from "@mui/icons-material/Refresh";
+import PsychologyIcon      from "@mui/icons-material/Psychology";
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer,
