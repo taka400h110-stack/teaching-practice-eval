@@ -102,7 +102,7 @@ export default function OnboardingPage() {
 
   // Step 1: プロフィール
   const [profile, setProfile] = useState({
-    name: "", grade: "2", school_type: "elementary",
+    student_id: "", name: "", grade: "2", school_type: "elementary",
     gender: "male",
   });
 
@@ -124,7 +124,7 @@ export default function OnboardingPage() {
 
   const canProceed = (): boolean => {
     if (activeStep === 0) return allConsentChecked;
-    if (activeStep === 1) return profile.name.trim() !== "";
+    if (activeStep === 1) return profile.name.trim() !== "" && profile.student_id.trim() !== "";
     return true;
   };
 
@@ -256,6 +256,15 @@ export default function OnboardingPage() {
                 <PersonIcon color="primary" />
                 <Typography variant="subtitle1" fontWeight="bold">あなたの基本情報</Typography>
               </Box>
+              <TextField
+                label="学籍番号"
+                value={profile.student_id}
+                onChange={(e) => setProfile({ ...profile, student_id: e.target.value })}
+                fullWidth size="small" sx={{ mb: 2 }}
+                required
+                placeholder="例: 2024A001"
+                helperText="大学発行の学籍番号を入力してください"
+              />
               <TextField
                 label="氏名（フルネーム）"
                 value={profile.name}

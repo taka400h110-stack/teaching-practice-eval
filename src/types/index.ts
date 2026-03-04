@@ -16,6 +16,8 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  student_number?: string;  // 学籍番号（実習生のみ）
+  grade?: number;           // 学年（実習生のみ：1-4）
 }
 
 export interface AuthTokens {
@@ -47,22 +49,26 @@ export interface HourRecord {
 }
 
 export interface JournalEntry {
-  id:                   string;
-  student_id:           string;
-  title:                string;
-  content:              string;
-  reflection_text:      string;
-  entry_date:           string;
-  status:               JournalStatus;
-  week_number:          number;
-  teacher_comment?:     string;
-  subject?:             string;
-  lesson_goal?:         string;
-  students_observation?: string;
-  difficulty?:          string;
-  devise?:              string;
-  next_action?:         string;
-  hour_records?:        HourRecord[];
+  id:                     string;
+  student_id:             string;
+  title:                  string;
+  content:                string;
+  reflection_text:        string;
+  entry_date:             string;
+  status:                 JournalStatus;
+  week_number:            number;
+  student_grade?:         number;           // 実習生の学年（1-4）
+  // コメント分岐：1-3年→大学教員コメント / 4年→実習先コメント
+  univ_teacher_comment?:  string;           // 大学教員コメント（1-3年生用）
+  school_mentor_comment?: string;           // 実習先コメント（4年生用）
+  teacher_comment?:       string;           // 後方互換（既存データ）
+  subject?:               string;
+  lesson_goal?:           string;
+  students_observation?:  string;
+  difficulty?:            string;
+  devise?:                string;
+  next_action?:           string;
+  hour_records?:          HourRecord[];
 }
 
 export interface JournalCreateRequest {
@@ -179,6 +185,7 @@ export interface BigFiveScores {
 
 export interface StudentProfile {
   id:                string;
+  student_number:    string;   // 学籍番号
   name:              string;
   gender:            "male" | "female" | "other";
   grade:             number;
@@ -220,4 +227,17 @@ export interface GoalEntry {
   is_smart:    boolean;
   achieved:    boolean;
   created_at:  string;
+}
+
+// ──────────────────────────────────────────────
+// ユーザー登録フォーム（学生以外の役割）
+// ──────────────────────────────────────────────
+export interface UserRegistration {
+  email:        string;
+  name:         string;
+  role:         UserRole;
+  affiliation?: string;  // 所属機関
+  department?:  string;  // 学部・専攻
+  position?:    string;  // 職位
+  notes?:       string;  // 備考
 }

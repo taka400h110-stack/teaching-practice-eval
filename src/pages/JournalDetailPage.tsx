@@ -8,7 +8,7 @@ import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
   Collapse, Divider, Grid, Paper, Stack, Typography, IconButton,
   Accordion, AccordionSummary, AccordionDetails, LinearProgress,
-  Table, TableBody, TableCell, TableHead, TableRow,
+  Table, TableBody, TableCell, TableHead, TableRow, TextField, Snackbar,
 } from "@mui/material";
 import ArrowBackIcon      from "@mui/icons-material/ArrowBack";
 import EditIcon           from "@mui/icons-material/Edit";
@@ -31,7 +31,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ReferenceLine,
 } from "recharts";
-import { useQuery }       from "@tanstack/react-query";
+import SendIcon from "@mui/icons-material/Send";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { JournalEntry, JournalStatus, HourRecord, EvaluationResult, GrowthData } from "../types";
 
@@ -501,6 +502,11 @@ const useJournalQuery = (id: string) => useQuery<JournalEntry>({
 const JournalDetailPage: React.FC = () => {
   const { journalId } = useParams<{ journalId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // 現在のログインユーザー（ロール判定）
+  const currentUser = mockApi.getCurrentUser() as { id: string; name: string; role: string } | null;
+  const userRole = currentUser?.role ?? "student";
 
   const { data: journal, isLoading, isError } = useJournalQuery(journalId ?? "");
 
@@ -531,6 +537,33 @@ const JournalDetailPage: React.FC = () => {
   });
   const hourRecords = parseHourRecords(journal.content);
   const isNewFormat = hourRecords !== null;
+
+  // ── コメント入力 ──
+  // 学年ベースでコメント種別を判定
+  const studentGrade = journal.student_grade;
+  const isGrade4 = studentGrade !== undefined && studentGrade >= 4;
+  const canInputComment =
+    (userRole === "univ_teacher" && !isGrade4) ||       // 1-3年生 → 大学教員
+    (userRole === "school_mentor" && isGrade4) ||        // 4年生 → 校内指導教員
+    userRole === "admin";                                // 管理者は全対応
+
+  const existingComment = isGrade4
+    ? (journal.school_mentor_comment ?? journal.teacher_comment ?? "")
+    : (journal.univ_teacher_comment ?? journal.teacher_comment ?? "");
+
+  const [commentText, setCommentText] = useState(existingComment);
+  const [commentSaved, setCommentSaved] = useState(false);
+
+  const commentMutation = useMutation<void, Error, string>({
+    mutationFn: async (text: string) => {
+      const field = isGrade4 ? "school_mentor_comment" : "univ_teacher_comment";
+      await mockApi.updateJournal(journalId!, { [field]: text } as Record<string, unknown>);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
+      setCommentSaved(true);
+    },
+  });
 
   return (
     <Box maxWidth={960} mx="auto">
@@ -618,11 +651,98 @@ const JournalDetailPage: React.FC = () => {
         </Section>
       )}
 
-      {/* 指導教員コメント */}
-      {journal.teacher_comment && (
-        <Section icon={<CommentIcon />} title="指導教員コメント" color="info.main" bgcolor="#E0F7FA" borderColor="#80DEEA">
-          <BodyText text={journal.teacher_comment} />
-        </Section>
+      {/* ────────────────────────────────────────────────────────
+          指導コメント入力フォーム（大学教員 / 校内指導教員）
+          1〜3年生 → 大学教員が入力
+          4年生   → 校内指導教員が入力
+      ──────────────────────────────────────────────────────── */}
+      {canInputComment && (
+        <Card sx={{
+          mb: 2, border: "1px solid",
+          borderColor: isGrade4 ? "#FFCC80" : "#90CAF9",
+          bgcolor: isGrade4 ? "#FFF8E1" : "#E8F4FD",
+        }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+              <CommentIcon sx={{ color: isGrade4 ? "#E65100" : "#1565C0" }} />
+              <Typography variant="subtitle2" fontWeight="bold" color={isGrade4 ? "#E65100" : "#1565C0"}>
+                {isGrade4 ? "実習先コメントを入力（4年生）" : "大学教員コメントを入力（1〜3年生）"}
+              </Typography>
+              <Chip
+                label={isGrade4 ? "校内指導教員" : "大学教員"}
+                size="small"
+                sx={{
+                  bgcolor: isGrade4 ? "#E65100" : "#1565C0",
+                  color: "white", fontSize: 10, height: 18,
+                }}
+              />
+            </Box>
+            <TextField
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder={isGrade4
+                ? "実習先での指導内容・評価・助言を記入してください…"
+                : "授業観察の所感・改善点・次週への助言を記入してください…"}
+              fullWidth multiline minRows={3}
+              size="small"
+              sx={{ mb: 1.5, bgcolor: "#fff" }}
+            />
+            <Box display="flex" gap={1} justifyContent="flex-end">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setCommentText(existingComment)}
+                disabled={commentMutation.isPending}
+              >
+                リセット
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<SendIcon />}
+                onClick={() => commentMutation.mutate(commentText)}
+                disabled={commentMutation.isPending || commentText.trim() === ""}
+                sx={{ bgcolor: isGrade4 ? "#E65100" : "#1565C0" }}
+              >
+                コメントを保存
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ────────────────────────────────────────────────────────
+          指導コメント（学年で分岐）
+          1〜3年生 → 大学教員コメント
+          4年生   → 実習先（校内指導教員）コメント
+          後方互換: teacher_comment（旧フィールド）も表示
+      ──────────────────────────────────────────────────────── */}
+      {journal.student_grade !== undefined && journal.student_grade <= 3 ? (
+        /* 1〜3年生：大学教員コメント */
+        (journal.univ_teacher_comment || journal.teacher_comment) && (
+          <Section
+            icon={<CommentIcon />}
+            title="大学教員コメント（1〜3年生）"
+            color="#1565C0"
+            bgcolor="#E3F2FD"
+            borderColor="#90CAF9"
+          >
+            <BodyText text={journal.univ_teacher_comment ?? journal.teacher_comment ?? ""} />
+          </Section>
+        )
+      ) : (
+        /* 4年生：実習先（校内指導教員）コメント */
+        (journal.school_mentor_comment || journal.teacher_comment) && (
+          <Section
+            icon={<CommentIcon />}
+            title="実習先コメント（4年生）"
+            color="#E65100"
+            bgcolor="#FFF3E0"
+            borderColor="#FFCC80"
+          >
+            <BodyText text={journal.school_mentor_comment ?? journal.teacher_comment ?? ""} />
+          </Section>
+        )
       )}
 
       {/* ════ AI評価セクション（評価済み日誌のみ）════ */}
@@ -652,6 +772,15 @@ const JournalDetailPage: React.FC = () => {
           </Typography>
         </Paper>
       ) : null}
+
+      {/* コメント保存完了スナック */}
+      <Snackbar
+        open={commentSaved}
+        autoHideDuration={3000}
+        onClose={() => setCommentSaved(false)}
+        message="コメントを保存しました"
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      />
     </Box>
   );
 };

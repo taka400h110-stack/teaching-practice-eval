@@ -5,53 +5,41 @@ import {
   ListItemIcon, ListItemText, Toolbar, Typography, Divider, Avatar, Chip,
   Collapse, Tooltip,
 } from "@mui/material";
-import MenuIcon              from "@mui/icons-material/Menu";
-import DashboardIcon         from "@mui/icons-material/Dashboard";
-import MenuBookIcon          from "@mui/icons-material/MenuBook";
-import BarChartIcon          from "@mui/icons-material/BarChart";
-import SelfImprovementIcon   from "@mui/icons-material/SelfImprovement";
-import TimelineIcon          from "@mui/icons-material/Timeline";
-import TrackChangesIcon      from "@mui/icons-material/TrackChanges";
-import ChatIcon              from "@mui/icons-material/Chat";
-import LogoutIcon            from "@mui/icons-material/Logout";
-import AssessmentIcon        from "@mui/icons-material/Assessment";
-import GroupsIcon            from "@mui/icons-material/Groups";
-import CompareArrowsIcon     from "@mui/icons-material/CompareArrows";
-import AccountTreeIcon       from "@mui/icons-material/AccountTree";
-import ArticleIcon           from "@mui/icons-material/Article";
-import PsychologyIcon        from "@mui/icons-material/Psychology";
-import EqualizerIcon         from "@mui/icons-material/Equalizer";
-import SchoolIcon            from "@mui/icons-material/School";
+import MenuIcon               from "@mui/icons-material/Menu";
+import DashboardIcon          from "@mui/icons-material/Dashboard";
+import MenuBookIcon           from "@mui/icons-material/MenuBook";
+import SelfImprovementIcon    from "@mui/icons-material/SelfImprovement";
+import TimelineIcon           from "@mui/icons-material/Timeline";
+import TrackChangesIcon       from "@mui/icons-material/TrackChanges";
+import ChatIcon               from "@mui/icons-material/Chat";
+import LogoutIcon             from "@mui/icons-material/Logout";
+import AssessmentIcon         from "@mui/icons-material/Assessment";
+import GroupsIcon             from "@mui/icons-material/Groups";
+import CompareArrowsIcon      from "@mui/icons-material/CompareArrows";
+import PsychologyIcon         from "@mui/icons-material/Psychology";
+import EqualizerIcon          from "@mui/icons-material/Equalizer";
+import SchoolIcon             from "@mui/icons-material/School";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import ExpandLessIcon        from "@mui/icons-material/ExpandLess";
-import ExpandMoreIcon        from "@mui/icons-material/ExpandMore";
-import VerifiedUserIcon      from "@mui/icons-material/VerifiedUser";
-import ScienceIcon           from "@mui/icons-material/Science";
-import AccountBalanceIcon    from "@mui/icons-material/AccountBalance";
+import ExpandLessIcon         from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon         from "@mui/icons-material/ExpandMore";
+import VerifiedUserIcon       from "@mui/icons-material/VerifiedUser";
+import PersonAddIcon          from "@mui/icons-material/PersonAdd";
+import DownloadIcon           from "@mui/icons-material/Download";
+import AccountBalanceIcon     from "@mui/icons-material/AccountBalance";
 import mockApi from "../api/client";
 import type { UserRole } from "../types";
 
 const DRAWER_WIDTH = 260;
 
-type NavItem = {
-  label: string;
-  path:  string;
-  icon:  React.ReactNode;
-};
+type NavItem  = { label: string; path: string; icon: React.ReactNode };
+type NavGroup = { group: string; items: NavItem[] };
 
-type NavGroup = {
-  group: string;
-  items: NavItem[];
-};
-
-// ────────────────────────────────────────────
-// 役割ラベル・カラー
 // ────────────────────────────────────────────
 const ROLE_LABEL: Record<UserRole, string> = {
   student:        "実習生",
   univ_teacher:   "大学教員",
   school_mentor:  "校内指導教員",
-  evaluator:      "評価者",
+  evaluator:      "評価者（RQ2）",
   researcher:     "研究者",
   collaborator:   "研究協力者",
   board_observer: "教育委員会",
@@ -70,243 +58,214 @@ const ROLE_COLOR: Record<UserRole, string> = {
 };
 
 // ────────────────────────────────────────────
-// 役割別ナビゲーション定義
+// 役割別ナビゲーション（論文2 RQ2 ＆ 論文3 RQ3）
 // ────────────────────────────────────────────
 function getNavGroups(role: UserRole): NavGroup[] {
-  // 実習生（student）
+
+  // ── 実習生（student）: 日誌作成→AI評価→チャット→目標→成長 ──
   if (role === "student") {
     return [
       {
-        group: "メイン",
+        group: "週次サイクル（RQ3）",
         items: [
-          { label: "ダッシュボード", path: "/dashboard", icon: <DashboardIcon /> },
-          { label: "実習日誌",       path: "/journals",  icon: <MenuBookIcon /> },
-          { label: "省察チャットBot", path: "/chat",     icon: <ChatIcon /> },
+          { label: "ダッシュボード",     path: "/dashboard",       icon: <DashboardIcon /> },
+          { label: "① 実習日誌作成",    path: "/journals",         icon: <MenuBookIcon /> },
+          { label: "② AI評価結果確認",  path: "/evaluations",      icon: <AssessmentIcon /> },
+          { label: "③ 省察チャットBot", path: "/chat",             icon: <ChatIcon /> },
         ],
       },
       {
-        group: "評価・フィードバック",
+        group: "自己評価・成長（RQ3）",
         items: [
-          { label: "AI評価一覧",  path: "/evaluations",    icon: <AssessmentIcon /> },
-          { label: "自己評価",    path: "/self-evaluation", icon: <SelfImprovementIcon /> },
-        ],
-      },
-      {
-        group: "成長・目標",
-        items: [
-          { label: "成長グラフ",        path: "/growth", icon: <TimelineIcon /> },
-          { label: "LPSダッシュボード", path: "/lps",    icon: <BarChartIcon /> },
-          { label: "目標履歴（SMART）", path: "/goals",  icon: <TrackChangesIcon /> },
+          { label: "④ 自己評価入力",    path: "/self-evaluation",  icon: <SelfImprovementIcon /> },
+          { label: "成長グラフ",         path: "/growth",           icon: <TimelineIcon /> },
+          { label: "目標履歴（SMART）",  path: "/goals",            icon: <TrackChangesIcon /> },
         ],
       },
     ];
   }
 
-  // 大学教員（univ_teacher）
+  // ── 大学教員（univ_teacher）: RQ2 信頼性検証 + RQ3 学生コメント ──
   if (role === "univ_teacher") {
     return [
       {
-        group: "メイン",
+        group: "ダッシュボード",
         items: [
           { label: "教員ダッシュボード", path: "/teacher-dashboard", icon: <DashboardIcon /> },
         ],
       },
       {
-        group: "評価",
+        group: "AI評価信頼性検証（RQ2）",
         items: [
-          { label: "評価一覧",      path: "/evaluations",         icon: <AssessmentIcon /> },
-          { label: "人間評価入力",  path: "/evaluations/human",   icon: <VerifiedUserIcon /> },
-          { label: "AI vs 人間比較", path: "/comparison",         icon: <CompareArrowsIcon /> },
+          { label: "評価一覧",           path: "/evaluations",  icon: <AssessmentIcon /> },
+          { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
+          { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
+          { label: "信頼性分析（ICC）",  path: "/reliability",  icon: <EqualizerIcon /> },
         ],
       },
       {
-        group: "学生管理・統計",
+        group: "学生管理（RQ3）",
         items: [
-          { label: "コーホート管理", path: "/cohorts",           icon: <GroupsIcon /> },
-          { label: "教員統計",       path: "/teacher-statistics", icon: <EqualizerIcon /> },
+          { label: "コーホート管理",     path: "/cohorts",      icon: <GroupsIcon /> },
+          { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
         ],
       },
     ];
   }
 
-  // 校内指導教員（school_mentor）
+  // ── 校内指導教員（school_mentor）: 4年生日誌コメント入力 ──
   if (role === "school_mentor") {
     return [
       {
-        group: "メイン",
+        group: "ダッシュボード",
         items: [
           { label: "教員ダッシュボード", path: "/teacher-dashboard", icon: <DashboardIcon /> },
         ],
       },
       {
-        group: "評価",
+        group: "実習生指導（4年生）",
         items: [
-          { label: "評価一覧",     path: "/evaluations", icon: <AssessmentIcon /> },
-          { label: "人間評価入力", path: "/evaluations/human", icon: <VerifiedUserIcon /> },
-        ],
-      },
-      {
-        group: "統計",
-        items: [
-          { label: "教員統計", path: "/teacher-statistics", icon: <EqualizerIcon /> },
+          { label: "日誌一覧・コメント", path: "/evaluations",  icon: <MenuBookIcon /> },
+          { label: "評価入力",           path: "/evaluations/human", icon: <VerifiedUserIcon /> },
         ],
       },
     ];
   }
 
-  // 評価者（evaluator）：RQ2用人間評価入力専門
+  // ── 評価者（evaluator）: RQ2 人間評価専担 ──
   if (role === "evaluator") {
     return [
       {
-        group: "評価業務",
+        group: "評価業務（RQ2）",
         items: [
-          { label: "評価一覧",     path: "/evaluations",       icon: <AssessmentIcon /> },
-          { label: "人間評価入力", path: "/evaluations/human", icon: <VerifiedUserIcon /> },
-          { label: "AI vs 人間比較", path: "/comparison",      icon: <CompareArrowsIcon /> },
-        ],
-      },
-      {
-        group: "信頼性分析",
-        items: [
-          { label: "信頼性分析（ICC）", path: "/reliability", icon: <AssessmentIcon /> },
+          { label: "評価一覧",           path: "/evaluations",       icon: <AssessmentIcon /> },
+          { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
+          { label: "AI vs 人間比較",     path: "/comparison",        icon: <CompareArrowsIcon /> },
+          { label: "信頼性分析（ICC）",  path: "/reliability",       icon: <EqualizerIcon /> },
         ],
       },
     ];
   }
 
-  // 研究者（researcher）：全分析機能
+  // ── 研究者（researcher）: 全分析機能 ──
   if (role === "researcher") {
     return [
       {
-        group: "メイン",
+        group: "研究ダッシュボード",
         items: [
           { label: "管理者ダッシュボード", path: "/admin", icon: <DashboardIcon /> },
         ],
       },
       {
-        group: "評価・信頼性（RQ2）",
+        group: "AI評価信頼性（RQ2）",
         items: [
-          { label: "評価一覧",          path: "/evaluations", icon: <AssessmentIcon /> },
-          { label: "AI vs 人間比較",    path: "/comparison",  icon: <CompareArrowsIcon /> },
-          { label: "信頼性分析（ICC）", path: "/reliability", icon: <VerifiedUserIcon /> },
+          { label: "評価一覧",           path: "/evaluations",  icon: <AssessmentIcon /> },
+          { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
+          { label: "信頼性分析（ICC）",  path: "/reliability",  icon: <EqualizerIcon /> },
         ],
       },
       {
-        group: "縦断・成長分析（RQ3）",
+        group: "縦断成長分析（RQ3）",
         items: [
-          { label: "コーホート管理",  path: "/cohorts",           icon: <GroupsIcon /> },
-          { label: "縦断分析（LGCM）",path: "/longitudinal",      icon: <TimelineIcon /> },
-          { label: "高度統計分析",    path: "/advanced-analysis", icon: <AccountTreeIcon /> },
-          { label: "統計ダッシュボード", path: "/statistics",     icon: <EqualizerIcon /> },
+          { label: "コーホート管理",     path: "/cohorts",      icon: <GroupsIcon /> },
+          { label: "縦断分析（LGCM）",   path: "/longitudinal", icon: <TimelineIcon /> },
+          { label: "SCAT 質的分析",      path: "/scat",         icon: <PsychologyIcon /> },
+          { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
         ],
       },
       {
-        group: "論文分析",
+        group: "データエクスポート",
         items: [
-          { label: "Paper2 分析",       path: "/paper2",    icon: <ArticleIcon /> },
-          { label: "SCAT 質的分析",     path: "/scat",      icon: <PsychologyIcon /> },
+          { label: "データ出力（CSV/JSON）", path: "/statistics", icon: <DownloadIcon /> },
         ],
       },
     ];
   }
 
-  // 研究協力者（collaborator）：閲覧・基本統計のみ
+  // ── 研究協力者（collaborator）: 閲覧・集計のみ ──
   if (role === "collaborator") {
     return [
       {
         group: "データ閲覧",
         items: [
-          { label: "統計ダッシュボード", path: "/statistics",      icon: <EqualizerIcon /> },
-          { label: "コーホート一覧",     path: "/cohorts",         icon: <GroupsIcon /> },
-          { label: "縦断データ",         path: "/longitudinal",    icon: <TimelineIcon /> },
+          { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
+          { label: "コーホート一覧",     path: "/cohorts",      icon: <GroupsIcon /> },
+          { label: "縦断データ",         path: "/longitudinal", icon: <TimelineIcon /> },
         ],
       },
       {
         group: "評価参照",
         items: [
-          { label: "評価一覧（閲覧）", path: "/evaluations", icon: <AssessmentIcon /> },
-          { label: "AI vs 人間比較",   path: "/comparison",  icon: <CompareArrowsIcon /> },
+          { label: "評価一覧（閲覧）",   path: "/evaluations",  icon: <AssessmentIcon /> },
+          { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
         ],
       },
     ];
   }
 
-  // 教育委員会（board_observer）：サマリー・学校別データ
+  // ── 教育委員会（board_observer）: サマリー・学校別 ──
   if (role === "board_observer") {
     return [
       {
         group: "統計サマリー",
         items: [
-          { label: "統計ダッシュボード",   path: "/statistics",      icon: <EqualizerIcon /> },
-          { label: "コーホート・学校別",   path: "/cohorts",         icon: <AccountBalanceIcon /> },
-          { label: "成長分析（縦断）",     path: "/longitudinal",    icon: <TimelineIcon /> },
+          { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
+          { label: "コーホート・学校別", path: "/cohorts",      icon: <AccountBalanceIcon /> },
+          { label: "成長分析（縦断）",   path: "/longitudinal", icon: <TimelineIcon /> },
         ],
       },
       {
         group: "評価参照",
         items: [
-          { label: "評価サマリー",    path: "/evaluations", icon: <AssessmentIcon /> },
-          { label: "AI vs 人間比較",  path: "/comparison",  icon: <CompareArrowsIcon /> },
+          { label: "評価サマリー",       path: "/evaluations",  icon: <AssessmentIcon /> },
+          { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
         ],
       },
     ];
   }
 
-  // 管理者（admin）：全メニュー
+  // ── 管理者（admin）: 全メニュー ──
   return [
     {
-      group: "メイン",
+      group: "管理",
       items: [
-        { label: "管理ダッシュボード",  path: "/admin",             icon: <AdminPanelSettingsIcon /> },
-        { label: "実習生ダッシュボード",path: "/dashboard",         icon: <DashboardIcon /> },
-        { label: "教員ダッシュボード",  path: "/teacher-dashboard", icon: <SchoolIcon /> },
+        { label: "管理ダッシュボード",   path: "/admin",             icon: <AdminPanelSettingsIcon /> },
+        { label: "ユーザー登録",         path: "/register-user",     icon: <PersonAddIcon /> },
       ],
     },
     {
-      group: "実習・日誌",
+      group: "実習生機能（RQ3）",
       items: [
-        { label: "実習日誌",    path: "/journals",  icon: <MenuBookIcon /> },
-        { label: "省察チャットBot", path: "/chat", icon: <ChatIcon /> },
-        { label: "自己評価",    path: "/self-evaluation", icon: <SelfImprovementIcon /> },
-        { label: "目標履歴",    path: "/goals",     icon: <TrackChangesIcon /> },
-        { label: "LPS",         path: "/lps",       icon: <BarChartIcon /> },
+        { label: "実習ダッシュボード",   path: "/dashboard",         icon: <DashboardIcon /> },
+        { label: "実習日誌",             path: "/journals",           icon: <MenuBookIcon /> },
+        { label: "省察チャットBot",      path: "/chat",              icon: <ChatIcon /> },
+        { label: "自己評価",             path: "/self-evaluation",   icon: <SelfImprovementIcon /> },
+        { label: "成長グラフ",           path: "/growth",            icon: <TimelineIcon /> },
+        { label: "目標履歴",             path: "/goals",             icon: <TrackChangesIcon /> },
       ],
     },
     {
       group: "評価（RQ2）",
       items: [
-        { label: "評価一覧",          path: "/evaluations", icon: <AssessmentIcon /> },
-        { label: "AI vs 人間比較",    path: "/comparison",  icon: <CompareArrowsIcon /> },
-        { label: "信頼性分析（ICC）", path: "/reliability", icon: <VerifiedUserIcon /> },
+        { label: "教員ダッシュボード",   path: "/teacher-dashboard", icon: <SchoolIcon /> },
+        { label: "評価一覧",             path: "/evaluations",       icon: <AssessmentIcon /> },
+        { label: "AI vs 人間比較",       path: "/comparison",        icon: <CompareArrowsIcon /> },
+        { label: "信頼性分析（ICC）",    path: "/reliability",       icon: <VerifiedUserIcon /> },
       ],
     },
     {
-      group: "統計・分析（RQ3）",
+      group: "分析（RQ3）",
       items: [
-        { label: "コーホート管理",     path: "/cohorts",           icon: <GroupsIcon /> },
-        { label: "縦断分析（LGCM）",   path: "/longitudinal",      icon: <TimelineIcon /> },
-        { label: "高度統計分析",       path: "/advanced-analysis", icon: <AccountTreeIcon /> },
-        { label: "統計ダッシュボード", path: "/statistics",        icon: <EqualizerIcon /> },
-        { label: "教員統計",           path: "/teacher-statistics",icon: <SchoolIcon /> },
+        { label: "コーホート管理",       path: "/cohorts",           icon: <GroupsIcon /> },
+        { label: "縦断分析（LGCM）",     path: "/longitudinal",      icon: <TimelineIcon /> },
+        { label: "SCAT 質的分析",        path: "/scat",              icon: <PsychologyIcon /> },
+        { label: "統計ダッシュボード",   path: "/statistics",        icon: <EqualizerIcon /> },
       ],
     },
     {
-      group: "論文分析",
+      group: "データ出力",
       items: [
-        { label: "Paper2 分析",   path: "/paper2", icon: <ArticleIcon /> },
-        { label: "SCAT 質的分析", path: "/scat",   icon: <PsychologyIcon /> },
-      ],
-    },
-    {
-      group: "システム管理",
-      items: [
-        { label: "成長グラフ", path: "/growth", icon: <TimelineIcon /> },
-      ],
-    },
-    {
-      group: "研究者向け",
-      items: [
-        { label: "科研 Paper2", path: "/paper2", icon: <ScienceIcon /> },
+        { label: "データエクスポート",   path: "/statistics",        icon: <DownloadIcon /> },
       ],
     },
   ];
@@ -316,44 +275,48 @@ function getNavGroups(role: UserRole): NavGroup[] {
 // コンポーネント本体
 // ────────────────────────────────────────────
 export default function AppLayout() {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed]   = useState<Record<string, boolean>>({});
+
   const user = mockApi.getCurrentUser() as { id: string; name: string; role: UserRole } | null;
   const role: UserRole = user?.role ?? "student";
-
   const navGroups = getNavGroups(role);
-  const allItems: NavItem[] = navGroups.flatMap((g) => g.items);
+  const allItems  = navGroups.flatMap((g) => g.items);
 
   const handleLogout = async () => {
     await mockApi.logout();
     navigate("/login");
   };
 
-  const toggleGroup = (group: string) => {
+  const toggleGroup = (group: string) =>
     setCollapsed((prev) => ({ ...prev, [group]: !prev[group] }));
-  };
 
   const drawer = (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "white" }}>
       {/* ロゴ */}
-      <Toolbar sx={{ bgcolor: "primary.main", minHeight: "48px !important", px: 2 }}>
-        <SchoolIcon sx={{ color: "white", mr: 1, fontSize: 20 }} />
-        <Typography variant="subtitle2" color="white" fontWeight="bold" lineHeight={1.3} fontSize={11}>
-          教育実習評価システム
-        </Typography>
-      </Toolbar>
+      <Box sx={{ bgcolor: ROLE_COLOR[role] ?? "primary.main", px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+        <SchoolIcon sx={{ color: "white", fontSize: 22 }} />
+        <Box>
+          <Typography variant="caption" color="rgba(255,255,255,0.8)" fontSize={9} display="block" lineHeight={1}>
+            AI支援
+          </Typography>
+          <Typography variant="subtitle2" color="white" fontWeight="bold" fontSize={11} lineHeight={1.2}>
+            教育実習評価システム
+          </Typography>
+        </Box>
+      </Box>
       <Divider />
 
       {/* ユーザー情報 */}
       {user && (
-        <Box sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1.5, bgcolor: "grey.50" }}>
           <Avatar
             sx={{
-              width: 34, height: 34,
+              width: 36, height: 36,
               bgcolor: ROLE_COLOR[role] ?? "primary.main",
-              fontSize: 14, fontWeight: "bold",
+              fontSize: 15, fontWeight: "bold",
             }}
           >
             {user.name?.[0] ?? "U"}
@@ -363,7 +326,11 @@ export default function AppLayout() {
             <Chip
               label={ROLE_LABEL[role] ?? role}
               size="small"
-              sx={{ fontSize: 9, height: 16, bgcolor: ROLE_COLOR[role], color: "white", mt: 0.2 }}
+              sx={{
+                fontSize: 9, height: 16,
+                bgcolor: ROLE_COLOR[role] ?? "primary.main",
+                color: "white", mt: 0.3,
+              }}
             />
           </Box>
         </Box>
@@ -371,45 +338,56 @@ export default function AppLayout() {
       <Divider />
 
       {/* ナビゲーション */}
-      <Box sx={{ flexGrow: 1, overflow: "auto" }}>
+      <Box sx={{ flexGrow: 1, overflowY: "auto" }}>
         {navGroups.map(({ group, items }) => (
           <React.Fragment key={group}>
             <ListItemButton
               dense
               onClick={() => toggleGroup(group)}
-              sx={{ py: 0.5, bgcolor: "#f5f5f5" }}
+              sx={{ py: 0.5, px: 1.5, bgcolor: "#f8f8f8" }}
             >
               <ListItemText
                 primary={group}
                 primaryTypographyProps={{
-                  fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase",
+                  fontSize: 9, fontWeight: 700,
+                  color: "text.secondary",
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
                 }}
               />
-              {collapsed[group] ? <ExpandMoreIcon fontSize="small" /> : <ExpandLessIcon fontSize="small" />}
+              {collapsed[group] ? <ExpandMoreIcon sx={{ fontSize: 14, color: "text.disabled" }} /> : <ExpandLessIcon sx={{ fontSize: 14, color: "text.disabled" }} />}
             </ListItemButton>
             <Collapse in={!collapsed[group]}>
               <List dense disablePadding>
                 {items.map((item) => {
-                  const selected =
+                  const isActive =
                     location.pathname === item.path ||
                     (item.path !== "/dashboard" && location.pathname.startsWith(item.path + "/"));
                   return (
-                    <Tooltip key={item.path} title={item.label} placement="right" disableHoverListener>
+                    <Tooltip key={`${item.path}-${item.label}`} title={item.label} placement="right" disableHoverListener>
                       <ListItemButton
-                        selected={selected}
+                        selected={isActive}
                         onClick={() => { navigate(item.path); setMobileOpen(false); }}
                         sx={{
-                          pl: 2,
+                          pl: 2, py: 0.6,
                           "&.Mui-selected": {
-                            bgcolor: ROLE_COLOR[role] ?? "primary.main",
-                            color: "white",
-                            "& .MuiListItemIcon-root": { color: "white" },
+                            bgcolor: `${ROLE_COLOR[role] ?? "#1976d2"}18`,
+                            borderRight: `3px solid ${ROLE_COLOR[role] ?? "#1976d2"}`,
+                            "& .MuiListItemIcon-root": { color: ROLE_COLOR[role] ?? "#1976d2" },
+                            "& .MuiListItemText-primary": { color: ROLE_COLOR[role] ?? "#1976d2", fontWeight: 700 },
                           },
-                          "&.Mui-selected:hover": { bgcolor: ROLE_COLOR[role] ?? "primary.dark" },
+                          "&.Mui-selected:hover": {
+                            bgcolor: `${ROLE_COLOR[role] ?? "#1976d2"}28`,
+                          },
                         }}
                       >
-                        <ListItemIcon sx={{ minWidth: 32, fontSize: 18 }}>{item.icon}</ListItemIcon>
-                        <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: 12 }} />
+                        <ListItemIcon sx={{ minWidth: 30, "& .MuiSvgIcon-root": { fontSize: 18 } }}>
+                          {item.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={item.label}
+                          primaryTypographyProps={{ fontSize: 12 }}
+                        />
                       </ListItemButton>
                     </Tooltip>
                   );
@@ -421,26 +399,20 @@ export default function AppLayout() {
       </Box>
 
       <Divider />
-
-      {/* ロールバッジ & ログアウト */}
-      <Box sx={{ p: 1, bgcolor: "grey.50" }}>
-        <Typography variant="caption" color="text.secondary" sx={{ px: 1, display: "block", mb: 0.5 }}>
-          ログイン中: {ROLE_LABEL[role] ?? role}
-        </Typography>
-      </Box>
+      {/* ログアウト */}
       <List dense>
-        <ListItemButton onClick={handleLogout}>
-          <ListItemIcon sx={{ minWidth: 36 }}><LogoutIcon /></ListItemIcon>
-          <ListItemText primary="ログアウト" primaryTypographyProps={{ fontSize: 13 }} />
+        <ListItemButton onClick={handleLogout} sx={{ color: "text.secondary" }}>
+          <ListItemIcon sx={{ minWidth: 30 }}><LogoutIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="ログアウト" primaryTypographyProps={{ fontSize: 12 }} />
         </ListItemButton>
       </List>
     </Box>
   );
 
   const currentLabel =
-    allItems.find((n) =>
-      location.pathname === n.path || location.pathname.startsWith(n.path + "/")
-    )?.label ?? "教育実習評価システム";
+    allItems.find(
+      (n) => location.pathname === n.path || location.pathname.startsWith(n.path + "/")
+    )?.label ?? "AI支援 教育実習評価システム";
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -449,8 +421,9 @@ export default function AppLayout() {
         position="fixed"
         sx={{
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
-          ml: { sm: `${DRAWER_WIDTH}px` },
+          ml:    { sm: `${DRAWER_WIDTH}px` },
           bgcolor: ROLE_COLOR[role] ?? "primary.main",
+          boxShadow: 1,
         }}
       >
         <Toolbar variant="dense">
@@ -500,9 +473,11 @@ export default function AppLayout() {
       <Box
         component="main"
         sx={{
-          flexGrow: 1, p: 2.5,
+          flexGrow: 1, p: { xs: 1.5, sm: 2.5 },
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
           mt: "48px",
+          bgcolor: "#f5f7fa",
+          minHeight: "calc(100vh - 48px)",
         }}
       >
         <Outlet />

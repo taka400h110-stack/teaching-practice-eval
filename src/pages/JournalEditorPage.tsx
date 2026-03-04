@@ -325,7 +325,7 @@ const JournalEditorPage: React.FC = () => {
   return (
     <Box p={0} maxWidth={900} mx="auto">
       {/* ヘッダー */}
-      <Box display="flex" alignItems="center" gap={1} mb={3} flexWrap="wrap">
+      <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/journals")} variant="outlined" size="small">一覧に戻る</Button>
         <Typography variant="h5" fontWeight="bold" ml={1}>{isEditMode ? "日誌を編集" : "今日の実習日誌"}</Typography>
         <Box sx={{ ml: "auto", display: "flex", gap: 1 }}>
@@ -333,6 +333,27 @@ const JournalEditorPage: React.FC = () => {
           <Button variant="contained" startIcon={<SendIcon />} onClick={() => { if (validate()) saveMutation.mutate(buildPayload("submitted")); }} disabled={isSaving} color="primary">提出する</Button>
         </Box>
       </Box>
+
+      {/* 週次サイクル案内（論文3 RQ3 フロー） */}
+      {!isEditMode && (
+        <Box
+          sx={{
+            mb: 2.5, p: 1.5, borderRadius: 2,
+            bgcolor: "#E3F2FD", border: "1px solid #90CAF9",
+            display: "flex", alignItems: "center", gap: 1.5,
+          }}
+        >
+          <AccessTimeIcon sx={{ color: "#1976d2", fontSize: 20 }} />
+          <Box>
+            <Typography variant="caption" fontWeight="bold" color="#1565C0">
+              週次サイクル: ① 日誌作成（今ここ）→ ② AI評価確認 → ③ チャットBot省察 → ④ 自己評価
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block">
+              時限ごとに教科・活動と授業内容を記録し、最後に省察を記述して提出してください。
+            </Typography>
+          </Box>
+        </Box>
+      )}
 
       {saveMutation.isError && <Alert severity="error" sx={{ mb: 2 }}>保存中にエラーが発生しました。</Alert>}
 

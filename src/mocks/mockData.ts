@@ -383,6 +383,7 @@ export const MOCK_COHORT_PROFILES: StudentProfile[] = Array.from({ length: 50 },
   const f4e= +(f4 + 0.85 + Math.cos(i * 2 + 1) * 0.3).toFixed(2);
   return {
     id:               `student-${String(i + 1).padStart(3, "0")}`,
+    student_number:   `2026${String(grade)}${String(i + 1).padStart(4, "0")}`,  // 学籍番号: 年度+学年+番号
     name,
     gender:           isMale ? "male" : "female",
     grade,
