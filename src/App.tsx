@@ -17,6 +17,7 @@ const AdminDashboardPage      = lazy(() => import("./pages/AdminDashboardPage"))
 const JournalListPage         = lazy(() => import("./pages/JournalListPage"));
 const JournalEditorPage       = lazy(() => import("./pages/JournalEditorPage"));
 const JournalDetailPage       = lazy(() => import("./pages/JournalDetailPage"));
+const JournalWorkflowPage     = lazy(() => import("./pages/JournalWorkflowPage"));
 // 評価 (RQ2)
 const EvaluationResultPage    = lazy(() => import("./pages/EvaluationResultPage"));
 const EvaluationsPage         = lazy(() => import("./pages/EvaluationsPage"));
@@ -74,6 +75,10 @@ export default function App() {
           <Route path="journals/new"                element={<JournalEditorPage />} />
           <Route path="journals/:journalId"         element={<JournalDetailPage />} />
           <Route path="journals/:journalId/edit"    element={<JournalEditorPage />} />
+
+          {/* 実習ワークフロー（日誌+AI評価+チャット統合） */}
+          <Route path="journal-workflow"              element={<JournalWorkflowPage />} />
+          <Route path="journal-workflow/:journalId"   element={<JournalWorkflowPage />} />
 
           {/* 評価 (RQ2) */}
           <Route path="evaluations"                         element={<EvaluationsPage />} />

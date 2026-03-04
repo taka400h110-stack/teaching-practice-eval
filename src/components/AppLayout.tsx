@@ -62,24 +62,22 @@ const ROLE_COLOR: Record<UserRole, string> = {
 // ────────────────────────────────────────────
 function getNavGroups(role: UserRole): NavGroup[] {
 
-  // ── 実習生（student）: 日誌作成→AI評価→チャット→目標→成長 ──
+  // ── 実習生（student）: 統合ワークフロー ──
   if (role === "student") {
     return [
       {
         group: "週次サイクル（RQ3）",
         items: [
-          { label: "ダッシュボード",     path: "/dashboard",       icon: <DashboardIcon /> },
-          { label: "① 実習日誌作成",    path: "/journals",         icon: <MenuBookIcon /> },
-          { label: "② AI評価結果確認",  path: "/evaluations",      icon: <AssessmentIcon /> },
-          { label: "③ 省察チャットBot", path: "/chat",             icon: <ChatIcon /> },
+          { label: "ダッシュボード",              path: "/dashboard",        icon: <DashboardIcon /> },
+          { label: "実習日誌ワークフロー",        path: "/journal-workflow", icon: <MenuBookIcon /> },
         ],
       },
       {
         group: "自己評価・成長（RQ3）",
         items: [
-          { label: "④ 自己評価入力",    path: "/self-evaluation",  icon: <SelfImprovementIcon /> },
-          { label: "成長グラフ",         path: "/growth",           icon: <TimelineIcon /> },
-          { label: "目標履歴（SMART）",  path: "/goals",            icon: <TrackChangesIcon /> },
+          { label: "自己評価入力",               path: "/self-evaluation",  icon: <SelfImprovementIcon /> },
+          { label: "成長グラフ",                  path: "/growth",           icon: <TimelineIcon /> },
+          { label: "目標履歴（SMART）",           path: "/goals",            icon: <TrackChangesIcon /> },
         ],
       },
     ];

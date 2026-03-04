@@ -153,7 +153,7 @@ export default function DashboardPage() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => navigate("/journals/new")}
+          onClick={() => navigate("/journal-workflow")}
           sx={{ bgcolor: "white", color: "primary.main", fontWeight: "bold", "&:hover": { bgcolor: "grey.100" } }}
         >
           今日の日誌を記録
@@ -303,10 +303,10 @@ export default function DashboardPage() {
               </Typography>
               <Grid container spacing={1}>
                 {[
-                  { label: "今日の日誌を書く",     icon: <EditIcon />,       path: "/journals/new",     color: "#1976d2" },
-                  { label: "AI評価を確認",          icon: <BarChartIcon />,   path: "/evaluations",      color: "#388e3c" },
+                  { label: "実習日誌ワークフロー",  icon: <EditIcon />,       path: "/journal-workflow", color: "#1976d2" },
                   { label: "成長グラフを見る",      icon: <TrendingUpIcon />, path: "/growth",           color: "#f57c00" },
-                  { label: "チャットBotと話す",     icon: <ChatIcon />,       path: "/chat",             color: "#7b1fa2" },
+                  { label: "自己評価入力",          icon: <BarChartIcon />,   path: "/self-evaluation",  color: "#388e3c" },
+                  { label: "目標履歴（SMART）",     icon: <ChatIcon />,       path: "/goals",            color: "#7b1fa2" },
                 ].map((a) => (
                   <Grid key={a.label} size={{ xs: 6 }}>
                     <Button
