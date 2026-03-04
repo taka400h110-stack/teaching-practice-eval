@@ -133,6 +133,22 @@ export default function DashboardPage() {
           <Typography variant="body2" sx={{ opacity: 0.85 }}>
             {new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}
           </Typography>
+          {/* 実習生：学籍番号・学年・実習情報 */}
+          {(user as { student_number?: string } | null)?.student_number && (
+            <Typography variant="caption" sx={{ opacity: 0.75, display: "block", mt: 0.5 }}>
+              学籍番号: {(user as { student_number?: string }).student_number}
+              {(user as { grade?: number }).grade && ` ／ ${(user as { grade?: number }).grade}年生`}
+              {(user as { school_type?: string }).school_type &&
+                ` ／ ${{ elementary: "小学校", middle: "中学校", high: "高等学校", special: "特別支援学校" }[
+                  (user as { school_type?: string }).school_type ?? ""
+                ] ?? ""}`
+              }
+              {(user as { internship_type?: string }).internship_type &&
+                ` ／ ${(user as { internship_type?: string }).internship_type === "intensive" ? "集中実習" : "分散実習"}`
+              }
+              {(user as { weeks?: number }).weeks ? ` ${(user as { weeks?: number }).weeks}週間` : ""}
+            </Typography>
+          )}
         </Box>
         <Button
           variant="contained"

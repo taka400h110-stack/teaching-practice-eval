@@ -16,8 +16,15 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  student_number?: string;  // 学籍番号（実習生のみ）
-  grade?: number;           // 学年（実習生のみ：1-4）
+  // 実習生専用フィールド
+  student_number?: string;    // 学籍番号
+  grade?: number;             // 学年（1-4）
+  school_type?: "elementary" | "middle" | "high" | "special";  // 校種
+  internship_type?: "intensive" | "distributed";               // 実習形態
+  weeks?: number;             // 実習週数
+  // 実習生以外のフィールド
+  organization?: string;      // 所属機関
+  position?: string;          // 役職
 }
 
 export interface AuthTokens {

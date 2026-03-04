@@ -311,27 +311,71 @@ export default function AppLayout() {
 
       {/* ユーザー情報 */}
       {user && (
-        <Box sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1.5, bgcolor: "grey.50" }}>
+        <Box sx={{ p: 1.5, display: "flex", alignItems: "flex-start", gap: 1.5, bgcolor: "grey.50" }}>
           <Avatar
             sx={{
-              width: 36, height: 36,
+              width: 40, height: 40,
               bgcolor: ROLE_COLOR[role] ?? "primary.main",
-              fontSize: 15, fontWeight: "bold",
+              fontSize: 16, fontWeight: "bold",
+              flexShrink: 0,
             }}
           >
             {user.name?.[0] ?? "U"}
           </Avatar>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="body2" fontWeight="bold" noWrap fontSize={12}>{user.name}</Typography>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="body2" fontWeight="bold" noWrap fontSize={13}>{user.name}</Typography>
             <Chip
               label={ROLE_LABEL[role] ?? role}
               size="small"
               sx={{
                 fontSize: 9, height: 16,
                 bgcolor: ROLE_COLOR[role] ?? "primary.main",
-                color: "white", mt: 0.3,
+                color: "white", mt: 0.3, mb: 0.3,
               }}
             />
+            {/* 実習生：学籍番号・学年・実習情報 */}
+            {role === "student" && (
+              <Box>
+                {(user as { student_number?: string }).student_number && (
+                  <Typography variant="caption" display="block" color="text.secondary" fontSize={10} noWrap>
+                    学籍: {(user as { student_number?: string }).student_number}
+                  </Typography>
+                )}
+                {(user as { grade?: number }).grade && (
+                  <Typography variant="caption" display="block" color="text.secondary" fontSize={10} noWrap>
+                    {(user as { grade?: number }).grade}年生
+                    {(user as { school_type?: string }).school_type &&
+                      ` / ${
+                        ({ elementary: "小学校", middle: "中学校", high: "高等学校", special: "特別支援" } as Record<string, string>)[
+                          (user as { school_type?: string }).school_type ?? ""
+                        ] ?? ""
+                      }`
+                    }
+                  </Typography>
+                )}
+                {(user as { internship_type?: string }).internship_type && (
+                  <Typography variant="caption" display="block" color="text.secondary" fontSize={10} noWrap>
+                    {(user as { internship_type?: string }).internship_type === "intensive" ? "集中実習" : "分散実習"}
+                    {(user as { weeks?: number }).weeks ? ` ${(user as { weeks?: number }).weeks}週間` : ""}
+                  </Typography>
+                )}
+              </Box>
+            )}
+            {/* 実習生以外：所属・役職 */}
+            {role !== "student" && (
+              <Box>
+                {(user as { organization?: string }).organization && (
+                  <Typography variant="caption" display="block" color="text.secondary" fontSize={10} sx={{ lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {(user as { organization?: string }).organization}
+                  </Typography>
+                )}
+                {(user as { position?: string }).position && (
+                  <Typography variant="caption" display="block" color="text.secondary" fontSize={10} noWrap>
+                    {(user as { position?: string }).position}
+                  </Typography>
+                )}
+              </Box>
+            )}
           </Box>
         </Box>
       )}

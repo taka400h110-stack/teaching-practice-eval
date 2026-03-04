@@ -103,28 +103,111 @@ function saveChatSessions(sessions: Record<string, ChatSession>): void {
   localStorage.setItem("mock_chat_sessions", JSON.stringify(sessions));
 }
 
-// 役割ごとのデモユーザー定義
-const DEMO_USERS: Record<string, { id: string; name: string; role: UserRole; firstLogin: boolean }> = {
-  "student@teaching-eval.jp":      { id: "user-001", name: "山田 太郎",    role: "student",        firstLogin: true },
-  "teacher@teaching-eval.jp":      { id: "user-002", name: "佐藤 花子",    role: "univ_teacher",   firstLogin: false },
-  "mentor@teaching-eval.jp":       { id: "user-003", name: "鈴木 一郎",    role: "school_mentor",  firstLogin: false },
-  "admin@teaching-eval.jp":        { id: "user-004", name: "田中 管理者",  role: "admin",          firstLogin: false },
-  "researcher@teaching-eval.jp":   { id: "user-005", name: "伊藤 研究者",  role: "researcher",     firstLogin: false },
-  "collaborator@teaching-eval.jp": { id: "user-006", name: "渡辺 協力者",  role: "collaborator",   firstLogin: false },
-  "board@teaching-eval.jp":        { id: "user-007", name: "中村 委員",    role: "board_observer", firstLogin: false },
-  "evaluator@teaching-eval.jp":    { id: "user-008", name: "小林 評価者",  role: "evaluator",      firstLogin: false },
+// ══════════════════════════════════════════════════════
+// デモユーザー定義（全役割・オンボーディング完了済み）
+// 全員 firstLogin: false → ログイン即ダッシュボードへ
+// ══════════════════════════════════════════════════════
+type DemoUserDef = {
+  id: string;
+  name: string;
+  role: UserRole;
+  firstLogin: boolean;
+  // 表示用プロフィール情報
+  student_number?: string;
+  grade?: number;
+  organization?: string;
+  position?: string;
+  school_type?: string;
+  internship_type?: string;
+  weeks?: number;
+};
+
+const DEMO_USERS: Record<string, DemoUserDef> = {
+  "student@teaching-eval.jp": {
+    id: "user-001", name: "山田 太郎", role: "student", firstLogin: false,
+    student_number: "2023A001", grade: 3,
+    school_type: "elementary", internship_type: "intensive", weeks: 10,
+  },
+  "teacher@teaching-eval.jp": {
+    id: "user-002", name: "佐藤 花子", role: "univ_teacher", firstLogin: false,
+    organization: "〇〇大学 教育学部", position: "准教授",
+  },
+  "mentor@teaching-eval.jp": {
+    id: "user-003", name: "鈴木 一郎", role: "school_mentor", firstLogin: false,
+    organization: "〇〇市立東小学校", position: "担任教諭",
+  },
+  "admin@teaching-eval.jp": {
+    id: "user-004", name: "田中 管理者", role: "admin", firstLogin: false,
+    organization: "〇〇大学 教職センター", position: "センター長",
+  },
+  "researcher@teaching-eval.jp": {
+    id: "user-005", name: "伊藤 研究者", role: "researcher", firstLogin: false,
+    organization: "〇〇大学大学院 教育研究科", position: "博士課程研究員",
+  },
+  "collaborator@teaching-eval.jp": {
+    id: "user-006", name: "渡辺 協力者", role: "collaborator", firstLogin: false,
+    organization: "△△教育センター", position: "研究協力員",
+  },
+  "board@teaching-eval.jp": {
+    id: "user-007", name: "中村 委員", role: "board_observer", firstLogin: false,
+    organization: "〇〇市教育委員会", position: "指導主事",
+  },
+  "evaluator@teaching-eval.jp": {
+    id: "user-008", name: "小林 評価者", role: "evaluator", firstLogin: false,
+    organization: "教員養成評価機構", position: "外部評価者",
+  },
 };
 
 // デモアカウント一覧（LoginPageで表示用）
 export const DEMO_ACCOUNT_LIST = [
-  { email: "student@teaching-eval.jp",      password: "demo1234", role: "実習生（3年生・小学校）",     name: "山田 太郎" },
-  { email: "teacher@teaching-eval.jp",      password: "demo1234", role: "大学教員（指導教官）",         name: "佐藤 花子" },
-  { email: "mentor@teaching-eval.jp",       password: "demo1234", role: "校内指導教員（メンター）",     name: "鈴木 一郎" },
-  { email: "admin@teaching-eval.jp",        password: "demo1234", role: "管理者",                      name: "田中 管理者" },
-  { email: "researcher@teaching-eval.jp",   password: "demo1234", role: "研究者",                      name: "伊藤 研究者" },
-  { email: "collaborator@teaching-eval.jp", password: "demo1234", role: "研究協力者",                  name: "渡辺 協力者" },
-  { email: "board@teaching-eval.jp",        password: "demo1234", role: "教育委員会（閲覧者）",         name: "中村 委員" },
-  { email: "evaluator@teaching-eval.jp",    password: "demo1234", role: "外部評価者",                  name: "小林 評価者" },
+  {
+    email: "student@teaching-eval.jp",      password: "password",
+    label: "実習生",       name: "山田 太郎",
+    detail: "3年生 / 小学校・集中実習（10週）/ 学籍番号: 2023A001",
+    group: "実習関係者",
+  },
+  {
+    email: "teacher@teaching-eval.jp",      password: "password",
+    label: "大学教員",     name: "佐藤 花子",
+    detail: "〇〇大学 教育学部 / 准教授",
+    group: "実習関係者",
+  },
+  {
+    email: "mentor@teaching-eval.jp",       password: "password",
+    label: "校内指導教員", name: "鈴木 一郎",
+    detail: "〇〇市立東小学校 / 担任教諭",
+    group: "実習関係者",
+  },
+  {
+    email: "evaluator@teaching-eval.jp",    password: "password",
+    label: "評価者",       name: "小林 評価者",
+    detail: "教員養成評価機構 / 外部評価者",
+    group: "実習関係者",
+  },
+  {
+    email: "researcher@teaching-eval.jp",   password: "password",
+    label: "研究者",       name: "伊藤 研究者",
+    detail: "〇〇大学大学院 教育研究科 / 博士課程研究員",
+    group: "研究・行政",
+  },
+  {
+    email: "collaborator@teaching-eval.jp", password: "password",
+    label: "研究協力者",   name: "渡辺 協力者",
+    detail: "△△教育センター / 研究協力員",
+    group: "研究・行政",
+  },
+  {
+    email: "board@teaching-eval.jp",        password: "password",
+    label: "教育委員会",   name: "中村 委員",
+    detail: "〇〇市教育委員会 / 指導主事",
+    group: "研究・行政",
+  },
+  {
+    email: "admin@teaching-eval.jp",        password: "password",
+    label: "管理者",       name: "田中 管理者",
+    detail: "〇〇大学 教職センター / センター長",
+    group: "システム",
+  },
 ];
 
 const mockApi = {
@@ -138,15 +221,29 @@ const mockApi = {
       ? { id: demo.id, email, name: demo.name, role: demo.role }
       : { id: "user-001", email, name: "山田 太郎", role: "student" as UserRole };
 
-    const isFirstLogin = demo?.firstLogin ?? true;
-    localStorage.setItem("user_info", JSON.stringify(user));
+    const isFirstLogin = demo?.firstLogin ?? false;
+    // デモユーザーのプロフィール情報を user_info に含める
+    const fullUser = demo ? {
+      ...user,
+      student_number: demo.student_number,
+      grade:          demo.grade,
+      organization:   demo.organization,
+      position:       demo.position,
+      school_type:    demo.school_type,
+      internship_type: demo.internship_type,
+      weeks:          demo.weeks,
+    } : user;
+    localStorage.setItem("user_info", JSON.stringify(fullUser));
     localStorage.setItem("auth_token", "mock-token-001");
-    // 初回ログインフラグ（初回の場合はOnboardingへ）
+    // デモアカウントは全員オンボーディング完了済みとしてマーク
+    if (demo) {
+      localStorage.setItem(`onboarding_done_${user.id}`, "true");
+    }
     const onboardingDone = localStorage.getItem(`onboarding_done_${user.id}`);
     if (!onboardingDone && isFirstLogin) {
       localStorage.setItem("pending_onboarding", "true");
     }
-    return { ...user, requiresOnboarding: !onboardingDone && isFirstLogin };
+    return { ...fullUser, requiresOnboarding: !onboardingDone && isFirstLogin };
   },
   logout: async () => {
     await delay(100);
