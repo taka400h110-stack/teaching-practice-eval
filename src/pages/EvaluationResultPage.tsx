@@ -25,37 +25,17 @@ import {
 import { useQuery }       from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { EvaluationItem } from "../types";
+import {
+  RUBRIC_ITEMS, REFLECTION_DEPTH_LEVELS, RUBRIC_FACTORS,
+  getRdByScore,
+} from "../constants/rubric";
 
-const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
-const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"];
+const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
 const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
 
-// 23項目のラベル
-const ITEM_LABELS: string[] = [
-  /* F1 1-7  */ "特別支援が必要な児童への適切な対応",
-  "母語が異なる児童への対応・指導",
-  "特別支援が必要な児童への対応理解",
-  "母語が異なる児童への対応理解",
-  "性別に関わる心理的・行動的差異の理解",
-  "社会的・文化的影響への理解",
-  "教科の特性に基づいた授業設計",
-  /* F2 8-13 */ "実習経験と教員としての仕事の関連付け",
-  "教育活動を評価する能力",
-  "積極的な価値・態度の実践",
-  "フィードバックの受容と活用",
-  "実践を振り返り専門的成長に責任を持つ",
-  "自己評価能力の維持",
-  /* F3 14-17*/ "学級運営と生徒指導",
-  "安全で効果的な学習環境の構築",
-  "学習における秩序と社会的に許容される行動の確立",
-  "個別対応と集団への関わり",
-  /* F4 18-23*/ "同僚としての役割認識",
-  "職責の遂行と専門的責任",
-  "学習困難の早期発見と対応",
-  "行動・学習特性の理解",
-  "知的発達段階の理解",
-  "発達と学習方法の理解",
-];
+// 23項目のラベル（rubric.ts から統一）
+const ITEM_LABELS: string[] = RUBRIC_ITEMS.map((item) => item.label);
 
 function ScoreChip({ score }: { score: number | null }) {
   if (score === null) return <Chip label="未評価" size="small" variant="outlined" />;
@@ -84,6 +64,21 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
 }
 
 // 評価項目行
+function RdBadge({ score }: { score: number | null }) {
+  if (!score) return null;
+  const rd = getRdByScore(score);
+  return (
+    <Chip
+      label={rd.rd}
+      size="small"
+      sx={{
+        bgcolor: rd.color, color: "white", fontWeight: "bold",
+        fontSize: 10, height: 18, ml: 0.5,
+      }}
+    />
+  );
+}
+
 function ItemRow({ item, label, expanded, onToggle }: {
   item: EvaluationItem; label: string; expanded: boolean; onToggle: () => void;
 }) {
@@ -97,7 +92,10 @@ function ItemRow({ item, label, expanded, onToggle }: {
           <Typography variant="caption" color="text.secondary">{item.item_number}</Typography>
         </TableCell>
         <TableCell sx={{ py: 0.8 }}>
-          <Typography variant="body2">{label}</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Typography variant="body2">{label}</Typography>
+            <RdBadge score={item.score} />
+          </Box>
         </TableCell>
         <TableCell sx={{ py: 0.8, textAlign: "center", width: 60 }}>
           <ScoreChip score={item.score} />

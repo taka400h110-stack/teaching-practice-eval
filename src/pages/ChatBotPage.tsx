@@ -26,64 +26,23 @@ import ExpandMoreIcon     from "@mui/icons-material/ExpandMore";
 import { useQuery }       from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { ChatMessage } from "../types";
+import {
+  RUBRIC_FACTORS as _RUBRIC_FACTORS,
+  RUBRIC_ITEMS,
+  REFLECTION_DEPTH_LEVELS,
+  getItemsByFactor,
+} from "../constants/rubric";
 
 // ────────────────────────────────────────────
-// ルーブリック定義（4因子23項目）
+// ルーブリック定義（rubric.ts から統一利用）
+// 2026-03-07: 全4因子・全23項目にRD水準を適用
 // ────────────────────────────────────────────
-const RUBRIC_FACTORS = [
-  {
-    key: "F1", label: "児童生徒への指導力", color: "#1976d2",
-    items: [
-      { num: 1,  label: "特別支援教育の実践" },
-      { num: 2,  label: "外国語・多文化対応" },
-      { num: 3,  label: "特別支援の理解" },
-      { num: 4,  label: "外国語支援の理解" },
-      { num: 5,  label: "異なる背景への配慮" },
-      { num: 6,  label: "インクルーシブな学習環境" },
-      { num: 7,  label: "個別ニーズへの対応" },
-    ],
-  },
-  {
-    key: "F2", label: "自己評価力", color: "#388e3c",
-    items: [
-      { num: 8,  label: "体験と成長の接続" },
-      { num: 9,  label: "指導姿勢の検証能力" },
-      { num: 10, label: "模範的姿勢の実践" },
-      { num: 11, label: "フィードバック受容力" },
-      { num: 12, label: "実践省察と改善責任" },
-      { num: 13, label: "専門性向上のための自己評価" },
-    ],
-  },
-  {
-    key: "F3", label: "学級経営力", color: "#f57c00",
-    items: [
-      { num: 14, label: "生徒指導力" },
-      { num: 15, label: "学級管理能力" },
-      { num: 16, label: "リーダーシップ発揮" },
-      { num: 17, label: "児童の困難支援" },
-    ],
-  },
-  {
-    key: "F4", label: "職務を理解して行動する力", color: "#7b1fa2",
-    items: [
-      { num: 18, label: "同僚の学習支援役割理解" },
-      { num: 19, label: "特別責任を有する同僚役割の理解" },
-      { num: 20, label: "人間関係・専門的期待への対応" },
-      { num: 21, label: "教師役割の多様性理解" },
-      { num: 22, label: "教師の権威の意味理解" },
-      { num: 23, label: "職業倫理と連帯責任" },
-    ],
-  },
-];
-
-// 省察深さレベル（Hatton & Smith, 1995）
-const REFLECTION_DEPTH_LEVELS = [
-  { level: 1, label: "RD-1: 記述的報告",         desc: "何が起きたかを事実のみ記述",              color: "#bdbdbd" },
-  { level: 2, label: "RD-2: 記述的省察",         desc: "理由や根拠を伴う記述",                    color: "#4fc3f7" },
-  { level: 3, label: "RD-3: 対話的省察",         desc: "複数の視点から問い直し",                  color: "#81c784" },
-  { level: 4, label: "RD-4: 批判的省察",         desc: "社会・倫理的文脈との関連づけ",            color: "#ffb74d" },
-  { level: 5, label: "RD-5: 変容的省察",         desc: "自己変容・価値観の変容を伴う深い洞察",    color: "#ce93d8" },
-];
+const RUBRIC_FACTORS = _RUBRIC_FACTORS.map((f) => ({
+  key: f.roman,
+  label: f.label,
+  color: f.color,
+  items: getItemsByFactor(f.key).map((item) => ({ num: item.num, label: item.label })),
+}));
 
 // フェーズラベル
 const PHASE_LABELS: Record<string, { label: string; color: "default" | "primary" | "success" | "warning" }> = {

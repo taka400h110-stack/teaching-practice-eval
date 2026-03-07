@@ -46,6 +46,12 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { JournalEntry, JournalCreateRequest, HourRecord, ChatMessage } from "../types";
+import {
+  REFLECTION_DEPTH_LEVELS,
+  RUBRIC_ITEMS,
+  getItemsByFactor,
+  RUBRIC_FACTORS as _RUBRIC_FACTORS,
+} from "../constants/rubric";
 
 // ═══════════════════════════════════════════
 // ① 日誌エディタ 共通ユーティリティ
@@ -224,13 +230,11 @@ const PHASE_LABELS: Record<string, { label: string; color: string; suggestions: 
     suggestions: ["目標を保存しましょう", "来週の実習頑張ってください！"] },
 };
 
-const REFLECTION_DEPTH_LEVELS = [
-  { level: 1, label: "RD-1: 記述的報告",  desc: "何が起きたかを事実のみ記述",         color: "#bdbdbd" },
-  { level: 2, label: "RD-2: 記述的省察",  desc: "理由や根拠を伴う記述",               color: "#4fc3f7" },
-  { level: 3, label: "RD-3: 対話的省察",  desc: "複数の視点から問い直し",             color: "#81c784" },
-  { level: 4, label: "RD-4: 批判的省察",  desc: "倫理・価値観に基づく問い直し",       color: "#ffb74d" },
-  { level: 5, label: "RD-5: 変容的省察",  desc: "アイデンティティの変容を伴う省察",   color: "#f06292" },
-];
+// ────────────────────────────────────────────
+// 省察深さレベル（rubric.ts から統一インポート）
+// 2026-03-07: 全4因子・全23項目に共通適用
+// ────────────────────────────────────────────
+// REFLECTION_DEPTH_LEVELS は rubric.ts からインポート済み
 
 function estimateReflectionDepth(text: string): number {
   const lower = text;
