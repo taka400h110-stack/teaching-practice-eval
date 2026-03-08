@@ -136,7 +136,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         group: "評価業務（RQ2）",
         items: [
           { label: "評価一覧",           path: "/evaluations",       icon: <AssessmentIcon /> },
-          { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
+          { label: "人間評価入力",       path: "/evaluations/journal-001/human", icon: <VerifiedUserIcon /> },
           { label: "AI vs 人間比較",     path: "/comparison",        icon: <CompareArrowsIcon /> },
           { label: "信頼性分析（ICC）",  path: "/reliability",       icon: <EqualizerIcon /> },
         ],
@@ -157,7 +157,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         group: "AI評価信頼性（RQ2）",
         items: [
           { label: "評価一覧",           path: "/evaluations",  icon: <AssessmentIcon /> },
-          { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
+          { label: "人間評価入力",       path: "/evaluations/journal-001/human", icon: <VerifiedUserIcon /> },
           { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
           { label: "信頼性分析（ICC）",  path: "/reliability",  icon: <EqualizerIcon /> },
         ],
@@ -201,7 +201,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         group: "評価参照",
         items: [
           { label: "評価一覧（閲覧）",   path: "/evaluations",  icon: <AssessmentIcon /> },
-          { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
+          { label: "人間評価入力",       path: "/evaluations/journal-001/human", icon: <VerifiedUserIcon /> },
           { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
         ],
       },
@@ -254,7 +254,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
       items: [
         { label: "教員ダッシュボード",   path: "/teacher-dashboard", icon: <SchoolIcon /> },
         { label: "評価一覧",             path: "/evaluations",       icon: <AssessmentIcon /> },
-        { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
+        { label: "人間評価入力",       path: "/evaluations/journal-001/human", icon: <VerifiedUserIcon /> },
         { label: "AI vs 人間比較",       path: "/comparison",        icon: <CompareArrowsIcon /> },
         { label: "信頼性分析（ICC）",    path: "/reliability",       icon: <VerifiedUserIcon /> },
       ],

@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   Box, Button, Card, CardContent, Chip, Slider, Typography,
   Alert, Snackbar, Divider, Tooltip, Collapse, IconButton, Paper, Tab, Tabs,
+  CircularProgress,
 } from "@mui/material";
 import ArrowBackIcon   from "@mui/icons-material/ArrowBack";
 import SaveIcon        from "@mui/icons-material/Save";
@@ -67,7 +68,7 @@ export default function HumanEvaluationPage() {
   const [tab, setTab] = useState(0);
   const [snackOpen, setSnackOpen] = useState(false);
 
-  const { data: journal } = useQuery({
+  const { data: journal, isLoading, isError } = useQuery({
     queryKey: ["journal", journalId],
     queryFn:  () => mockApi.getJournal(journalId!),
     enabled:  !!journalId,
@@ -77,6 +78,30 @@ export default function HumanEvaluationPage() {
     mutationFn: async () => { await new Promise((r) => setTimeout(r, 600)); return scores; },
     onSuccess:  () => { setSnackOpen(true); },
   });
+
+  if (!journalId) {
+    return (
+      <Box maxWidth={920} mx="auto" p={3}>
+        <Alert severity="warning">ジャーナルIDが指定されていません。評価一覧ページから選択してください。</Alert>
+      </Box>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (isError || !journal) {
+    return (
+      <Box maxWidth={920} mx="auto" p={3}>
+        <Alert severity="error">日誌の取得に失敗しました。一覧に戻って再度お試しください。</Alert>
+      </Box>
+    );
+  }
 
   const factorAvg = (factorKey: string) => {
     const items = RUBRIC_ITEMS.filter((i) => i.factor === factorKey);
@@ -89,7 +114,6 @@ export default function HumanEvaluationPage() {
   // 日誌本文の展開 (バージョン2対応)
   let parsedRecords: any[] = [];
   let parsedReflection = "";
-  // @ts-ignore
   if (journal?.content) {
     try {
       const p = JSON.parse(journal.content);

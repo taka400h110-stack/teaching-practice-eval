@@ -4,7 +4,7 @@
  */
 import React, { useState } from "react";
 import {
-  Box, Card, CardContent, Chip, Grid, Typography, LinearProgress,
+  Box, CircularProgress, Alert, Card, CardContent, Chip, Grid, Typography, LinearProgress,
   ToggleButton, ToggleButtonGroup, Paper, Avatar, Divider, Tabs, Tab,
 } from "@mui/material";
 import TrendingUpIcon   from "@mui/icons-material/TrendingUp";
@@ -44,6 +44,22 @@ export default function GrowthVisualizationPage() {
     queryKey: ["selfEvals"],
     queryFn:  () => mockApi.getSelfEvaluations(),
   });
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!growth || !growth.weekly_scores || growth.weekly_scores.length === 0) {
+    return (
+      <Box maxWidth={1000} mx="auto" p={3}>
+        <Alert severity="info">成長データがありません。</Alert>
+      </Box>
+    );
+  }
 
   const scores    = growth.weekly_scores;
   const latest    = scores[scores.length - 1];

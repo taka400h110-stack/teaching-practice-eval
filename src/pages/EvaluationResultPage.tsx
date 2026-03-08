@@ -162,7 +162,24 @@ export default function EvaluationResultPage() {
     });
   };
 
-  const factorScores = FACTOR_KEYS.map((fk) => result?.factor_scores[fk]);
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (isError || !result) {
+    return (
+      <Box maxWidth={1000} mx="auto" p={3}>
+        <Alert severity="error">評価結果の取得に失敗しました。一覧に戻って再度お試しください。</Alert>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mt: 2 }}>戻る</Button>
+      </Box>
+    );
+  }
+
+  const factorScores = FACTOR_KEYS.map((fk) => result?.factor_scores[fk] ?? 0);
 
   // レーダーチャート用データ
   const radarData = FACTOR_LABELS.map((label, i) => ({
