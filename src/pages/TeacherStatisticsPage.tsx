@@ -47,10 +47,10 @@ export default function TeacherStatisticsPage() {
   const avg = (arr: number[]) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
   const totalScores = cohorts.map((p) => p.final_total);
   const avgTotal = avg(totalScores);
-  const f1Scores = cohorts.map((p) => (p.factor_scores as Record<string, number>)?.factor1 ?? p.final_total * 0.9);
-  const f2Scores = cohorts.map((p) => (p.factor_scores as Record<string, number>)?.factor2 ?? p.final_total);
-  const f3Scores = cohorts.map((p) => (p.factor_scores as Record<string, number>)?.factor3 ?? p.final_total * 0.95);
-  const f4Scores = cohorts.map((p) => (p.factor_scores as Record<string, number>)?.factor4 ?? p.final_total * 1.05);
+  const f1Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor1 ?? p.final_total * 0.9);
+  const f2Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor2 ?? p.final_total);
+  const f3Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor3 ?? p.final_total * 0.95);
+  const f4Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor4 ?? p.final_total * 1.05);
 
   const factorAvgs = {
     factor1: avg(f1Scores),

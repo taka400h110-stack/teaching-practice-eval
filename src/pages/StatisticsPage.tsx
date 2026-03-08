@@ -6,6 +6,8 @@ import {
   Button, Menu, MenuItem, Tooltip,
 } from "@mui/material";
 import EqualizerIcon from "@mui/icons-material/Equalizer";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Checkbox from "@mui/material/Checkbox";
 import DownloadIcon  from "@mui/icons-material/Download";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -47,6 +49,7 @@ function downloadJSON(filename: string, data: unknown): void {
 export default function StatisticsPage() {
   const [tab, setTab] = useState(0);
   const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null);
+  const [anonymize, setAnonymize] = useState(true);
 
   const { data: cohorts = [], isLoading } = useQuery({
     queryKey: ["cohorts"],
@@ -74,8 +77,8 @@ export default function StatisticsPage() {
     };
     const genderMap: Record<string, string> = { male: "男性", female: "女性", other: "その他" };
     const rows = cohorts.map((p) => [
-      p.student_number ?? p.id,
-      p.name,
+      anonymize ? `ID-${p.id.slice(0, 4)}` : (p.student_number ?? p.id),
+      anonymize ? "匿名ユーザー" : p.name,
       String(p.grade),
       genderMap[p.gender] ?? p.gender,
       schoolTypeMap[p.school_type] ?? p.school_type,
@@ -107,8 +110,8 @@ export default function StatisticsPage() {
     cohorts.forEach((p) => {
       p.weekly_scores.forEach((ws) => {
         rows.push([
-          p.student_number ?? p.id,
-          p.name,
+          anonymize ? `ID-${p.id.slice(0, 4)}` : (p.student_number ?? p.id),
+          anonymize ? "匿名ユーザー" : p.name,
           String(ws.week),
           ws.factor1.toFixed(3),
           ws.factor2.toFixed(3),
@@ -127,8 +130,8 @@ export default function StatisticsPage() {
       exported_at: new Date().toISOString(),
       n: cohorts.length,
       cohorts: cohorts.map((p) => ({
-        student_number: p.student_number ?? p.id,
-        name: p.name,
+        student_number: anonymize ? `ID-${p.id.slice(0, 4)}` : (p.student_number ?? p.id),
+        name: anonymize ? "匿名ユーザー" : p.name,
         grade: p.grade,
         gender: p.gender,
         school_type: p.school_type,
@@ -228,6 +231,13 @@ export default function StatisticsPage() {
             open={Boolean(exportAnchor)}
             onClose={() => setExportAnchor(null)}
           >
+            <Box px={2} py={1}>
+              <FormControlLabel
+                control={<Checkbox checked={anonymize} onChange={(e) => setAnonymize(e.target.checked)} size="small" />}
+                label={<Typography variant="body2">個人情報を匿名化する (ID化)</Typography>}
+              />
+            </Box>
+            <Divider />
             <MenuItem onClick={handleExportCohortCSV}>
               📊 コーホートデータ (CSV) — Mplus/R向け
             </MenuItem>

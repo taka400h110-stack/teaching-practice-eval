@@ -29,8 +29,6 @@ const TabPanel = ({ children, value, index }: TabPanelProps) =>
   value === index ? <Box pt={2}>{children}</Box> : null;
 
 function TrendIcon({ delta }: { delta: number }) {
-  if (delta > 0.05) return <TrendingUpIcon sx={{ color: "success.main", fontSize: 18 }} />;
-  if (delta < -0.05) return <TrendingDownIcon sx={{ color: "error.main", fontSize: 18 }} />;
   return <TrendingFlatIcon sx={{ color: "text.secondary", fontSize: 18 }} />;
 }
 
@@ -46,9 +44,6 @@ export default function GrowthVisualizationPage() {
     queryKey: ["selfEvals"],
     queryFn:  () => mockApi.getSelfEvaluations(),
   });
-
-  if (isLoading) return <LinearProgress />;
-  if (!growth) return null;
 
   const scores    = growth.weekly_scores;
   const latest    = scores[scores.length - 1];
@@ -371,7 +366,12 @@ export default function GrowthVisualizationPage() {
                   const selfLatest = selfEvals[selfEvals.length - 1];
                   const selfScore  = selfLatest ? selfLatest[fk] : null;
                   const gap = selfScore !== null ? +(latest[fk] - selfScore).toFixed(2) : null;
-                  return (
+                  if (fDelta > 0.05) return <TrendingUpIcon sx={{ color: "success.main", fontSize: 18 }} />;
+  if (delta < -0.05) return <TrendingDownIcon sx={{ color: "error.main", fontSize: 18 }} />;
+  if (isLoading) return <LinearProgress />;
+  if (!growth) return null;
+
+  return (
                     <Box key={fk} mb={2.5}>
                       <Box display="flex" alignItems="center" gap={1} mb={0.5}>
                         <Avatar sx={{ width: 22, height: 22, bgcolor: FACTOR_COLORS[i], fontSize: 10 }}>{i + 1}</Avatar>

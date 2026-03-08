@@ -38,7 +38,6 @@ const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
 const ITEM_LABELS: string[] = RUBRIC_ITEMS.map((item) => item.label);
 
 function ScoreChip({ score }: { score: number | null }) {
-  if (score === null) return <Chip label="未評価" size="small" variant="outlined" />;
   const color = score >= 4 ? "success" : score >= 3 ? "primary" : score >= 2 ? "warning" : "error";
   return (
     <Chip
@@ -65,7 +64,6 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
 
 // 評価項目行
 function RdBadge({ score }: { score: number | null }) {
-  if (!score) return null;
   const rd = getRdByScore(score);
   return (
     <Chip
@@ -164,10 +162,7 @@ export default function EvaluationResultPage() {
     });
   };
 
-  if (isLoading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh"><CircularProgress /></Box>;
-  if (isError || !result) return <Box p={3}><Alert severity="error">評価結果の取得に失敗しました。</Alert></Box>;
-
-  const factorScores = FACTOR_KEYS.map((fk) => result.factor_scores[fk]);
+  const factorScores = FACTOR_KEYS.map((fk) => result?.factor_scores[fk]);
 
   // レーダーチャート用データ
   const radarData = FACTOR_LABELS.map((label, i) => ({
@@ -183,7 +178,7 @@ export default function EvaluationResultPage() {
   }));
 
   // 23項目スコア棒グラフ用データ
-  const itemBarData = result.evaluation_items.map((item) => ({
+  const itemBarData = result?.evaluation_items.map((item) => ({
     name: `${item.item_number}`,
     スコア: item.score ?? 0,
     因子: item.factor,
@@ -251,9 +246,9 @@ export default function EvaluationResultPage() {
                 <Box key={fk} mb={1.5}>
                   <Box display="flex" justifyContent="space-between" mb={0.3}>
                     <Typography variant="caption" fontWeight={600} color={FACTOR_COLORS[i]}>{FACTOR_LABELS[i].slice(0, 6)}</Typography>
-                    <Typography variant="caption" fontWeight="bold">{result.factor_scores[fk].toFixed(2)}/5.0</Typography>
+                    <Typography variant="caption" fontWeight="bold">{result?.factor_scores[fk].toFixed(2)}/5.0</Typography>
                   </Box>
-                  <ScoreBar value={result.factor_scores[fk]} color={FACTOR_COLORS[i]} />
+                  <ScoreBar value={result?.factor_scores[fk]} color={FACTOR_COLORS[i]} />
                 </Box>
               ))}
             </CardContent>
@@ -269,7 +264,7 @@ export default function EvaluationResultPage() {
             <Typography variant="subtitle1" fontWeight="bold">総合コメント</Typography>
           </Box>
           <Paper variant="outlined" sx={{ p: 2, bgcolor: "#E3F2FD", borderRadius: 2 }}>
-            <Typography variant="body1" sx={{ lineHeight: 1.9 }}>{result.overall_comment}</Typography>
+            <Typography variant="body1" sx={{ lineHeight: 1.9 }}>{result?.overall_comment}</Typography>
           </Paper>
         </CardContent>
       </Card>
@@ -289,11 +284,16 @@ export default function EvaluationResultPage() {
           {[null, ...FACTOR_KEYS].map((fk, tabIdx) => {
             if (tab !== tabIdx) return null;
             const items = fk
-              ? result.evaluation_items.filter((it) => it.factor === fk)
-              : result.evaluation_items;
+              ? result?.evaluation_items.filter((it) => it.factor === fk)
+              : result?.evaluation_items;
             const fIdx = FACTOR_KEYS.indexOf(fk as typeof FACTOR_KEYS[number]);
 
-            return (
+            if (score === null) return <Chip label="未評価" size="small" variant="outlined" />;
+  if (!score) return null;
+  if (isLoading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh"><CircularProgress /></Box>;
+  if (isError || !result) return <Box p={3}><Alert severity="error">評価結果の取得に失敗しました。</Alert></Box>;
+
+  return (
               <TableContainer key={tabIdx} component={Paper} variant="outlined">
                 <Table size="small">
                   <TableHead>

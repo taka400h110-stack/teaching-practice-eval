@@ -97,17 +97,15 @@ const FACTOR_LABELS = {
 // 統計API呼び出し（/api/stats/full-reliability）
 // ────────────────────────────────────────────────────────────────
 async function fetchFullReliability(cohorts: ReturnType<typeof mockApi.getCohortProfiles> extends Promise<infer T> ? T : never): Promise<FullReliabilityResult | null> {
-  if (!cohorts || cohorts.length === 0) return null;
-
   // コーホートデータからAIスコアと人間スコアを取得
   const ai_total = cohorts.map((p) => p.final_total);
   const human_total = cohorts.map((p) => +(p.final_total + (Math.random() - 0.5) * 0.6).toFixed(2));
 
   const ai_by_factor: Record<string, number[]> = {
-    factor1: cohorts.map((p) => (p.factor_scores as Record<string, number>)?.factor1 ?? p.final_total * 0.9),
-    factor2: cohorts.map((p) => (p.factor_scores as Record<string, number>)?.factor2 ?? p.final_total * 1.0),
-    factor3: cohorts.map((p) => (p.factor_scores as Record<string, number>)?.factor3 ?? p.final_total * 0.95),
-    factor4: cohorts.map((p) => (p.factor_scores as Record<string, number>)?.factor4 ?? p.final_total * 1.05),
+    factor1: cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor1 ?? p.final_total * 0.9),
+    factor2: cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor2 ?? p.final_total * 1.0),
+    factor3: cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor3 ?? p.final_total * 0.95),
+    factor4: cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor4 ?? p.final_total * 1.05),
   };
   const human_by_factor: Record<string, number[]> = Object.fromEntries(
     Object.entries(ai_by_factor).map(([k, v]) => [k, v.map((s) => +(s + (Math.random() - 0.5) * 0.5).toFixed(2))])
@@ -230,9 +228,11 @@ export default function ReliabilityAnalysisPage() {
     }
   }, [cohorts]);
 
-  if (isLoading) return <LinearProgress />;
-
   const data = result;
+
+  if (!cohorts || cohorts.length === 0) return null;
+
+  if (isLoading) return <LinearProgress />;
 
   return (
     <Box>

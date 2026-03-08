@@ -232,7 +232,7 @@ export default function LongitudinalAnalysisPage() {
                 <ResponsiveContainer width="100%" height={340}>
                   <LineChart data={myScores}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" label={{ value: "週", position: "insideBottomRight", offset: -5 }} />
+                    <XAxis dataKey="weekStr" label={{ value: "週", position: "insideBottomRight", offset: -5 }} />
                     <YAxis domain={[1, 5]} label={{ value: "スコア（5段階）", angle: -90, position: "insideLeft" }} />
                     <RechartTooltip />
                     <Legend />
@@ -294,7 +294,7 @@ export default function LongitudinalAnalysisPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" label={{ value: "週", position: "insideBottomRight", offset: -5 }} />
+                    <XAxis dataKey="weekStr" label={{ value: "週", position: "insideBottomRight", offset: -5 }} />
                     <YAxis domain={[1.5, 4.5]} label={{ value: "総合スコア（5段階）", angle: -90, position: "insideLeft" }} />
                     <RechartTooltip />
                     <Legend />
@@ -314,7 +314,7 @@ export default function LongitudinalAnalysisPage() {
                 <ResponsiveContainer width="100%" height={320}>
                   <LineChart>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" dataKey="week" domain={[1, weeks]} />
+                    <XAxis type="number" dataKey="weekStr" domain={[1, weeks]} />
                     <YAxis domain={[1.5, 4.8]} />
                     <RechartTooltip />
                     {(cohorts ?? []).slice(0, 10).map((p, i) => (
@@ -348,7 +348,7 @@ export default function LongitudinalAnalysisPage() {
                       lower: +((d as Record<string, number>)[`f${idx+1}_mean`] - (d as Record<string, number>)[`f${idx+1}_sd`]).toFixed(2),
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week" />
+                      <XAxis dataKey="weekStr" />
                       <YAxis domain={[1.5, 4.5]} />
                       <RechartTooltip />
                       <Area type="monotone" dataKey="upper" stroke="none" fill={FACTOR_COLORS[f]} fillOpacity={0.15} />
@@ -468,7 +468,7 @@ export default function LongitudinalAnalysisPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" dataKey="week" domain={[1, weeks]}
+                    <XAxis type="number" dataKey="weekStr" domain={[1, weeks]}
                       label={{ value: "実習週", position: "insideBottomRight", offset: -5 }} />
                     <YAxis domain={[1.5, 4.5]}
                       label={{ value: "予測スコア（5段階）", angle: -90, position: "insideLeft" }} />
@@ -540,7 +540,7 @@ export default function LongitudinalAnalysisPage() {
                 <ResponsiveContainer width="100%" height={320}>
                   <LineChart>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" dataKey="week" domain={[1, weeks]}
+                    <XAxis type="number" dataKey="weekStr" domain={[1, weeks]}
                       label={{ value: "実習週", position: "insideBottomRight", offset: -5 }} />
                     <YAxis domain={[1.5, 4.8]}
                       label={{ value: "スコア（5段階）", angle: -90, position: "insideLeft" }} />

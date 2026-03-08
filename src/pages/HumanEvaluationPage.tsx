@@ -7,13 +7,14 @@ import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Box, Button, Card, CardContent, Chip, Slider, Typography,
-  Alert, Snackbar, Divider, Tooltip, Collapse, IconButton, Paper,
+  Alert, Snackbar, Divider, Tooltip, Collapse, IconButton, Paper, Tab, Tabs,
 } from "@mui/material";
 import ArrowBackIcon   from "@mui/icons-material/ArrowBack";
 import SaveIcon        from "@mui/icons-material/Save";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ExpandMoreIcon  from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon  from "@mui/icons-material/ExpandLess";
+import VisibilityIcon  from "@mui/icons-material/Visibility";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import {
@@ -35,6 +36,8 @@ const FACTOR_COLOR: Record<string, string> = {
 // 評価値 → RD水準チップ
 function RdIndicator({ score }: { score: number }) {
   const rd = getRdByScore(score);
+
+
   return (
     <Tooltip title={rd.desc} arrow>
       <Chip
@@ -61,6 +64,7 @@ export default function HumanEvaluationPage() {
     Object.fromEntries(RUBRIC_ITEMS.map((item) => [item.num, 3]))
   );
   const [expandedItem, setExpandedItem] = useState<number | null>(null);
+  const [tab, setTab] = useState(0);
   const [snackOpen, setSnackOpen] = useState(false);
 
   const { data: journal } = useQuery({
@@ -82,6 +86,22 @@ export default function HumanEvaluationPage() {
     RUBRIC_ITEMS.reduce((s, i) => s + (scores[i.num] ?? 3), 0) / RUBRIC_ITEMS.length
   ).toFixed(2);
 
+  // 日誌本文の展開 (バージョン2対応)
+  let parsedRecords: any[] = [];
+  let parsedReflection = "";
+  // @ts-ignore
+  if (journal?.content) {
+    try {
+      const p = JSON.parse(journal.content);
+      if (p.version === 2) {
+        parsedRecords = p.records || [];
+        parsedReflection = p.reflection || "";
+      }
+    } catch {
+      parsedReflection = journal.content;
+    }
+  }
+
   return (
     <Box maxWidth={920} mx="auto">
       {/* ヘッダー */}
@@ -98,6 +118,45 @@ export default function HumanEvaluationPage() {
           </Button>
         </Box>
       </Box>
+
+      {/* 日誌内容表示（ブラインド評価） */}
+      {journal && (
+        <Card sx={{ mb: 3, borderLeft: "4px solid #9c27b0" }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" gap={1} mb={2}>
+              <VisibilityIcon color="secondary" />
+              <Typography variant="subtitle1" fontWeight="bold">実習日誌内容（ブラインド表示）</Typography>
+              <Chip label="AI評価・他者コメント非表示" size="small" color="secondary" variant="outlined" />
+            </Box>
+            
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+              <Tab label="省察（リフレクション）" />
+              <Tab label="事実記録（授業・活動）" />
+            </Tabs>
+            
+            {tab === 0 && (
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: "#fafafa", minHeight: 100 }}>
+                <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+                  {parsedReflection || journal.reflection_text || "（省察の記述がありません）"}
+                </Typography>
+              </Paper>
+            )}
+            
+            {tab === 1 && (
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: "#fafafa", minHeight: 100 }}>
+                {parsedRecords.length > 0 ? parsedRecords.map((r: any, i: number) => (
+                  <Box key={i} mb={2}>
+                    <Typography variant="subtitle2" color="primary" fontWeight="bold">[{r.time_label}] {r.subject}</Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{r.body}</Typography>
+                  </Box>
+                )) : (
+                  <Typography variant="body2" color="text.secondary">記録がありません</Typography>
+                )}
+              </Paper>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* RD水準ガイド */}
       <Card sx={{ mb: 3, bgcolor: "#f8f9fa", border: "1px solid #dee2e6" }}>

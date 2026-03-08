@@ -21,6 +21,7 @@ import DragIndicatorIcon   from "@mui/icons-material/DragIndicator";
 import ExpandMoreIcon      from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon      from "@mui/icons-material/ExpandLess";
 import AccessTimeIcon      from "@mui/icons-material/AccessTime";
+import TrackChangesIcon    from "@mui/icons-material/TrackChanges";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { JournalEntry, JournalCreateRequest, HourRecord } from "../types";
@@ -231,6 +232,13 @@ const JournalEditorPage: React.FC = () => {
     queryFn:  () => mockApi.getJournal(journalId!) as Promise<JournalEntry>,
     enabled:  !!journalId,
   });
+
+  const { data: goals = [] } = useQuery({
+    queryKey: ["goals"],
+    queryFn: () => mockApi.getGoalHistory()
+  });
+  
+  const currentGoal = goals.find(g => g.week === weekNumber);
 
   useEffect(() => {
     if (!existing) return;

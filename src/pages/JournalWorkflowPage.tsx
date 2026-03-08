@@ -503,8 +503,6 @@ export default function JournalWorkflowPage() {
   const phaseCfg = PHASE_LABELS[phase] ?? PHASE_LABELS.phase1;
   const currentRd = rdHistory.length > 0 ? rdHistory[rdHistory.length - 1] : 0;
 
-  if (loadingJournal) return <LinearProgress />;
-
   // ── 完成度バッジ ──
   const totalBody   = records.reduce((s, r) => s + r.body.length, 0);
   const hasRefl     = reflection.length >= 20;
@@ -927,7 +925,9 @@ export default function JournalWorkflowPage() {
                 {FACTOR_KEYS.map((key, fi) => {
                   const items = (evalData.evaluation_items ?? []).filter((it) => it.factor === FACTOR_KEYS[fi]);
                   if (items.length === 0) return null;
-                  return (
+                  if (loadingJournal) return <LinearProgress />;
+
+  return (
                     <Accordion key={key} sx={{ mb: 1 }}>
                       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                         <Box display="flex" alignItems="center" gap={1}>

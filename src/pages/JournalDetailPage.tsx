@@ -2,7 +2,7 @@
  * src/pages/JournalDetailPage.tsx
  * 実習日誌詳細 — 日誌本文 / AI評価レーダー / 23項目スコア / 成長曲線 / AIフィードバック
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
@@ -83,7 +83,6 @@ function itemFactorIdx(itemNum: number): number {
 // 時限ブロック用ユーティリティ
 // ─────────────────────────────────────────────
 function parseHourRecords(content: string): HourRecord[] | null {
-  if (!content) return null;
   try {
     const p = JSON.parse(content);
     if (p.version === 2 && Array.isArray(p.records) && p.records.length > 0) {
@@ -207,12 +206,13 @@ const BodyText: React.FC<{ text?: string | null; fallback?: string }> = ({ text,
 // AI評価パネル（レーダー + 項目スコア + 成長曲線 + フィードバック）
 // ─────────────────────────────────────────────
 interface EvalPanelProps {
+  currentSelfEval: any;
   evalData: EvaluationResult;
   growthData: GrowthData | undefined;
   weekNumber: number;
 }
 
-const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekNumber }) => {
+const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekNumber, currentSelfEval }) => {
   const fs = evalData.factor_scores;
 
   // レーダーチャート用データ
@@ -220,6 +220,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
     factor: label,
     score:  fs[FACTOR_KEYS[i]],
     fullMark: 5,
+    selfScore: currentSelfEval ? currentSelfEval[FACTOR_KEYS[i]] : undefined,
   }));
 
   // 成長曲線（現在の週まで）
@@ -257,7 +258,9 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
                     tickFormatter={(v: string) => v.length > 8 ? v.slice(0, 8) + "…" : v}
                   />
                   <PolarRadiusAxis domain={[0, 5]} tickCount={6} tick={{ fontSize: 9 }} />
-                  <Radar name="スコア" dataKey="score" stroke="#1976d2" fill="#1976d2" fillOpacity={0.35} />
+                  <Legend verticalAlign="top" height={36}/>
+                  <Radar name="AI評価" dataKey="score" stroke="#1976d2" fill="#1976d2" fillOpacity={0.35} />
+                  {currentSelfEval && <Radar name="自己評価" dataKey="selfScore" stroke="#fb8c00" fill="#fb8c00" fillOpacity={0.35} />}
                 </RadarChart>
               </ResponsiveContainer>
             </Grid>
@@ -299,7 +302,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
           <Divider sx={{ mb: 1.5 }} />
           {FACTOR_KEYS.map((key, fi) => {
             const items = factorGroups[key];
-            const avg   = items.length > 0 ? items.reduce((s, it) => s + it.score, 0) / items.length : 0;
+            const avg   = items.length > 0 ? items.reduce((s, it) => s + (it.score || 0), 0) / items.length : 0;
             return (
               <Accordion key={key} disableGutters sx={{ mb: 1, border: `1px solid ${FACTOR_COLORS[fi]}30`, borderRadius: "8px !important", "&:before": { display: "none" } }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: `${FACTOR_COLORS[fi]}08`, borderRadius: 2 }}>
@@ -369,7 +372,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
       </Card>
 
       {/* ─── ③ この日誌までの成長曲線 ─── */}
-      {growthUntilNow.length > 1 && (
+      {growthUntilNow.length >= 1 && (
         <Card sx={{ mb: 2.5, border: "1.5px solid #388e3c" }}>
           <CardContent>
             <Box display="flex" alignItems="center" gap={1} mb={1}>
@@ -378,7 +381,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
                 成長曲線（Week 1 〜 Week {weekNumber}）
               </Typography>
               <Chip
-                label={`今週 総合 ${growthUntilNow.at(-1)?.total.toFixed(2) ?? "—"}`}
+                label={`今週 総合 ${growthUntilNow.slice(-1)[0]?.total.toFixed(2) ?? "—"}`}
                 size="small"
                 sx={{ ml: "auto", bgcolor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold" }}
               />
@@ -448,7 +451,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
           </Typography>
           {evalData.evaluation_items
             .slice()
-            .sort((a, b) => a.score - b.score)
+            .sort((a, b) => (a.score || 0) - (b.score || 0))
             .slice(0, 3)
             .map((item, rank) => {
               const fi = itemFactorIdx(item.item_number);
@@ -510,11 +513,26 @@ const JournalDetailPage: React.FC = () => {
 
   const { data: journal, isLoading, isError } = useJournalQuery(journalId ?? "");
 
+  const { data: goals = [] } = useQuery({
+    queryKey: ["goals"],
+    queryFn: () => mockApi.getGoalHistory()
+  });
+  
+  const currentGoal = journal ? goals.find(g => g.week === journal.week_number) : undefined;
+
   const { data: evalData } = useQuery<EvaluationResult>({
     queryKey: ["evaluation", journalId],
     queryFn:  () => mockApi.getEvaluation(journalId ?? ""),
     enabled:  !!journalId && journal?.status === "evaluated",
   });
+
+  const { data: selfEvals = [] } = useQuery({
+    queryKey: ["selfEvaluations"],
+    queryFn: () => mockApi.getSelfEvaluations(),
+    enabled: !!journal
+  });
+  
+  const currentSelfEval: any = journal ? selfEvals.find(e => (e as any).week_number === journal.week_number) : undefined;
 
   const { data: growthData } = useQuery<GrowthData>({
     queryKey: ["growth"],
@@ -522,6 +540,31 @@ const JournalDetailPage: React.FC = () => {
     enabled:  !!journalId,
   });
 
+  
+  const [commentText, setCommentText] = useState("");
+  const [commentSaved, setCommentSaved] = useState(false);
+
+  useEffect(() => {
+    if (journal) {
+       const isIntensive = (journal as any).internship_type === "intensive";
+       const existing = isIntensive
+         ? (journal.school_mentor_comment ?? journal.teacher_comment ?? "")
+         : (journal.univ_teacher_comment ?? journal.teacher_comment ?? "");
+       setCommentText(existing);
+    }
+  }, [journal]);
+
+  const commentMutation = useMutation<void, Error, string>({
+    mutationFn: async (text: string) => {
+      const isIntensive = (journal as any).internship_type === "intensive";
+      const field = isIntensive ? "school_mentor_comment" : "univ_teacher_comment";
+      await mockApi.updateJournal(journalId!, { [field]: text } as Record<string, unknown>);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
+      setCommentSaved(true);
+    }
+  });
   if (isLoading) return (
     <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
       <CircularProgress />
@@ -530,7 +573,6 @@ const JournalDetailPage: React.FC = () => {
   if (isError || !journal) return (
     <Box p={3}><Alert severity="error">日誌の取得に失敗しました。</Alert></Box>
   );
-
   const statusConfig = STATUS_CONFIG[journal.status];
   const formattedDate = new Date(journal.entry_date).toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
@@ -539,31 +581,22 @@ const JournalDetailPage: React.FC = () => {
   const isNewFormat = hourRecords !== null;
 
   // ── コメント入力 ──
-  // 学年ベースでコメント種別を判定
-  const studentGrade = journal.student_grade;
-  const isGrade4 = studentGrade !== undefined && studentGrade >= 4;
+  // 実習形態ベースでコメント種別を判定
+  const internshipType = (journal as any).internship_type;
+  const isIntensive = internshipType === "intensive";
+  
+  // 入力権限判定（実習形態に基づく）
   const canInputComment =
-    (userRole === "univ_teacher" && !isGrade4) ||       // 1-3年生 → 大学教員
-    (userRole === "school_mentor" && isGrade4) ||        // 4年生 → 校内指導教員
-    userRole === "admin";                                // 管理者は全対応
+    (userRole === "univ_teacher" && !isIntensive) ||       // 分散実習 → 大学教員
+    (userRole === "school_mentor" && isIntensive) ||        // 集中実習 → 校内指導教員
+    userRole === "admin";                                   // 管理者は全対応
 
-  const existingComment = isGrade4
-    ? (journal.school_mentor_comment ?? journal.teacher_comment ?? "")
-    : (journal.univ_teacher_comment ?? journal.teacher_comment ?? "");
+  // 学生自身もコメントの閲覧が可能
+  const canViewComment = canInputComment || userRole === "student";
 
-  const [commentText, setCommentText] = useState(existingComment);
-  const [commentSaved, setCommentSaved] = useState(false);
-
-  const commentMutation = useMutation<void, Error, string>({
-    mutationFn: async (text: string) => {
-      const field = isGrade4 ? "school_mentor_comment" : "univ_teacher_comment";
-      await mockApi.updateJournal(journalId!, { [field]: text } as Record<string, unknown>);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
-      setCommentSaved(true);
-    },
-  });
+  const existingComment = isIntensive
+    ? (journal?.school_mentor_comment ?? journal?.teacher_comment ?? "")
+    : (journal?.univ_teacher_comment ?? journal?.teacher_comment ?? "");
 
   return (
     <Box maxWidth={960} mx="auto">
@@ -663,26 +696,26 @@ const JournalDetailPage: React.FC = () => {
 
       {/* ────────────────────────────────────────────────────────
           指導コメント入力フォーム（大学教員 / 校内指導教員）
-          1〜3年生 → 大学教員が入力
-          4年生   → 校内指導教員が入力
+          分散実習 → 大学教員が入力
+          集中実習 → 校内指導教員が入力
       ──────────────────────────────────────────────────────── */}
       {canInputComment && (
         <Card sx={{
           mb: 2, border: "1px solid",
-          borderColor: isGrade4 ? "#FFCC80" : "#90CAF9",
-          bgcolor: isGrade4 ? "#FFF8E1" : "#E8F4FD",
+          borderColor: isIntensive ? "#FFCC80" : "#90CAF9",
+          bgcolor: isIntensive ? "#FFF8E1" : "#E8F4FD",
         }}>
           <CardContent>
             <Box display="flex" alignItems="center" gap={1} mb={1.5}>
-              <CommentIcon sx={{ color: isGrade4 ? "#E65100" : "#1565C0" }} />
-              <Typography variant="subtitle2" fontWeight="bold" color={isGrade4 ? "#E65100" : "#1565C0"}>
-                {isGrade4 ? "実習先コメントを入力（4年生）" : "大学教員コメントを入力（1〜3年生）"}
+              <CommentIcon sx={{ color: isIntensive ? "#E65100" : "#1565C0" }} />
+              <Typography variant="subtitle2" fontWeight="bold" color={isIntensive ? "#E65100" : "#1565C0"}>
+                {isIntensive ? "実習先コメントを入力（集中実習）" : "大学教員コメントを入力（分散実習）"}
               </Typography>
               <Chip
-                label={isGrade4 ? "校内指導教員" : "大学教員"}
+                label={isIntensive ? "校内指導教員" : "大学教員"}
                 size="small"
                 sx={{
-                  bgcolor: isGrade4 ? "#E65100" : "#1565C0",
+                  bgcolor: isIntensive ? "#E65100" : "#1565C0",
                   color: "white", fontSize: 10, height: 18,
                 }}
               />
@@ -690,7 +723,7 @@ const JournalDetailPage: React.FC = () => {
             <TextField
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
-              placeholder={isGrade4
+              placeholder={isIntensive
                 ? "実習先での指導内容・評価・助言を記入してください…"
                 : "授業観察の所感・改善点・次週への助言を記入してください…"}
               fullWidth multiline minRows={3}
@@ -712,7 +745,7 @@ const JournalDetailPage: React.FC = () => {
                 startIcon={<SendIcon />}
                 onClick={() => commentMutation.mutate(commentText)}
                 disabled={commentMutation.isPending || commentText.trim() === ""}
-                sx={{ bgcolor: isGrade4 ? "#E65100" : "#1565C0" }}
+                sx={{ bgcolor: isIntensive ? "#E65100" : "#1565C0" }}
               >
                 コメントを保存
               </Button>
@@ -722,37 +755,41 @@ const JournalDetailPage: React.FC = () => {
       )}
 
       {/* ────────────────────────────────────────────────────────
-          指導コメント（学年で分岐）
-          1〜3年生 → 大学教員コメント
-          4年生   → 実習先（校内指導教員）コメント
+          指導コメント（実習形態で分岐・学生も閲覧可能）
+          分散実習 → 大学教員コメント
+          集中実習 → 実習先（校内指導教員）コメント
           後方互換: teacher_comment（旧フィールド）も表示
       ──────────────────────────────────────────────────────── */}
-      {journal.student_grade !== undefined && journal.student_grade <= 3 ? (
-        /* 1〜3年生：大学教員コメント */
-        (journal.univ_teacher_comment || journal.teacher_comment) && (
-          <Section
-            icon={<CommentIcon />}
-            title="大学教員コメント（1〜3年生）"
-            color="#1565C0"
-            bgcolor="#E3F2FD"
-            borderColor="#90CAF9"
-          >
-            <BodyText text={journal.univ_teacher_comment ?? journal.teacher_comment ?? ""} />
-          </Section>
-        )
-      ) : (
-        /* 4年生：実習先（校内指導教員）コメント */
-        (journal.school_mentor_comment || journal.teacher_comment) && (
-          <Section
-            icon={<CommentIcon />}
-            title="実習先コメント（4年生）"
-            color="#E65100"
-            bgcolor="#FFF3E0"
-            borderColor="#FFCC80"
-          >
-            <BodyText text={journal.school_mentor_comment ?? journal.teacher_comment ?? ""} />
-          </Section>
-        )
+      {canViewComment && (
+        <Box sx={{ mb: 3 }}>
+          {internshipType === "distributed" || (!isIntensive && journal.student_grade && journal.student_grade <= 3) ? (
+            /* 分散実習：大学教員コメント */
+            (journal.univ_teacher_comment || journal.teacher_comment) && (
+              <Section
+                icon={<CommentIcon />}
+                title="大学教員コメント"
+                color="#1565C0"
+                bgcolor="#E3F2FD"
+                borderColor="#90CAF9"
+              >
+                <BodyText text={journal.univ_teacher_comment ?? journal.teacher_comment ?? ""} />
+              </Section>
+            )
+          ) : (
+            /* 集中実習：実習先（校内指導教員）コメント */
+            (journal.school_mentor_comment || journal.teacher_comment) && (
+              <Section
+                icon={<CommentIcon />}
+                title="実習先コメント"
+                color="#E65100"
+                bgcolor="#FFF3E0"
+                borderColor="#FFCC80"
+              >
+                <BodyText text={journal.school_mentor_comment ?? journal.teacher_comment ?? ""} />
+              </Section>
+            )
+          )}
+        </Box>
       )}
 
       {/* ════ AI評価セクション（評価済み日誌のみ）════ */}
@@ -769,7 +806,7 @@ const JournalDetailPage: React.FC = () => {
             evalData={evalData}
             growthData={growthData}
             weekNumber={journal.week_number}
-          />
+           currentSelfEval={currentSelfEval} />
         </Box>
       ) : journal.status !== "evaluated" ? (
         <Paper

@@ -33,22 +33,30 @@ export default function JournalListPage() {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["journals"] }); },
   });
 
+  const currentUser = mockApi.getCurrentUser() as { role: string } | null;
+  const userRole = currentUser?.role ?? "student";
+  const isStudent = userRole === "student";
+
   if (isLoading) return <Box p={3}><Typography>読み込み中...</Typography></Box>;
 
   return (
     <Box>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
         <Typography variant="h5" fontWeight="bold">実習日誌一覧</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate("/journals/new")}>
-          新規作成
-        </Button>
+        {isStudent && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate("/journals/new")}>
+            新規作成
+          </Button>
+        )}
       </Box>
 
       {journals.length === 0 && (
         <Card>
           <CardContent sx={{ textAlign: "center", py: 6 }}>
             <MenuBookIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
-            <Typography color="text.secondary">日誌がまだありません。「新規作成」から記録を始めましょう。</Typography>
+            <Typography color="text.secondary">
+              {isStudent ? "日誌がまだありません。「新規作成」から記録を始めましょう。" : "提出された日誌がまだありません。"}
+            </Typography>
           </CardContent>
         </Card>
       )}
@@ -67,12 +75,12 @@ export default function JournalListPage() {
                   </Typography>
                 </Box>
                 <Chip label={cfg.label} color={cfg.color} size="small" />
-                <Tooltip title="詳細・AI評価・チャット">
-                  <IconButton size="small" color="primary" onClick={() => navigate(`/journal-workflow/${j.id}`)}>
+                <Tooltip title="詳細を見る">
+                  <IconButton size="small" color="primary" onClick={() => navigate(`/journals/${j.id}`)}>
                     <VisibilityIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                {j.status !== "evaluated" && (
+                {isStudent && j.status !== "evaluated" && (
                   <Tooltip title="編集">
                     <IconButton size="small" onClick={() => navigate(`/journals/${j.id}/edit`)}>
                       <EditIcon fontSize="small" />
@@ -80,12 +88,13 @@ export default function JournalListPage() {
                   </Tooltip>
                 )}
                 {j.status === "evaluated" && (
-                  <Tooltip title="AI評価結果">
-                    <IconButton size="small" color="success" onClick={() => navigate(`/journal-workflow/${j.id}`)}>
+                  <Tooltip title="AI評価結果・コメント">
+                    <IconButton size="small" color="success" onClick={() => navigate(`/journals/${j.id}`)}>
                       <AssessmentIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 )}
+                {isStudent && (
                 <Tooltip title="削除">
                   <IconButton
                     size="small"
@@ -95,6 +104,7 @@ export default function JournalListPage() {
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
+              )}
               </Box>
             </CardContent>
           </Card>

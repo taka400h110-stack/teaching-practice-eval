@@ -86,7 +86,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
     ];
   }
 
-  // ── 大学教員（univ_teacher）: RQ2 信頼性検証 + RQ3 学生コメント ──
+    // ── 大学教員（univ_teacher）: RQ3 学生コメント ──
   if (role === "univ_teacher") {
     return [
       {
@@ -96,12 +96,9 @@ function getNavGroups(role: UserRole): NavGroup[] {
         ],
       },
       {
-        group: "AI評価信頼性検証（RQ2）",
+        group: "実習生指導（分散実習）",
         items: [
-          { label: "評価一覧",           path: "/evaluations",  icon: <AssessmentIcon /> },
-          { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
-          { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
-          { label: "信頼性分析（ICC）",  path: "/reliability",  icon: <EqualizerIcon /> },
+          { label: "日誌一覧・コメント", path: "/journals", icon: <MenuBookIcon /> },
         ],
       },
       {
@@ -114,7 +111,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
     ];
   }
 
-  // ── 校内指導教員（school_mentor）: 4年生日誌コメント入力 ──
+    // ── 校内指導教員（school_mentor）: 4年生日誌コメント入力 ──
   if (role === "school_mentor") {
     return [
       {
@@ -124,10 +121,9 @@ function getNavGroups(role: UserRole): NavGroup[] {
         ],
       },
       {
-        group: "実習生指導（4年生）",
+        group: "実習生指導（集中実習）",
         items: [
-          { label: "日誌一覧・コメント", path: "/evaluations",  icon: <MenuBookIcon /> },
-          { label: "評価入力",           path: "/evaluations/human", icon: <VerifiedUserIcon /> },
+          { label: "日誌一覧・コメント", path: "/journals",  icon: <MenuBookIcon /> },
         ],
       },
     ];
@@ -149,7 +145,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
   }
 
   // ── 研究者（researcher）: 全分析機能 ──
-  if (role === "researcher") {
+  if (role === "researcher" || role === ("collaborator" as any)) {
     return [
       {
         group: "研究ダッシュボード",
@@ -161,6 +157,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         group: "AI評価信頼性（RQ2）",
         items: [
           { label: "評価一覧",           path: "/evaluations",  icon: <AssessmentIcon /> },
+          { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
           { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
           { label: "信頼性分析（ICC）",  path: "/reliability",  icon: <EqualizerIcon /> },
         ],
@@ -190,7 +187,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
   }
 
   // ── 研究協力者（collaborator）: 閲覧・集計のみ ──
-  if (role === "collaborator") {
+  if (role === ("collaborator" as any)) {
     return [
       {
         group: "データ閲覧",
@@ -204,6 +201,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         group: "評価参照",
         items: [
           { label: "評価一覧（閲覧）",   path: "/evaluations",  icon: <AssessmentIcon /> },
+          { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
           { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
         ],
       },
@@ -256,6 +254,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
       items: [
         { label: "教員ダッシュボード",   path: "/teacher-dashboard", icon: <SchoolIcon /> },
         { label: "評価一覧",             path: "/evaluations",       icon: <AssessmentIcon /> },
+        { label: "人間評価入力",       path: "/evaluations/human", icon: <VerifiedUserIcon /> },
         { label: "AI vs 人間比較",       path: "/comparison",        icon: <CompareArrowsIcon /> },
         { label: "信頼性分析（ICC）",    path: "/reliability",       icon: <VerifiedUserIcon /> },
       ],
