@@ -103,16 +103,22 @@ export default function HumanEvaluationPage() {
     );
   }
 
+  const itemsArray = RUBRIC_ITEMS.map((item) => ({
+    item_number: item.num,
+    score: scores[item.num],
+    is_na: false
+  }));
+  const strictScores = computeStrictScores(itemsArray);
+
   const factorAvg = (factorKey: string) => {
-    const items = RUBRIC_ITEMS.filter((i) => i.factor === factorKey);
-    const validScores = items.map(i => scores[i.num]).filter(s => s != null) as number[];
-    if (validScores.length === 0) return "0.00";
-    return Math.round((validScores.reduce((s, v) => s + v, 0) / validScores.length) * 100) / 100;
+    if (factorKey === "factor1") return strictScores.factor1_score?.toFixed(2) ?? "0.00";
+    if (factorKey === "factor2") return strictScores.factor2_score?.toFixed(2) ?? "0.00";
+    if (factorKey === "factor3") return strictScores.factor3_score?.toFixed(2) ?? "0.00";
+    if (factorKey === "factor4") return strictScores.factor4_score?.toFixed(2) ?? "0.00";
+    return "0.00";
   };
-    const validTotalScores = RUBRIC_ITEMS.map(i => scores[i.num]).filter(s => s != null) as number[];
-  const totalAvg = validTotalScores.length > 0 
-    ? (Math.round((validTotalScores.reduce((s, v) => s + v, 0) / validTotalScores.length) * 100) / 100).toFixed(2)
-    : "0.00";
+  
+  const totalAvg = strictScores.total_score?.toFixed(2) ?? "0.00";
 
   // 日誌本文の展開 (バージョン2対応)
   let parsedRecords: any[] = [];

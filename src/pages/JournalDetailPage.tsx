@@ -302,7 +302,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
           <Divider sx={{ mb: 1.5 }} />
           {FACTOR_KEYS.map((key, fi) => {
             const items = factorGroups[key];
-            const avg   = items.length > 0 ? items.reduce((s, it) => s + (it.score || 0), 0) / items.length : 0;
+            const avg = evalData.factor_scores ? evalData.factor_scores[key as keyof typeof evalData.factor_scores] : (items.length > 0 ? items.reduce((s, it) => s + (it.score || 0), 0) / items.length : 0);
             return (
               <Accordion key={key} disableGutters sx={{ mb: 1, border: `1px solid ${FACTOR_COLORS[fi]}30`, borderRadius: "8px !important", "&:before": { display: "none" } }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: `${FACTOR_COLORS[fi]}08`, borderRadius: 2 }}>
