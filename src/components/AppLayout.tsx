@@ -274,7 +274,7 @@ export default function AppLayout() {
   const user = mockApi.getCurrentUser() as { id: string; name: string; role: UserRole } | null;
   const roles: UserRole[] = ((user as any)?.roles || [(user as any)?.role || "student"]) ?? ["student"];
   // 下位互換性のため古い role も fallback として扱う
-  if (user && !user.roles && (user as any).role) roles.push((user as any).role);
+  if (user && !(user as any).roles && (user as any).role) roles.push((user as any).role);
   const navGroups = getNavGroups(roles);
   const allItems  = navGroups.flatMap((g) => g.items);
 

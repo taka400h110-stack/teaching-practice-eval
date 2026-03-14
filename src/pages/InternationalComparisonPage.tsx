@@ -18,7 +18,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, RadarChart, Radar, PolarGrid,
   PolarAngleAxis, PolarRadiusAxis, ScatterChart, Scatter,
-  ErrorBar, BoxPlot,
+  ErrorBar,
 } from "recharts";
 
 // ────────────────────────────────────────────────────────────────

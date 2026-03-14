@@ -78,7 +78,7 @@ export default function AdvancedAnalyticsPage() {
       {/* ━━ 多変量解析 ━━ */}
       <TabPanel value={tab} index={0}>
         <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} gutterBottom>
@@ -117,7 +117,7 @@ export default function AdvancedAnalyticsPage() {
             </Card>
           </Grid>
           
-          <Grid item xs={12} md={6}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} gutterBottom>
@@ -176,7 +176,7 @@ export default function AdvancedAnalyticsPage() {
       {/* ━━ NLP ━━ */}
       <TabPanel value={tab} index={1}>
         <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} gutterBottom>
@@ -198,7 +198,7 @@ export default function AdvancedAnalyticsPage() {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={6}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} gutterBottom>
@@ -256,19 +256,19 @@ export default function AdvancedAnalyticsPage() {
               LittleのMCAR検定結果: χ²(15) = 18.4, p = 0.242 (MCARが棄却されない → 欠損は完全にランダムとみなせる)
             </Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{xs: 12, sm: 4}}>
                 <Paper sx={{ p: 2, textAlign: "center", bgcolor: "#fff3e0", border: "1px solid #ffe0b2" }}>
                   <Typography variant="h4" color="warning.main" fontWeight="bold">4.2%</Typography>
                   <Typography variant="caption">全体欠損率</Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{xs: 12, sm: 4}}>
                 <Paper sx={{ p: 2, textAlign: "center", bgcolor: "#e3f2fd", border: "1px solid #bbdefb" }}>
                   <Typography variant="h4" color="primary.main" fontWeight="bold">Listwise</Typography>
                   <Typography variant="caption">現在の処理方式</Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{xs: 12, sm: 4}}>
                 <Paper sx={{ p: 2, textAlign: "center", bgcolor: "#e8f5e9", border: "1px solid #c8e6c9" }}>
                   <Typography variant="h4" color="success.main" fontWeight="bold">FCS/MICE</Typography>
                   <Typography variant="caption">推奨される代入法</Typography>
@@ -282,7 +282,7 @@ export default function AdvancedAnalyticsPage() {
       {/* ━━ 性格特性 (BigFive) ━━ */}
       <TabPanel value={tab} index={4}>
         <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -354,7 +354,7 @@ export default function AdvancedAnalyticsPage() {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={6}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} gutterBottom>

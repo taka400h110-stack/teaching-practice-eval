@@ -107,7 +107,7 @@ function saveChatSessions(sessions: Record<string, ChatSession>): void {
 // デモユーザー定義（全役割・オンボーディング完了済み）
 // 全員 firstLogin: false → ログイン即ダッシュボードへ
 // ══════════════════════════════════════════════════════
-type DemoUserDef = {
+type DemoUserDef = { id: string; firstLogin?: boolean;
   email: string;
   name: string;
   roles: UserRole[];
@@ -122,36 +122,36 @@ type DemoUserDef = {
 
 const DEMO_USERS: Record<string, DemoUserDef> = {
   "student@teaching-eval.jp": {
-    id: "user-001", name: "山田 太郎", roles: ["student"], firstLogin: false,
+    id: "user-001", email: "student@teaching-eval.jp", name: "山田 太郎", roles: ["student"], firstLogin: false,
     student_number: "2023A001", grade: 3,
     school_type: "elementary", internship_type: "intensive", weeks: 10,
   },
   "teacher@teaching-eval.jp": {
-    id: "user-002", name: "佐藤 花子", roles: ["univ_teacher"], firstLogin: false,
+    id: "user-002", email: "teacher@teaching-eval.jp", name: "佐藤 花子", roles: ["univ_teacher"], firstLogin: false,
     organization: "〇〇大学 教育学部", position: "准教授",
   },
   "mentor@teaching-eval.jp": {
-    id: "user-003", name: "鈴木 一郎", roles: ["school_mentor"], firstLogin: false,
+    id: "user-003", email: "mentor@teaching-eval.jp", name: "鈴木 一郎", roles: ["school_mentor"], firstLogin: false,
     organization: "〇〇市立東小学校", position: "担任教諭",
   },
   "admin@teaching-eval.jp": {
-    id: "user-004", name: "田中 管理者", roles: ["admin"], firstLogin: false,
+    id: "user-004", email: "admin@teaching-eval.jp", name: "田中 管理者", roles: ["admin"], firstLogin: false,
     organization: "〇〇大学 教職センター", position: "センター長",
   },
   "researcher@teaching-eval.jp": {
-    id: "user-005", name: "伊藤 研究者", roles: ["researcher"], firstLogin: false,
+    id: "user-005", email: "researcher@teaching-eval.jp", name: "伊藤 研究者", roles: ["researcher"], firstLogin: false,
     organization: "〇〇大学大学院 教育研究科", position: "博士課程研究員",
   },
   "collaborator@teaching-eval.jp": {
-    id: "user-006", name: "渡辺 協力者", roles: ["collaborator"], firstLogin: false,
+    id: "user-006", email: "collaborator@teaching-eval.jp", name: "渡辺 協力者", roles: ["collaborator"], firstLogin: false,
     organization: "△△教育センター", position: "研究協力員",
   },
   "board@teaching-eval.jp": {
-    id: "user-007", name: "中村 委員", roles: ["board_observer"], firstLogin: false,
+    id: "user-007", email: "observer@teaching-eval.jp", name: "中村 委員", roles: ["board_observer"], firstLogin: false,
     organization: "〇〇市教育委員会", position: "指導主事",
   },
   "evaluator@teaching-eval.jp": {
-    id: "user-008", name: "小林 評価者", roles: ["evaluator"], firstLogin: false,
+    id: "user-008", email: "evaluator@teaching-eval.jp", name: "小林 評価者", roles: ["evaluator"], firstLogin: false,
     organization: "教員養成評価機構", position: "外部評価者",
   },
 };
@@ -216,7 +216,7 @@ const mockApi = {
 
     const demo = DEMO_USERS[email];
     const user = demo
-      ? { id: demo.id, email, name: demo.name, role: demo.role }
+      ? { id: demo.id, email, name: demo.name, role: demo.roles[0] }
       : { id: "user-001", email, name: "山田 太郎", roles: ["student"] as UserRole };
 
     const isFirstLogin = demo?.firstLogin ?? false;
