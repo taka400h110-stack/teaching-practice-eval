@@ -395,7 +395,7 @@ export default function SCATAnalysisPage() {
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>コーダー間一致率（Cohen's κ）</Typography>
-                <TableContainer component={Paper} variant="outlined">
+                <TableContainer component={Paper} variant="outlined" sx={{ overflowX: "auto" }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ bgcolor: "grey.100" }}>
@@ -488,7 +488,7 @@ export default function SCATAnalysisPage() {
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>
                   SCAT分析テーマ × ルーブリック因子 対応マトリクス
                 </Typography>
-                <TableContainer component={Paper} variant="outlined">
+                <TableContainer component={Paper} variant="outlined" sx={{ overflowX: "auto" }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ bgcolor: "#e8f5e9" }}>
