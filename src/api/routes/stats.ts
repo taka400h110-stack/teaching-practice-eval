@@ -590,9 +590,18 @@ statsRouter.post("/bland-altman", async (c) => {
 statsRouter.post("/missing-data-process", async (c) => {
   const body = await c.req.json() as {
     data: (number | null)[][];
-    method?: "listwise" | "mean_imputation";
+    method?: "listwise" | "fcs" | "mean_imputation";
   };
   try {
+    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
+    if (STATS_API_URL) {
+      const response = await fetch(`${STATS_API_URL}/api/missing-data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) return c.json(await response.json());
+    }
     const processed = handleMissingData(body.data, body.method ?? "listwise");
     return c.json({ success: true, processed_data: processed, method: body.method ?? "listwise" });
   } catch (err) {
@@ -606,6 +615,15 @@ statsRouter.post("/lcga", async (c) => {
     max_classes?: number;
   };
   try {
+    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
+    if (STATS_API_URL) {
+      const response = await fetch(`${STATS_API_URL}/api/lcga`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) return c.json(await response.json());
+    }
     const result = computeLCGA(body.weekly_scores, body.max_classes ?? 5);
     return c.json({ success: true, ...result });
   } catch (err) {
@@ -618,8 +636,16 @@ statsRouter.post("/lgcm", async (c) => {
     weekly_scores: number[][];  // [student][week]
     factor?: string;
   };
-
   try {
+    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
+    if (STATS_API_URL) {
+      const response = await fetch(`${STATS_API_URL}/api/lgcm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) return c.json(await response.json());
+    }
     const result = computeLGCMSummary(body.weekly_scores);
     return c.json({ success: true, ...result, factor: body.factor ?? "total" });
   } catch (err) {

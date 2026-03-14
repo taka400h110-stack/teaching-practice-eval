@@ -7,3 +7,4 @@ scipy
 pingouin
 statsmodels
 scikit-learn
+semopy
