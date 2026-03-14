@@ -171,6 +171,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
           { label: "縦断分析（LGCM）",   path: "/longitudinal", icon: <TimelineIcon /> },
           { label: "SCAT 質的分析",      path: "/scat",         icon: <PsychologyIcon /> },
           { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
+          { label: "高度分析 (NLP/SEM)", path: "/advanced",    icon: <ScienceIcon /> },
         ],
       },
       {
