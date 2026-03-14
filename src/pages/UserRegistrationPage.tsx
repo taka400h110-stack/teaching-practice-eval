@@ -146,7 +146,7 @@ function saveUsers(users: RegisteredUser[]): void {
 }
 
 export default function UserRegistrationPage() {
-  const [selectedRoless, setSelectedRoless] = useState<UserRole[]>(["univ_teacher"]);
+  const [selectedRoles, setSelectedRoles] = useState<UserRole[]>(["univ_teacher"]);
   const [form, setForm] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [users, setUsers]   = useState<RegisteredUser[]>(loadUsers);
@@ -154,7 +154,7 @@ export default function UserRegistrationPage() {
   const [deleteTarget, setDeleteTarget] = useState<RegisteredUser | null>(null);
   const [editTarget, setEditTarget]     = useState<RegisteredUser | null>(null);
 
-  const roleConfigs = selectedRoless.map(sr => ROLE_CONFIGS.find((r) => r.role === sr)).filter(Boolean) as typeof ROLE_CONFIGS;
+  const roleConfigs = selectedRoles.map(sr => ROLE_CONFIGS.find((r) => r.role === sr)).filter(Boolean) as typeof ROLE_CONFIGS;
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
@@ -177,7 +177,7 @@ export default function UserRegistrationPage() {
     if (editTarget) {
       const updated = users.map((u) =>
         u.id === editTarget.id
-          ? { ...u, name: form.name, email: form.email, roles: selectedRoless, extra: { ...form } }
+          ? { ...u, name: form.name, email: form.email, roles: selectedRoles, extra: { ...form } }
           : u
       );
       saveUsers(updated);
@@ -189,7 +189,7 @@ export default function UserRegistrationPage() {
         id:         `user-${Date.now()}`,
         email:      form.email,
         name:       form.name,
-        roles:      selectedRoless,
+        roles:      selectedRoles,
         extra:      { ...form },
         created_at: new Date().toISOString(),
       };
@@ -211,7 +211,7 @@ export default function UserRegistrationPage() {
   };
 
   const handleEdit = (user: RegisteredUser) => {
-    setSelectedRoless(user.roles || []);
+    setSelectedRoles(user.roles || []);
     setForm({ ...user.extra, name: user.name, email: user.email });
     setEditTarget(user);
   };
@@ -256,12 +256,22 @@ export default function UserRegistrationPage() {
             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
               <InputLabel>役割</InputLabel>
               <Select
+                multiple
                 value={selectedRoles}
                 label="役割"
                 onChange={(e) => {
-                  setSelectedRoles(e.target.value as UserRole);
+                  const val = e.target.value;
+                  setSelectedRoles(typeof val === 'string' ? val.split(',') as UserRole[] : val as UserRole[]);
                   setErrors({});
                 }}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {(selected as UserRole[]).map((value) => {
+                      const cfg = ROLE_CONFIGS.find(r => r.role === value);
+                      return cfg ? <Chip key={value} label={cfg.label} size="small" sx={{ bgcolor: cfg.color, color: "#fff", fontSize: 10, height: 20 }} /> : null;
+                    })}
+                  </Box>
+                )}
               >
                 {ROLE_CONFIGS.map((r) => (
                   <MenuItem key={r.role} value={r.role}>
