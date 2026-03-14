@@ -1,3 +1,4 @@
+import { computeFactorWeightedTotal, roundScore } from "../utils/score";
 import type {
   User, JournalEntry, EvaluationResult, GrowthData, WeeklyScore,
   ChatSession, SelfEvaluation, LpsWeek, GoalEntry, StudentProfile,
@@ -404,7 +405,7 @@ function makeEvaluation(journalId: string, week: number): EvaluationResult {
   const factor2 = avg(f2Scores);
   const factor3 = avg(f3Scores);
   const factor4 = avg(f4Scores);
-  const totalScore = Math.round(((factor1 * 7 + factor2 * 6 + factor3 * 4 + factor4 * 6) / 23) * 100) / 100;
+  const totalScore = computeFactorWeightedTotal(factor1, factor2, factor3, factor4);
 
   const OVERALL_COMMENTS: Record<number, string> = {
     1: "初回の実習お疲れ様でした。緊張の中でも最後まで授業をやり遂げた点は評価できます。ウォン君への対応に課題感を持てていることは省察力の高さを示しています。次週は発問後の「待ち時間」を意識することで、より多くの児童の思考を引き出せるでしょう。",
@@ -748,8 +749,8 @@ function makeWeeklyScoresFromData(
 }
 
 export const MOCK_COHORT_PROFILES: StudentProfile[] = STUDENT_DATA.map((d, i) => {
-  const totalFinal = (d.f1e * 7 + d.f2e * 6 + d.f3e * 4 + d.f4e * 6) / 23;
-  const totalStart = (d.f1s * 7 + d.f2s * 6 + d.f3s * 4 + d.f4s * 6) / 23;
+  const totalFinal = computeFactorWeightedTotal(d.f1e, d.f2e, d.f3e, d.f4e);
+  const totalStart = computeFactorWeightedTotal(d.f1s, d.f2s, d.f3s, d.f4s);
   const schoolTypeLabel = { elementary: "小", middle: "中", high: "高", special: "特別支援" }[d.school_type];
   return {
     id:             `student-${String(i + 1).padStart(3, "0")}`,
@@ -774,10 +775,10 @@ export const MOCK_COHORT_PROFILES: StudentProfile[] = STUDENT_DATA.map((d, i) =>
     final_factor2: d.f2e,
     final_factor3: d.f3e,
     final_factor4: d.f4e,
-    final_total:   +totalFinal.toFixed(2),
-    growth_delta:  +(totalFinal - totalStart).toFixed(2),
+    final_total:   totalFinal,
+    growth_delta:  roundScore(totalFinal - totalStart),
     self_eval_gap: +(Math.abs(d.f2e - d.f2s) * 0.3).toFixed(2),
-    lps:           +(0.5 + (totalFinal - 2.5) * 0.2).toFixed(2),
+    lps:           roundScore(0.5 + (totalFinal - 2.5) * 0.2),
     weekly_scores: makeWeeklyScoresFromData(d.f1s, d.f2s, d.f3s, d.f4s, d.f1e, d.f2e, d.f3e, d.f4e, d.weeks),
   };
 });

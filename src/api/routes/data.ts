@@ -364,7 +364,26 @@ dataRouter.post("/evaluations", async (c) => {
     duration_ms?: number;
   };
 
+  
   try {
+    const scores = { f1: [] as number[], f2: [] as number[], f3: [] as number[], f4: [] as number[] };
+    body.evaluation.items.forEach((item) => {
+      if (item.is_na || !item.score) return;
+      if (item.item_number <= 7) scores.f1.push(item.score);
+      else if (item.item_number <= 13) scores.f2.push(item.score);
+      else if (item.item_number <= 17) scores.f3.push(item.score);
+      else scores.f4.push(item.score);
+    });
+
+    const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
+    const allScores = [...scores.f1, ...scores.f2, ...scores.f3, ...scores.f4];
+    
+    const computedTotal = avg(allScores);
+    const f1Score = avg(scores.f1);
+    const f2Score = avg(scores.f2);
+    const f3Score = avg(scores.f3);
+    const f4Score = avg(scores.f4);
+    
     const evalId = genId();
     await db.prepare(`
       INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature,
@@ -376,11 +395,11 @@ dataRouter.post("/evaluations", async (c) => {
       body.model_name ?? "gpt-4o",
       body.prompt_version ?? "CoT-A-v1.0",
       body.temperature ?? 0.2,
-      body.evaluation.total_score,
-      body.evaluation.factor_scores.factor1,
-      body.evaluation.factor_scores.factor2,
-      body.evaluation.factor_scores.factor3,
-      body.evaluation.factor_scores.factor4,
+      computedTotal,
+      f1Score,
+      f2Score,
+      f3Score,
+      f4Score,
       body.evaluation.overall_comment,
       body.evaluation.reasoning,
       body.evaluation.halo_effect_detected ? 1 : 0,

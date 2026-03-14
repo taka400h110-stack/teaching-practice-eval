@@ -13,6 +13,7 @@ import HistoryIcon         from "@mui/icons-material/History";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { SelfEvaluation } from "../types";
+import { computeFactorWeightedTotal } from "../utils/score";
 
 const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
 const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"];
@@ -113,7 +114,7 @@ export default function SelfEvaluationPage() {
   });
 
   const aiLatest = aiGrowth?.weekly_scores.slice(-1)[0];
-  const total = Math.round(((scores.factor1 * 7 + scores.factor2 * 6 + scores.factor3 * 4 + scores.factor4 * 6) / 23) * 100) / 100;
+  const total = computeFactorWeightedTotal(scores.factor1, scores.factor2, scores.factor3, scores.factor4);
   const historyLatest: SelfEvaluation | undefined = history[history.length - 1];
 
   const queryClient = useQueryClient();
