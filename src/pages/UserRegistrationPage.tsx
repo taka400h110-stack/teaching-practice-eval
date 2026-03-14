@@ -33,6 +33,14 @@ const ROLE_CONFIGS: Array<{
   fields: string[];
 }> = [
   {
+    role: "student",
+    label: "実習生",
+    color: "#1976d2",
+    icon: <PersonAddIcon />,
+    description: "実習日誌の作成・自己評価の入力などを行う学生アカウント",
+    fields: ["student_number", "grade", "school_type"],
+  },
+  {
     role: "univ_teacher",
     label: "大学教員",
     color: "#388e3c",
@@ -215,6 +223,8 @@ export default function UserRegistrationPage() {
   };
 
   const fieldLabel = (field: string): string => ({
+    student_number:"学籍番号",
+    grade:         "学年",
     department:    "所属学科・部署",
     position:      "役職・肩書き",
     school_name:   "勤務校名",
