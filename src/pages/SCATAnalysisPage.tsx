@@ -303,7 +303,7 @@ export default function SCATAnalysisPage() {
         {rows.map((row) => (
           <Accordion key={row.id} sx={{ mb: 1 }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box display="flex" alignItems="center" gap={1} width="100%">
+              <Box display="flex" alignItems="center" gap={1} sx={{ width: "100%", overflow: "hidden" }}>
                 <Chip label={`#${row.id}`} size="small" variant="outlined" />
                 {row.week && <Chip label={`第${row.week}週`} size="small" />}
                 {row.factor && <Chip label={FACTOR_LABELS[row.factor]?.split(": ")[0]} size="small" color="primary" />}
