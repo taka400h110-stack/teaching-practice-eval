@@ -99,21 +99,30 @@ const SAMPLE_SCAT: ScatRow[] = [
 // カッパ係数計算（Cohen's κ）
 // ────────────────────────────────────────────────────────────────
 function computeCohenKappa(
-  coder1: string[],
-  coder2: string[],
-): { kappa: number; agreement: number; interpretation: string } {
-  const n = Math.min(coder1.length, coder2.length);
-  if (n === 0) return { kappa: 0, agreement: 0, interpretation: "データなし" };
+  coder1: { id: string | number; code: string }[],
+  coder2: { id: string | number; code: string }[],
+): { kappa: number; agreement: number; interpretation: string; n: number } {
+  // セグメントIDによる厳密な突合
+  const map2 = new Map(coder2.map((c) => [c.id, c.code]));
+  const matched = coder1
+    .filter((c) => map2.has(c.id))
+    .map((c) => ({ code1: c.code, code2: map2.get(c.id)! }));
 
-  const agree = coder1.slice(0, n).filter((v, i) => v === coder2[i]).length;
+  const n = matched.length;
+  if (n === 0) return { kappa: 0, agreement: 0, interpretation: "データなし", n: 0 };
+
+  const agree = matched.filter((m) => m.code1 === m.code2).length;
   const po = agree / n;
 
   // 期待一致率
-  const categories = [...new Set([...coder1, ...coder2])];
+  const allCodes1 = matched.map(m => m.code1);
+  const allCodes2 = matched.map(m => m.code2);
+  const categories = [...new Set([...allCodes1, ...allCodes2])];
+  
   let pe = 0;
   for (const cat of categories) {
-    const p1 = coder1.filter((v) => v === cat).length / n;
-    const p2 = coder2.filter((v) => v === cat).length / n;
+    const p1 = allCodes1.filter((v) => v === cat).length / n;
+    const p2 = allCodes2.filter((v) => v === cat).length / n;
     pe += p1 * p2;
   }
 
@@ -128,6 +137,7 @@ function computeCohenKappa(
     kappa: Math.round(kappa * 1000) / 1000,
     agreement: Math.round(po * 100) / 100,
     interpretation,
+    n
   };
 }
 
@@ -193,7 +203,7 @@ export default function SCATAnalysisPage() {
   const [tab, setTab] = useState(0);
   const [rows, setRows] = useState<ScatRow[]>(SAMPLE_SCAT);
   const [nextId, setNextId] = useState(SAMPLE_SCAT.length + 1);
-  const [kappaResult, setKappaResult] = useState<{ kappa: number; agreement: number; interpretation: string } | null>(null);
+  const [kappaResult, setKappaResult] = useState<{ kappa: number; agreement: number; interpretation: string; n: number } | null>(null);
   const [isCalcKappa, setIsCalcKappa] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, msg: "" });
 
@@ -203,8 +213,8 @@ export default function SCATAnalysisPage() {
     await new Promise((r) => setTimeout(r, 800));
 
     // デモ: 同じデータの一部を変えてコーダー間差異を模擬
-    const coder1 = rows.map((r) => r.theme);
-    const coder2 = rows.map((r, i) => i % 5 === 0 ? (r.theme + "（変更）") : r.theme); // 20%不一致模擬
+    const coder1 = rows.map((r) => ({ id: r.id, code: r.theme }));
+    const coder2 = rows.map((r, i) => ({ id: r.id, code: i % 5 === 0 ? (r.theme + "（変更）") : r.theme })); // 20%不一致模擬
 
     const result = computeCohenKappa(coder1, coder2);
     setKappaResult(result);
@@ -272,7 +282,7 @@ export default function SCATAnalysisPage() {
           onClose={() => setKappaResult(null)}
         >
           <strong>コーダー間一致率 (Cohen's κ):</strong> κ = {kappaResult.kappa}、
-          一致率 = {(kappaResult.agreement * 100).toFixed(1)}%、
+          一致率 = {(kappaResult.agreement * 100).toFixed(1)}% (N={kappaResult.n})、
           解釈: {kappaResult.interpretation}
           （κ≥0.6 が目安）
         </Alert>
