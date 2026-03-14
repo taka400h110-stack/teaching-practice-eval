@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
-  AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItemButton,
+  AppBar, Box, CssBaseline, Drawer, Container, IconButton, List, ListItemButton,
   ListItemIcon, ListItemText, Toolbar, Typography, Divider, Avatar, Chip,
   Collapse, Tooltip,
 } from "@mui/material";
@@ -530,7 +530,9 @@ export default function AppLayout() {
           minHeight: "calc(100vh - 48px)",
         }}
       >
-        <Outlet />
+        <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
+          <Outlet />
+        </Container>
       </Box>
     </Box>
   );
