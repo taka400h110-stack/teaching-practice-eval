@@ -19,7 +19,7 @@ export const MOCK_USER: User = {
 // ══════════════════════════════════════════════
 // 週次サイクルヘルパー
 function ws(week: number, f1: number, f2: number, f3: number, f4: number): WeeklyScore {
-  return { week, factor1: f1, factor2: f2, factor3: f3, factor4: f4, total: +((f1+f2+f3+f4)/4).toFixed(2) };
+  return { week, factor1: f1, factor2: f2, factor3: f3, factor4: f4, total: +((f1*7+f2*6+f3*4+f4*6)/23).toFixed(2) };
 }
 
 // ══════════════════════════════════════════════
@@ -404,7 +404,7 @@ function makeEvaluation(journalId: string, week: number): EvaluationResult {
   const factor2 = avg(f2Scores);
   const factor3 = avg(f3Scores);
   const factor4 = avg(f4Scores);
-  const totalScore = +((factor1 + factor2 + factor3 + factor4) / 4).toFixed(2);
+  const totalScore = Math.round(((factor1 * 7 + factor2 * 6 + factor3 * 4 + factor4 * 6) / 23) * 100) / 100;
 
   const OVERALL_COMMENTS: Record<number, string> = {
     1: "初回の実習お疲れ様でした。緊張の中でも最後まで授業をやり遂げた点は評価できます。ウォン君への対応に課題感を持てていることは省察力の高さを示しています。次週は発問後の「待ち時間」を意識することで、より多くの児童の思考を引き出せるでしょう。",
@@ -510,15 +510,15 @@ export const MOCK_GROWTH_DATA: GrowthData = {
 // ══════════════════════════════════════════════
 export const MOCK_SELF_EVALUATIONS: SelfEvaluation[] = [
   { id: "se-1",  week: 1,  factor1: 2.0, factor2: 2.3, factor3: 2.0, factor4: 2.2, total: 2.13, comment: "初めての授業で緊張した。ウォン君への支援が不十分で反省が多い。" },
-  { id: "se-2",  week: 2,  factor1: 2.5, factor2: 2.8, factor3: 2.3, factor4: 2.5, total: 2.53, comment: "絵カードが効果的だった。発問後の待ち時間を実践できた。" },
-  { id: "se-3",  week: 3,  factor1: 2.8, factor2: 3.1, factor3: 2.6, factor4: 2.8, total: 2.83, comment: "ICT活用で学び合いが生まれた。机間指導の計画化が次の課題。" },
-  { id: "se-4",  week: 4,  factor1: 3.0, factor2: 3.3, factor3: 2.9, factor4: 3.1, total: 3.08, comment: "机間支援計画が機能した。3名それぞれの目標達成を確認できた。" },
-  { id: "se-5",  week: 5,  factor1: 3.2, factor2: 3.5, factor3: 3.1, factor4: 3.3, total: 3.28, comment: "単元のまとめができた。全員発表という達成感を共有できた。" },
-  { id: "se-6",  week: 6,  factor1: 3.4, factor2: 3.7, factor3: 3.3, factor4: 3.5, total: 3.48, comment: "母語ルビ付き教材が機能した。チーム対応の大切さを実感した。" },
-  { id: "se-7",  week: 7,  factor1: 3.5, factor2: 3.7, factor3: 3.4, factor4: 3.6, total: 3.55, comment: "研究授業の準備が具体化した。指導案の精度が高まっている。" },
+  { id: "se-2",  week: 2,  factor1: 2.5, factor2: 2.8, factor3: 2.3, factor4: 2.5, total: 2.54, comment: "絵カードが効果的だった。発問後の待ち時間を実践できた。" },
+  { id: "se-3",  week: 3,  factor1: 2.8, factor2: 3.1, factor3: 2.6, factor4: 2.8, total: 2.84, comment: "ICT活用で学び合いが生まれた。机間指導の計画化が次の課題。" },
+  { id: "se-4",  week: 4,  factor1: 3.0, factor2: 3.3, factor3: 2.9, factor4: 3.1, total: 3.09, comment: "机間支援計画が機能した。3名それぞれの目標達成を確認できた。" },
+  { id: "se-5",  week: 5,  factor1: 3.2, factor2: 3.5, factor3: 3.1, factor4: 3.3, total: 3.29, comment: "単元のまとめができた。全員発表という達成感を共有できた。" },
+  { id: "se-6",  week: 6,  factor1: 3.4, factor2: 3.7, factor3: 3.3, factor4: 3.5, total: 3.49, comment: "母語ルビ付き教材が機能した。チーム対応の大切さを実感した。" },
+  { id: "se-7",  week: 7,  factor1: 3.5, factor2: 3.7, factor3: 3.4, factor4: 3.6, total: 3.56, comment: "研究授業の準備が具体化した。指導案の精度が高まっている。" },
   { id: "se-8",  week: 8,  factor1: 3.5, factor2: 3.8, factor3: 3.5, factor4: 3.7, total: 3.63, comment: "研究授業本番。予想外の展開を活かせた。研究協議会で多くを学んだ。" },
   { id: "se-9",  week: 9,  factor1: 3.6, factor2: 3.8, factor3: 3.6, factor4: 3.7, total: 3.68, comment: "実習の終盤。個別対応力はついてきた。総合的な授業力をもっと高めたい。" },
-  { id: "se-10", week: 10, factor1: 3.7, factor2: 3.9, factor3: 3.6, factor4: 3.8, total: 3.75, comment: "10週間を振り返り、確実な成長を感じる。教師という仕事の奥深さを実感した。" },
+  { id: "se-10", week: 10, factor1: 3.7, factor2: 3.9, factor3: 3.6, factor4: 3.8, total: 3.76, comment: "10週間を振り返り、確実な成長を感じる。教師という仕事の奥深さを実感した。" },
 ];
 
 // ══════════════════════════════════════════════
@@ -743,13 +743,13 @@ function makeWeeklyScoresFromData(
     const f2 = +(f2s + (f2e - f2s) * curve + (Math.random() - 0.5) * 0.05).toFixed(2);
     const f3 = +(f3s + (f3e - f3s) * curve + (Math.random() - 0.5) * 0.05).toFixed(2);
     const f4 = +(f4s + (f4e - f4s) * curve + (Math.random() - 0.5) * 0.05).toFixed(2);
-    return { week: i + 1, factor1: f1, factor2: f2, factor3: f3, factor4: f4, total: +((f1+f2+f3+f4)/4).toFixed(2) };
+    return { week: i + 1, factor1: f1, factor2: f2, factor3: f3, factor4: f4, total: +((f1*7+f2*6+f3*4+f4*6)/23).toFixed(2) };
   });
 }
 
 export const MOCK_COHORT_PROFILES: StudentProfile[] = STUDENT_DATA.map((d, i) => {
-  const totalFinal = (d.f1e + d.f2e + d.f3e + d.f4e) / 4;
-  const totalStart = (d.f1s + d.f2s + d.f3s + d.f4s) / 4;
+  const totalFinal = (d.f1e * 7 + d.f2e * 6 + d.f3e * 4 + d.f4e * 6) / 23;
+  const totalStart = (d.f1s * 7 + d.f2s * 6 + d.f3s * 4 + d.f4s * 6) / 23;
   const schoolTypeLabel = { elementary: "小", middle: "中", high: "高", special: "特別支援" }[d.school_type];
   return {
     id:             `student-${String(i + 1).padStart(3, "0")}`,

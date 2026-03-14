@@ -105,11 +105,14 @@ export default function HumanEvaluationPage() {
 
   const factorAvg = (factorKey: string) => {
     const items = RUBRIC_ITEMS.filter((i) => i.factor === factorKey);
-    return (items.reduce((s, i) => s + (scores[i.num] ?? 3), 0) / items.length).toFixed(2);
+    const validScores = items.map(i => scores[i.num]).filter(s => s != null) as number[];
+    if (validScores.length === 0) return "0.00";
+    return Math.round((validScores.reduce((s, v) => s + v, 0) / validScores.length) * 100) / 100;
   };
-  const totalAvg = (
-    RUBRIC_ITEMS.reduce((s, i) => s + (scores[i.num] ?? 3), 0) / RUBRIC_ITEMS.length
-  ).toFixed(2);
+    const validTotalScores = RUBRIC_ITEMS.map(i => scores[i.num]).filter(s => s != null) as number[];
+  const totalAvg = validTotalScores.length > 0 
+    ? (Math.round((validTotalScores.reduce((s, v) => s + v, 0) / validTotalScores.length) * 100) / 100).toFixed(2)
+    : "0.00";
 
   // 日誌本文の展開 (バージョン2対応)
   let parsedRecords: any[] = [];

@@ -113,7 +113,7 @@ export default function SelfEvaluationPage() {
   });
 
   const aiLatest = aiGrowth?.weekly_scores.slice(-1)[0];
-  const total    = +(FACTOR_KEYS.reduce((s, fk) => s + scores[fk], 0) / 4).toFixed(2);
+  const total = Math.round(((scores.factor1 * 7 + scores.factor2 * 6 + scores.factor3 * 4 + scores.factor4 * 6) / 23) * 100) / 100;
   const historyLatest: SelfEvaluation | undefined = history[history.length - 1];
 
   const queryClient = useQueryClient();

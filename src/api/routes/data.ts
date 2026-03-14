@@ -456,7 +456,7 @@ dataRouter.post("/human-evals", async (c) => {
       else scores.f4.push(item.score);
     });
 
-    const avg = (arr: number[]) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+    const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
     const allScores = [...scores.f1, ...scores.f2, ...scores.f3, ...scores.f4];
 
     const id = genId();
@@ -504,7 +504,7 @@ dataRouter.post("/self-evals", async (c) => {
   };
 
   try {
-    const total = (body.factor1_score + body.factor2_score + body.factor3_score + body.factor4_score) / 4;
+    const total = (body.factor1_score * 7 + body.factor2_score * 6 + body.factor3_score * 4 + body.factor4_score * 6) / 23;
     const id = genId();
 
     await db.prepare(`
