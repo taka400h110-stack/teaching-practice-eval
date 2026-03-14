@@ -25,6 +25,7 @@ import {
   getItemsByFactor,
   getRdByScore,
 } from "../constants/rubric";
+import { computeStrictScores } from "../utils/score";
 
 // 因子別カラーマップ（rubric.ts と同期）
 const FACTOR_COLOR: Record<string, string> = {
