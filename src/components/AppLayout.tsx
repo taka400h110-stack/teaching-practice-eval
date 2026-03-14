@@ -238,7 +238,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
       group: "管理",
       items: [
         { label: "管理ダッシュボード",   path: "/admin",             icon: <AdminPanelSettingsIcon /> },
-        { label: "ユーザー登録",         path: "/register-user",     icon: <PersonAddIcon /> },
+        { label: "ユーザー登録",         path: "/register",     icon: <PersonAddIcon /> },
       ],
     },
     {
