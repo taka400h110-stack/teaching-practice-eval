@@ -214,7 +214,17 @@ const mockApi = {
     await delay();
     if (!email.includes("@")) throw new Error("Invalid credentials");
 
-    const demo = DEMO_USERS[email];
+    // 複数のメールアドレス対応: DEMO_USERSのキーや値から探索
+    let demo = DEMO_USERS[email];
+    if (!demo) {
+      const demoUser = Object.values(DEMO_USERS).find(d => 
+        d.email && d.email.split(',').map(e => e.trim()).includes(email)
+      );
+      if (demoUser) {
+        demo = demoUser;
+      }
+    }
+    
     const user = demo
       ? { id: demo.id, email, name: demo.name, role: demo.roles[0] }
       : { id: "user-001", email, name: "山田 太郎", roles: ["student"] as UserRole };
