@@ -19,13 +19,10 @@ import VisibilityIcon  from "@mui/icons-material/Visibility";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import {
-  RUBRIC_ITEMS,
   RUBRIC_FACTORS,
   REFLECTION_DEPTH_LEVELS,
-  getItemsByFactor,
-  getRdByScore,
+    getRdByScore,
 } from "../constants/rubric";
-import { computeStrictScores } from "../utils/score";
 
 // 因子別カラーマップ（rubric.ts と同期）
 const FACTOR_COLOR: Record<string, string> = {
@@ -62,9 +59,9 @@ export default function HumanEvaluationPage() {
   const navigate = useNavigate();
   const { journalId } = useParams<{ journalId?: string }>();
 
-  const [scores, setScores] = useState<Record<number, number>>(
-    Object.fromEntries(RUBRIC_ITEMS.map((item) => [item.num, 3]))
-  );
+  const [scores, setScores] = useState<Record<string, number>>({
+    factor1: 3, factor2: 3, factor3: 3, factor4: 3
+  });
   const [expandedItem, setExpandedItem] = useState<number | null>(null);
   const [tab, setTab] = useState(0);
   const [snackOpen, setSnackOpen] = useState(false);
@@ -77,7 +74,12 @@ export default function HumanEvaluationPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const items = Object.entries(scores).map(([k, v]) => ({ item_number: parseInt(k), score: v }));
+      const items = [
+        { item_number: 1, score: scores.factor1 },
+        { item_number: 2, score: scores.factor2 },
+        { item_number: 3, score: scores.factor3 },
+        { item_number: 4, score: scores.factor4 },
+      ];
       return mockApi.saveHumanEvaluation(journalId!, journal?.week_number || 1, items);
     },
     onSuccess:  () => { setSnackOpen(true); },
@@ -107,22 +109,8 @@ export default function HumanEvaluationPage() {
     );
   }
 
-  const itemsArray = RUBRIC_ITEMS.map((item) => ({
-    item_number: item.num,
-    score: scores[item.num],
-    is_na: false
-  }));
-  const strictScores = computeStrictScores(itemsArray);
-
-  const factorAvg = (factorKey: string) => {
-    if (factorKey === "factor1") return strictScores.factor1_score?.toFixed(2) ?? "0.00";
-    if (factorKey === "factor2") return strictScores.factor2_score?.toFixed(2) ?? "0.00";
-    if (factorKey === "factor3") return strictScores.factor3_score?.toFixed(2) ?? "0.00";
-    if (factorKey === "factor4") return strictScores.factor4_score?.toFixed(2) ?? "0.00";
-    return "0.00";
-  };
-  
-  const totalAvg = strictScores.total_score?.toFixed(2) ?? "0.00";
+  const factorAvg = (factorKey: string) => scores[factorKey]?.toFixed(2) ?? "0.00";
+  const totalAvg = ((scores.factor1 + scores.factor2 + scores.factor3 + scores.factor4) / 4).toFixed(2);
 
   // 日誌本文の展開 (バージョン2対応)
   let parsedRecords: any[] = [];
@@ -245,122 +233,46 @@ export default function HumanEvaluationPage() {
         </CardContent>
       </Card>
 
-      {/* 23項目評価（因子別） */}
+      {/* 4因子評価 */}
       {RUBRIC_FACTORS.map((factor) => {
-        const factorItems = getItemsByFactor(factor.key);
+        const currentScore = scores[factor.key] ?? 3;
+        const rd = getRdByScore(currentScore);
+
         return (
           <Card key={factor.key} sx={{ mb: 3, borderLeft: `4px solid ${factor.color}` }}>
             <CardContent>
-              <Box display="flex" alignItems="center" gap={1} mb={2}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                 <Typography variant="subtitle1" fontWeight="bold" sx={{ color: factor.color }}>
                   第{factor.roman}因子：{factor.label}
                 </Typography>
-                <Chip label={`α=.${String(Math.round(factor.alpha * 100)).padStart(2, "0")}`}
-                  size="small" sx={{ fontSize: 10 }} />
-                <Chip label={`${factorItems.length}項目`} size="small" variant="outlined" sx={{ fontSize: 10 }} />
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Chip
+                    label={currentScore.toFixed(1)}
+                    size="small"
+                    sx={{ bgcolor: factor.color, color: "#fff", fontWeight: "bold", minWidth: 44 }}
+                  />
+                  <RdIndicator score={currentScore} />
+                </Box>
               </Box>
 
-              {factorItems.map((item) => {
-                const currentScore = scores[item.num] ?? 3;
-                const rd = getRdByScore(currentScore);
-                const isExpanded = expandedItem === item.num;
-                const behaviors = item.behaviors;
-
-                return (
-                  <Box key={item.num} sx={{ mb: 2.5 }}>
-                    {/* 項目ヘッダー */}
-                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={0.5}>
-                      <Box display="flex" alignItems="center" gap={1} flex={1}>
-                        <Chip label={`項目${item.num}`} size="small" variant="outlined"
-                          sx={{ fontSize: 10, minWidth: 44 }} />
-                        <Box>
-                          <Typography variant="body2" fontWeight="medium">{item.label}</Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
-                            λ={item.lambda}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Box display="flex" alignItems="center" gap={0.5}>
-                        <Chip
-                          label={currentScore}
-                          size="small"
-                          color={currentScore >= 4 ? "success" : currentScore >= 3 ? "primary" : currentScore >= 2 ? "warning" : "error"}
-                          sx={{ fontWeight: "bold", minWidth: 32 }}
-                        />
-                        <RdIndicator score={currentScore} />
-                        <Tooltip title="行動指標を表示">
-                          <IconButton size="small" onClick={() => setExpandedItem(isExpanded ? null : item.num)}>
-                            {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </Box>
-
-                    {/* スライダー */}
-                    <Slider
-                      value={currentScore}
-                      onChange={(_, v) => setScores((prev) => ({ ...prev, [item.num]: v as number }))}
-                      min={1} max={5} step={1}
-                      marks={REFLECTION_DEPTH_LEVELS.map((r) => ({
-                        value: r.score,
-                        label: (
-                          <Typography
-                            component="span"
-                            sx={{ fontSize: 9, color: r.color, fontWeight: "bold" }}
-                          >
-                            {r.rd}
-                          </Typography>
-                        ),
-                      }))}
-                      sx={{
-                        color: factor.color, py: 0.5,
-                        "& .MuiSlider-track": { bgcolor: rd.color },
-                        "& .MuiSlider-thumb": { bgcolor: rd.color },
-                      }}
-                    />
-
-                    {/* 行動指標展開パネル */}
-                    <Collapse in={isExpanded}>
-                      <Paper variant="outlined" sx={{ p: 1.5, mt: 0.5, bgcolor: "#fafafa" }}>
-                        <Typography variant="caption" fontWeight="bold" color="text.secondary" mb={1} display="block">
-                          📋 行動指標（日誌記述の評価基準）― {item.text}
-                        </Typography>
-                        {behaviors.slice().reverse().map((beh) => {
-                          const isSelected = beh.score === currentScore;
-                          const brd = getRdByScore(beh.score);
-                          return (
-                            <Box
-                              key={beh.score}
-                              sx={{
-                                display: "flex", gap: 1, mb: 0.8, p: 0.8,
-                                borderRadius: 1, cursor: "pointer",
-                                bgcolor: isSelected ? brd.color + "22" : "transparent",
-                                border: isSelected ? `1px solid ${brd.color}` : "1px solid transparent",
-                                "&:hover": { bgcolor: brd.color + "11" },
-                              }}
-                              onClick={() => setScores((prev) => ({ ...prev, [item.num]: beh.score }))}
-                            >
-                              <Chip
-                                label={`${beh.score} ${beh.rd}`}
-                                size="small"
-                                sx={{
-                                  bgcolor: brd.color, color: "#fff",
-                                  fontWeight: "bold", fontSize: 10, minWidth: 68, flexShrink: 0,
-                                }}
-                              />
-                              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.5 }}>
-                                {beh.indicator}
-                              </Typography>
-                            </Box>
-                          );
-                        })}
-                      </Paper>
-                    </Collapse>
-
-                    <Divider sx={{ mt: 1.5 }} />
-                  </Box>
-                );
-              })}
+              <Slider
+                value={currentScore}
+                onChange={(_, v) => setScores((prev) => ({ ...prev, [factor.key]: v as number }))}
+                min={1} max={5} step={0.5}
+                marks={REFLECTION_DEPTH_LEVELS.map((r) => ({
+                  value: r.score,
+                  label: (
+                    <Typography component="span" sx={{ fontSize: 9, color: r.color, fontWeight: "bold" }}>
+                      {r.rd}
+                    </Typography>
+                  ),
+                }))}
+                sx={{
+                  color: factor.color, py: 1, mt: 1,
+                  "& .MuiSlider-track": { bgcolor: rd.color },
+                  "& .MuiSlider-thumb": { bgcolor: rd.color, width: 20, height: 20 },
+                }}
+              />
             </CardContent>
           </Card>
         );
