@@ -476,6 +476,15 @@ statsRouter.post("/icc", async (c) => {
   };
 
   try {
+    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
+    if (STATS_API_URL) {
+      const response = await fetch(`${STATS_API_URL}/api/icc`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) return c.json(await response.json());
+    }
     const result = computeICC21(body.ratings);
     return c.json({ success: true, ...result, factor: body.factor ?? "total" });
   } catch (err) {
@@ -555,12 +564,21 @@ statsRouter.post("/pearson", async (c) => {
 // POST /api/stats/bland-altman
 statsRouter.post("/bland-altman", async (c) => {
   const body = await c.req.json() as {
-    method1: number[];  // AI scores
-    method2: number[];  // Human scores
+    method1: number[];
+    method2: number[];
     factor?: string;
   };
-
   try {
+    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
+    if (STATS_API_URL) {
+      const response = await fetch(`${STATS_API_URL}/api/bland-altman`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) return c.json(await response.json());
+    }
+
     const result = computeBlandAltman(body.method1, body.method2);
     return c.json({ success: true, ...result, factor: body.factor ?? "total" });
   } catch (err) {

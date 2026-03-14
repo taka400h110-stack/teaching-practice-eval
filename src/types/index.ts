@@ -248,3 +248,8 @@ export interface UserRegistration {
   position?:    string;  // 職位
   notes?:       string;  // 備考
 }
+
+export interface CloudflareBindings {
+  DB: any;
+  STAT_API_URL?: string;
+}
