@@ -307,7 +307,7 @@ export default function SCATAnalysisPage() {
                 <Chip label={`#${row.id}`} size="small" variant="outlined" />
                 {row.week && <Chip label={`第${row.week}週`} size="small" />}
                 {row.factor && <Chip label={FACTOR_LABELS[row.factor]?.split(": ")[0]} size="small" color="primary" />}
-                <Typography variant="body2" noWrap sx={{ flex: 1, ml: 1 }}>{row.text.slice(0, 60) || "（空欄）"}</Typography>
+                <Typography variant="body2" sx={{ flex: 1, ml: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text || "（空欄）"}</Typography>
                 <IconButton size="small" onClick={(e) => { e.stopPropagation(); removeRow(row.id); }}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
