@@ -263,7 +263,7 @@ export default function ReliabilityAnalysisPage() {
 
       {!data && !isCalculating && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          「信頼性を計算」ボタンを押してください。AI評価スコアと人間評価スコア（評価者3名の平均値）の比較分析を実行します。
+          「信頼性を計算」ボタンを押してください。AI評価スコアと人間評価スコア（複数評価者の平均値）の比較分析を実行します。
           <br />API（/api/stats/full-reliability）が利用可能な場合はサーバーサイド計算、それ以外は論文掲載値を表示します。
         </Alert>
       )}
@@ -416,7 +416,7 @@ export default function ReliabilityAnalysisPage() {
             <Card>
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                  AI評価 vs 人間評価（3名平均） 散布図（Pearson r = {data.total.pearson.r}）
+                  AI評価 vs 人間評価（平均） 散布図（Pearson r = {data.total.pearson.r}）
                 </Typography>
                 <ResponsiveContainer width="100%" height={380}>
                   <ScatterChart margin={{ top: 10, right: 30, bottom: 30, left: 20 }}>

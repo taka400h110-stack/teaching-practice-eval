@@ -137,7 +137,7 @@ export default function EvaluationsPage() {
         <Card variant="outlined" sx={{ mb: 3, bgcolor: "#e3f2fd" }}>
           <CardContent>
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-              評価タスク進捗（3名平均分析用データ）
+              評価タスク進捗（複数名平均分析用データ）
             </Typography>
             <Box display="flex" alignItems="center" gap={2}>
               <Box flex={1}>
