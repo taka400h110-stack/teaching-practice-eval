@@ -75,7 +75,10 @@ export default function HumanEvaluationPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: async () => { await new Promise((r) => setTimeout(r, 600)); return scores; },
+    mutationFn: async () => {
+      const items = Object.entries(scores).map(([k, v]) => ({ item_number: parseInt(k), score: v }));
+      return mockApi.saveHumanEvaluation(journalId!, journal?.week_number || 1, items);
+    },
     onSuccess:  () => { setSnackOpen(true); },
   });
 

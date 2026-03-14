@@ -60,6 +60,7 @@ export default function EvaluationsPage() {
     queryFn: () => mockApi.getJournals(),
   });
 
+  const { data: humanEvals = [] } = useQuery({ queryKey: ["humanEvaluations"], queryFn: () => mockApi.getHumanEvaluations() });
   const { data: allEvals = [] } = useQuery({
     queryKey: ["allEvaluations"],
     queryFn: () => mockApi.getAllEvaluations(),
@@ -82,7 +83,7 @@ export default function EvaluationsPage() {
       title:     j.title,
       date:      j.entry_date,
       week:      j.week_number,
-      status:    j.status === "evaluated" ? "completed" : "pending",
+      status: isEvaluator ? (humanEvals.some(he => he.journal_id === j.id) ? "completed" : "pending") : (j.status === "evaluated" ? "completed" : "pending"),
       total:     evalResult ? evalResult.total_score : null,
       f1: evalResult ? evalResult.factor_scores.factor1 : null,
       f2: evalResult ? evalResult.factor_scores.factor2 : null,
