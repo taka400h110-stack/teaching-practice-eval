@@ -317,15 +317,18 @@ export default function AppLayout() {
           </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="body2" fontWeight="bold" noWrap fontSize={13}>{user.name}</Typography>
-            <Chip
-              label={ROLE_LABEL[role] ?? role}
-              size="small"
-              sx={{
-                fontSize: 9, height: 16,
-                bgcolor: ROLE_COLOR[roles[0] as UserRole] ?? "primary.main",
-                color: "white", mt: 0.3, mb: 0.3,
-              }}
-            />
+            {roles.map(r => (
+              <Chip
+                key={r}
+                label={ROLE_LABEL[r as UserRole] ?? r}
+                size="small"
+                sx={{
+                  fontSize: 9, height: 16,
+                  bgcolor: ROLE_COLOR[r as UserRole] ?? "primary.main",
+                  color: "white", mt: 0.3, mb: 0.3, mr: 0.5,
+                }}
+              />
+            ))}
             {/* 実習生：学籍番号・学年・実習情報 */}
             {roles.includes("student") && (
               <Box>
@@ -355,7 +358,7 @@ export default function AppLayout() {
               </Box>
             )}
             {/* 実習生以外：所属・役職 */}
-            {!role === "student" && (
+            {!roles.includes("student") && (
               <Box>
                 {(user as { organization?: string }).organization && (
                   <Typography variant="caption" display="block" color="text.secondary" fontSize={10} sx={{ lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
