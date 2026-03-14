@@ -302,12 +302,12 @@ export default function SCATAnalysisPage() {
         </Alert>
         {rows.map((row) => (
           <Accordion key={row.id} sx={{ mb: 1 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ ".MuiAccordionSummary-content": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", pr: 2 } }}>
               <Box display="flex" alignItems="center" gap={1} sx={{ width: "100%", overflow: "hidden" }}>
                 <Chip label={`#${row.id}`} size="small" variant="outlined" />
                 {row.week && <Chip label={`第${row.week}週`} size="small" />}
                 {row.factor && <Chip label={FACTOR_LABELS[row.factor]?.split(": ")[0]} size="small" color="primary" />}
-                <Typography variant="body2" sx={{ flex: 1, ml: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text || "（空欄）"}</Typography>
+                <Typography variant="body2" sx={{ flex: 1, minWidth: 0, ml: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{row.text || "（空欄）"}</Typography>
                 <IconButton size="small" onClick={(e) => { e.stopPropagation(); removeRow(row.id); }}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
