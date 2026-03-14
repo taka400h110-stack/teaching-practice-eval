@@ -30,6 +30,7 @@ const LongitudinalAnalysisPage= lazy(() => import("./pages/LongitudinalAnalysisP
 const StatisticsPage          = lazy(() => import("./pages/StatisticsPage"));
 const CohortsManagementPage   = lazy(() => import("./pages/CohortsManagementPage"));
 const SCATAnalysisPage        = lazy(() => import("./pages/SCATAnalysisPage"));
+const AdvancedAnalyticsPage   = lazy(() => import("./pages/AdvancedAnalyticsPage"));
 // 個人
 const SelfEvaluationPage      = lazy(() => import("./pages/SelfEvaluationPage"));
 const GoalHistoryPage         = lazy(() => import("./pages/GoalHistoryPage"));
@@ -97,6 +98,7 @@ export default function App() {
           <Route path="growth"            element={<GrowthVisualizationPage />} />
           <Route path="longitudinal"      element={<LongitudinalAnalysisPage />} />
           <Route path="statistics"        element={<StatisticsPage />} />
+          <Route path="advanced"          element={<AdvancedAnalyticsPage />} />
           <Route path="cohorts"           element={<CohortsManagementPage />} />
           <Route path="scat"              element={<SCATAnalysisPage />} />
 

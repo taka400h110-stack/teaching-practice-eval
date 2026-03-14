@@ -26,6 +26,7 @@ import VerifiedUserIcon       from "@mui/icons-material/VerifiedUser";
 import PersonAddIcon          from "@mui/icons-material/PersonAdd";
 import DownloadIcon           from "@mui/icons-material/Download";
 import AccountBalanceIcon     from "@mui/icons-material/AccountBalance";
+import ScienceIcon            from "@mui/icons-material/Science";
 import mockApi from "../api/client";
 import type { UserRole } from "../types";
 
@@ -106,6 +107,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         items: [
           { label: "コーホート管理",     path: "/cohorts",      icon: <GroupsIcon /> },
           { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
+          { label: "高度分析 (NLP/SEM)", path: "/advanced",    icon: <ScienceIcon /> },
         ],
       },
     ];
@@ -266,6 +268,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         { label: "縦断分析（LGCM）",     path: "/longitudinal",      icon: <TimelineIcon /> },
         { label: "SCAT 質的分析",        path: "/scat",              icon: <PsychologyIcon /> },
         { label: "統計ダッシュボード",   path: "/statistics",        icon: <EqualizerIcon /> },
+        { label: "高度分析ダッシュボード", path: "/advanced",          icon: <ScienceIcon /> },
       ],
     },
     {
