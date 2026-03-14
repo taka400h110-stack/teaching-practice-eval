@@ -64,7 +64,7 @@ const ROLE_COLOR: Record<UserRole, string> = {
 function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
 
   // ── 実習生（student）: 統合ワークフロー ──
-  if (roles.includes("student")) {
+  if (role === "student") {
     return [
       {
         group: "週次サイクル（RQ3）",
@@ -289,7 +289,7 @@ export default function AppLayout() {
   const drawer = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "white" }}>
       {/* ロゴ */}
-      <Box sx={{ bgcolor: ROLE_COLOR[roles[0]] ?? "primary.main", px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+      <Box sx={{ bgcolor: ROLE_COLOR[roles[0] as UserRole] ?? "primary.main", px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
         <SchoolIcon sx={{ color: "white", fontSize: 22 }} />
         <Box>
           <Typography variant="caption" color="rgba(255,255,255,0.8)" fontSize={9} display="block" lineHeight={1}>
@@ -308,7 +308,7 @@ export default function AppLayout() {
           <Avatar
             sx={{
               width: 40, height: 40,
-              bgcolor: ROLE_COLOR[roles[0]] ?? "primary.main",
+              bgcolor: ROLE_COLOR[roles[0] as UserRole] ?? "primary.main",
               fontSize: 16, fontWeight: "bold",
               flexShrink: 0,
             }}
@@ -322,7 +322,7 @@ export default function AppLayout() {
               size="small"
               sx={{
                 fontSize: 9, height: 16,
-                bgcolor: ROLE_COLOR[roles[0]] ?? "primary.main",
+                bgcolor: ROLE_COLOR[roles[0] as UserRole] ?? "primary.main",
                 color: "white", mt: 0.3, mb: 0.3,
               }}
             />
@@ -355,7 +355,7 @@ export default function AppLayout() {
               </Box>
             )}
             {/* 実習生以外：所属・役職 */}
-            {!roles.includes("student") && (
+            {!role === "student" && (
               <Box>
                 {(user as { organization?: string }).organization && (
                   <Typography variant="caption" display="block" color="text.secondary" fontSize={10} sx={{ lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -408,13 +408,13 @@ export default function AppLayout() {
                         sx={{
                           pl: 2, py: 0.6,
                           "&.Mui-selected": {
-                            bgcolor: `${ROLE_COLOR[roles[0]] ?? "#1976d2"}18`,
-                            borderRight: `3px solid ${ROLE_COLOR[roles[0]] ?? "#1976d2"}`,
-                            "& .MuiListItemIcon-root": { color: ROLE_COLOR[roles[0]] ?? "#1976d2" },
-                            "& .MuiListItemText-primary": { color: ROLE_COLOR[roles[0]] ?? "#1976d2", fontWeight: 700 },
+                            bgcolor: `${ROLE_COLOR[roles[0] as UserRole] ?? "#1976d2"}18`,
+                            borderRight: `3px solid ${ROLE_COLOR[roles[0] as UserRole] ?? "#1976d2"}`,
+                            "& .MuiListItemIcon-root": { color: ROLE_COLOR[roles[0] as UserRole] ?? "#1976d2" },
+                            "& .MuiListItemText-primary": { color: ROLE_COLOR[roles[0] as UserRole] ?? "#1976d2", fontWeight: 700 },
                           },
                           "&.Mui-selected:hover": {
-                            bgcolor: `${ROLE_COLOR[roles[0]] ?? "#1976d2"}28`,
+                            bgcolor: `${ROLE_COLOR[roles[0] as UserRole] ?? "#1976d2"}28`,
                           },
                         }}
                       >
@@ -459,7 +459,7 @@ export default function AppLayout() {
         sx={{
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
           ml:    { sm: `${DRAWER_WIDTH}px` },
-          bgcolor: ROLE_COLOR[roles[0]] ?? "primary.main",
+          bgcolor: ROLE_COLOR[roles[0] as UserRole] ?? "primary.main",
           boxShadow: 1,
         }}
       >
