@@ -109,7 +109,7 @@ interface RegisteredUser {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
+  roles: UserRole[];
   extra: Record<string, string>;
   created_at: string;
 }
@@ -119,14 +119,14 @@ const STORAGE_KEY = "registered_users";
 
 // デモ用初期ユーザー
 const DEMO_INITIAL_USERS: RegisteredUser[] = [
-  { id: "user-001", email: "student@teaching-eval.jp",      name: "山田 太郎",   role: "student",        extra: { student_number: "2023A001", grade: "3年" }, created_at: "2026-04-01T09:00:00Z" },
-  { id: "user-002", email: "teacher@teaching-eval.jp",      name: "佐藤 花子",   role: "univ_teacher",   extra: { department: "教育学部", position: "准教授" }, created_at: "2026-03-01T09:00:00Z" },
-  { id: "user-003", email: "mentor@teaching-eval.jp",       name: "鈴木 一郎",   role: "school_mentor",  extra: { school_name: "○○市立東小学校", school_type: "elementary", position: "担任教諭" }, created_at: "2026-03-01T09:00:00Z" },
-  { id: "user-004", email: "admin@teaching-eval.jp",        name: "田中 管理者", role: "admin",          extra: {}, created_at: "2026-01-01T09:00:00Z" },
-  { id: "user-005", email: "researcher@teaching-eval.jp",   name: "伊藤 研究者", role: "researcher",     extra: { institution: "△△大学", research_field: "教育評価学" }, created_at: "2026-03-01T09:00:00Z" },
-  { id: "user-006", email: "collaborator@teaching-eval.jp", name: "渡辺 協力者", role: "collaborator",   extra: { organization: "□□教育センター" }, created_at: "2026-03-01T09:00:00Z" },
-  { id: "user-007", email: "board@teaching-eval.jp",        name: "中村 委員",   role: "board_observer", extra: { board_name: "〇〇市教育委員会" }, created_at: "2026-03-01T09:00:00Z" },
-  { id: "user-008", email: "evaluator@teaching-eval.jp",    name: "小林 評価者", role: "evaluator",      extra: { affiliation: "教員養成評価機構" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-001", email: "student@teaching-eval.jp",      name: "山田 太郎",   roles: ["student"],        extra: { student_number: "2023A001", grade: "3年" }, created_at: "2026-04-01T09:00:00Z" },
+  { id: "user-002", email: "teacher@teaching-eval.jp",      name: "佐藤 花子",   roles: ["univ_teacher"],   extra: { department: "教育学部", position: "准教授" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-003", email: "mentor@teaching-eval.jp",       name: "鈴木 一郎",   roles: ["school_mentor"],  extra: { school_name: "○○市立東小学校", school_type: "elementary", position: "担任教諭" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-004", email: "admin@teaching-eval.jp",        name: "田中 管理者", roles: ["admin"],          extra: {}, created_at: "2026-01-01T09:00:00Z" },
+  { id: "user-005", email: "researcher@teaching-eval.jp",   name: "伊藤 研究者", roles: ["researcher"],     extra: { institution: "△△大学", research_field: "教育評価学" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-006", email: "collaborator@teaching-eval.jp", name: "渡辺 協力者", roles: ["collaborator"],   extra: { organization: "□□教育センター" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-007", email: "board@teaching-eval.jp",        name: "中村 委員",   roles: ["board_observer"], extra: { board_name: "〇〇市教育委員会" }, created_at: "2026-03-01T09:00:00Z" },
+  { id: "user-008", email: "evaluator@teaching-eval.jp",    name: "小林 評価者", roles: ["evaluator"],      extra: { affiliation: "教員養成評価機構" }, created_at: "2026-03-01T09:00:00Z" },
 ];
 
 function loadUsers(): RegisteredUser[] {
@@ -146,7 +146,7 @@ function saveUsers(users: RegisteredUser[]): void {
 }
 
 export default function UserRegistrationPage() {
-  const [selectedRole, setSelectedRole] = useState<UserRole>("univ_teacher");
+  const [selectedRoless, setSelectedRoless] = useState<UserRole[]>(["univ_teacher"]);
   const [form, setForm] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [users, setUsers]   = useState<RegisteredUser[]>(loadUsers);
@@ -154,7 +154,7 @@ export default function UserRegistrationPage() {
   const [deleteTarget, setDeleteTarget] = useState<RegisteredUser | null>(null);
   const [editTarget, setEditTarget]     = useState<RegisteredUser | null>(null);
 
-  const roleConfig = ROLE_CONFIGS.find((r) => r.role === selectedRole)!;
+  const roleConfigs = selectedRoless.map(sr => ROLE_CONFIGS.find((r) => r.role === sr)).filter(Boolean) as typeof ROLE_CONFIGS;
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
@@ -164,7 +164,7 @@ export default function UserRegistrationPage() {
       errs.email = "有効なメールアドレスを入力してください";
     if (users.some((u) => u.email === form.email && u.id !== editTarget?.id))
       errs.email = "このメールアドレスはすでに登録されています";
-    roleConfig.fields.forEach((f) => {
+    roleConfigs.flatMap(rc => rc.fields).forEach((f) => {
       if (!form[f]?.trim()) errs[f] = "このフィールドは必須です";
     });
     setErrors(errs);
@@ -177,7 +177,7 @@ export default function UserRegistrationPage() {
     if (editTarget) {
       const updated = users.map((u) =>
         u.id === editTarget.id
-          ? { ...u, name: form.name, email: form.email, role: selectedRole, extra: { ...form } }
+          ? { ...u, name: form.name, email: form.email, roles: selectedRoless, extra: { ...form } }
           : u
       );
       saveUsers(updated);
@@ -189,14 +189,14 @@ export default function UserRegistrationPage() {
         id:         `user-${Date.now()}`,
         email:      form.email,
         name:       form.name,
-        role:       selectedRole,
+        roles:      selectedRoless,
         extra:      { ...form },
         created_at: new Date().toISOString(),
       };
       const updated = [...users, newUser];
       saveUsers(updated);
       setUsers(updated);
-      setSnackMsg(`${form.name}（${roleConfig.label}）を登録しました`);
+      setSnackMsg(`${form.name}（${roleConfigs.map(rc => rc.label).join('、')}）を登録しました`);
     }
     setForm({});
     setErrors({});
@@ -211,7 +211,7 @@ export default function UserRegistrationPage() {
   };
 
   const handleEdit = (user: RegisteredUser) => {
-    setSelectedRole(user.role);
+    setSelectedRoless(user.roles || []);
     setForm({ ...user.extra, name: user.name, email: user.email });
     setEditTarget(user);
   };
@@ -256,10 +256,10 @@ export default function UserRegistrationPage() {
             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
               <InputLabel>役割</InputLabel>
               <Select
-                value={selectedRole}
+                value={selectedRoles}
                 label="役割"
                 onChange={(e) => {
-                  setSelectedRole(e.target.value as UserRole);
+                  setSelectedRoles(e.target.value as UserRole);
                   setErrors({});
                 }}
               >
@@ -279,7 +279,7 @@ export default function UserRegistrationPage() {
 
             {/* 役割説明 */}
             <Alert severity="info" sx={{ mb: 2, py: 0.5, fontSize: 12 }}>
-              {roleConfig.description}
+              {roleConfigs.map(rc => rc.description).join(' / ')}
             </Alert>
 
             {/* 共通フィールド */}
@@ -306,7 +306,7 @@ export default function UserRegistrationPage() {
             </Divider>
 
             {/* 役割別追加フィールド */}
-            {roleConfig.fields.map((field) => (
+            {Array.from(new Set(roleConfigs.flatMap(rc => rc.fields))).map((field) => (
               field === "school_type" ? (
                 <FormControl key={field} fullWidth size="small" sx={{ mb: 1.5 }} error={!!errors[field]}>
                   <InputLabel>{fieldLabel(field)}</InputLabel>
@@ -354,7 +354,7 @@ export default function UserRegistrationPage() {
                 fullWidth
                 startIcon={editTarget ? <EditIcon /> : <PersonAddIcon />}
                 onClick={handleSubmit}
-                sx={{ bgcolor: roleConfig.color }}
+                sx={{ bgcolor: roleConfigs[0]?.color || 'primary.main' }}
               >
                 {editTarget ? "更新" : "登録"}
               </Button>
@@ -373,7 +373,7 @@ export default function UserRegistrationPage() {
             {/* 役割フィルター */}
             <Box display="flex" gap={0.5} flexWrap="wrap" mb={2}>
               {ROLE_CONFIGS.map((r) => {
-                const cnt = users.filter((u) => u.role === r.role).length;
+                const cnt = users.filter((u) => u.roles && u.roles.includes(r.role)).length;
                 return (
                   <Chip
                     key={r.role}
@@ -407,16 +407,19 @@ export default function UserRegistrationPage() {
                   </TableHead>
                   <TableBody>
                     {users.map((u) => {
-                      const cfg = ROLE_CONFIGS.find((r) => r.role === u.role);
+                      const cfgs = (u.roles || []).map(role => ROLE_CONFIGS.find((r) => r.role === role)).filter(Boolean);
                       return (
                         <TableRow key={u.id} hover>
                           <TableCell>{u.name}</TableCell>
                           <TableCell>
-                            <Chip
-                              label={cfg?.label ?? u.role}
-                              size="small"
-                              sx={{ bgcolor: cfg?.color ?? "grey.400", color: "white", fontSize: 10, height: 18 }}
-                            />
+                            {cfgs.filter(Boolean).map(c => (
+                              <Chip
+                                key={c?.role}
+                                label={c?.label ?? "不明"}
+                                size="small"
+                                sx={{ bgcolor: c?.color ?? "grey.400", color: "white", fontSize: 10, height: 18, mr: 0.5, mb: 0.5 }}
+                              />
+                            ))}
                           </TableCell>
                           <TableCell sx={{ fontSize: 11, color: "text.secondary" }}>{u.email}</TableCell>
                           <TableCell sx={{ fontSize: 11 }}>
@@ -457,7 +460,7 @@ export default function UserRegistrationPage() {
         <DialogTitle>ユーザーを削除しますか？</DialogTitle>
         <DialogContent>
           <Typography>
-            <strong>{deleteTarget?.name}</strong>（{ROLE_CONFIGS.find((r) => r.role === deleteTarget?.role)?.label}）
+            <strong>{deleteTarget?.name}</strong>（{(deleteTarget?.roles || []).map(role => ROLE_CONFIGS.find((r) => r.role === role)?.label).join('、')}）
             を削除します。この操作は取り消せません。
           </Typography>
         </DialogContent>

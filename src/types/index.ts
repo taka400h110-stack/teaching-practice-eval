@@ -15,7 +15,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
+  roles: UserRole[]; // 複数兼任対応
   // 実習生専用フィールド
   student_number?: string;    // 学籍番号
   grade?: number;             // 学年（1-4）
@@ -242,7 +242,7 @@ export interface GoalEntry {
 export interface UserRegistration {
   email:        string;
   name:         string;
-  role:         UserRole;
+  roles: UserRole[]; // 複数兼任対応
   affiliation?: string;  // 所属機関
   department?:  string;  // 学部・専攻
   position?:    string;  // 職位

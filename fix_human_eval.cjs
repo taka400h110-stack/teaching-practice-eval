@@ -1,35 +1,32 @@
 const fs = require('fs');
-let code = fs.readFileSync('src/pages/HumanEvaluationPage.tsx', 'utf8');
 
-if (!code.includes("import { computeStrictScores }")) {
-  code = code.replace(
-    /import type \{ EvaluationResult, JournalEntry \} from "\.\.\/types";/,
-    `import type { EvaluationResult, JournalEntry } from "../types";\nimport { computeStrictScores } from "../utils/score";`
+// 1. HumanEvaluationPage.tsx の修正
+let humanFile = fs.readFileSync('src/pages/HumanEvaluationPage.tsx', 'utf-8');
+humanFile = humanFile.replace(
+  /mutationFn: async \(\) => { await new Promise\(\(r\) => setTimeout\(r, 600\)\); return scores; },/,
+  `mutationFn: async () => {\n      const items = Object.entries(scores).map(([k, v]) => ({ item_number: parseInt(k), score: v }));\n      return mockApi.saveHumanEvaluation(journalId!, journal?.week_number || 1, items);\n    },`
+);
+fs.writeFileSync('src/pages/HumanEvaluationPage.tsx', humanFile);
+
+// 2. EvaluationsPage.tsx の修正
+let evalFile = fs.readFileSync('src/pages/EvaluationsPage.tsx', 'utf-8');
+
+// (a) useQueryでgetHumanEvaluationsを取得するように追加
+if (!evalFile.includes("getHumanEvaluations")) {
+  evalFile = evalFile.replace(
+    /const { data: allEvals = \[\] } = useQuery\(\{/,
+    `const { data: humanEvals = [] } = useQuery({ queryKey: ["humanEvaluations"], queryFn: () => mockApi.getHumanEvaluations() });\n  const { data: allEvals = [] } = useQuery({`
   );
 }
 
-const replacement = `
-  const itemsArray = RUBRIC_ITEMS.map((item) => ({
-    item_number: item.num,
-    score: scores[item.num],
-    is_na: false
-  }));
-  const strictScores = computeStrictScores(itemsArray);
+// (b) completedの判定を、isEvaluatorの場合は自分が評価済みかどうかで判断する
+if (evalFile.includes('j.status === "evaluated" ? "completed" : "pending"')) {
+  evalFile = evalFile.replace(
+    /status:\s+j\.status === "evaluated" \? "completed" : "pending",/g,
+    `status: isEvaluator ? (humanEvals.some(he => he.journal_id === j.id) ? "completed" : "pending") : (j.status === "evaluated" ? "completed" : "pending"),`
+  );
+}
 
-  const factorAvg = (factorKey: string) => {
-    if (factorKey === "factor1") return strictScores.factor1_score?.toFixed(2) ?? "0.00";
-    if (factorKey === "factor2") return strictScores.factor2_score?.toFixed(2) ?? "0.00";
-    if (factorKey === "factor3") return strictScores.factor3_score?.toFixed(2) ?? "0.00";
-    if (factorKey === "factor4") return strictScores.factor4_score?.toFixed(2) ?? "0.00";
-    return "0.00";
-  };
-  
-  const totalAvg = strictScores.total_score?.toFixed(2) ?? "0.00";
-`;
+fs.writeFileSync('src/pages/EvaluationsPage.tsx', evalFile);
 
-const regex = /const factorAvg = \(factorKey: string\) => \{[\s\S]*?const totalAvg = validTotalScores\.length > 0 \s*\n\s*\? \(Math\.round\(\(validTotalScores\.reduce\(\(s, v\) => s \+ v, 0\) \/ validTotalScores\.length\) \* 100\) \/ 100\)\.toFixed\(2\)\s*\n\s*: "0\.00";/;
-
-code = code.replace(regex, replacement.trim());
-
-fs.writeFileSync('src/pages/HumanEvaluationPage.tsx', code);
-console.log("HumanEvaluationPage updated.");
+console.log('Fixed HumanEvaluationPage and EvaluationsPage.');

@@ -11,8 +11,8 @@ export const MOCK_USER: User = {
   id:    "user-001",
   email: "student@teaching-eval.jp",
   name:  "山田 太郎",
-  role:  "student",
-  student_id: "2023A001",
+  roles: ["student"],
+  
 };
 
 // ══════════════════════════════════════════════

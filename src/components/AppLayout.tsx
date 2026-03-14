@@ -61,10 +61,10 @@ const ROLE_COLOR: Record<UserRole, string> = {
 // ────────────────────────────────────────────
 // 役割別ナビゲーション（論文2 RQ2 ＆ 論文3 RQ3）
 // ────────────────────────────────────────────
-function getNavGroups(role: UserRole): NavGroup[] {
+function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
 
   // ── 実習生（student）: 統合ワークフロー ──
-  if (role === "student") {
+  if (roles.includes("student")) {
     return [
       {
         group: "週次サイクル（RQ3）",
@@ -232,53 +232,34 @@ function getNavGroups(role: UserRole): NavGroup[] {
     ];
   }
 
-  // ── 管理者（admin）: 全メニュー ──
-  return [
-    {
-      group: "管理",
-      items: [
-        { label: "管理ダッシュボード",   path: "/admin",             icon: <AdminPanelSettingsIcon /> },
-        { label: "ユーザー登録",         path: "/register",     icon: <PersonAddIcon /> },
-      ],
-    },
-    {
-      group: "実習生機能（RQ3）",
-      items: [
-        { label: "実習ダッシュボード",   path: "/dashboard",         icon: <DashboardIcon /> },
-        { label: "実習日誌",             path: "/journals",           icon: <MenuBookIcon /> },
-        { label: "省察チャットBot",      path: "/chat",              icon: <ChatIcon /> },
-        { label: "自己評価",             path: "/self-evaluation",   icon: <SelfImprovementIcon /> },
-        { label: "成長グラフ",           path: "/growth",            icon: <TimelineIcon /> },
-        { label: "目標履歴",             path: "/goals",             icon: <TrackChangesIcon /> },
-      ],
-    },
-    {
-      group: "評価（RQ2）",
-      items: [
-        { label: "教員ダッシュボード",   path: "/teacher-dashboard", icon: <SchoolIcon /> },
-        { label: "評価一覧",             path: "/evaluations",       icon: <AssessmentIcon /> },
-        { label: "人間評価入力",       path: "/evaluations/journal-001/human", icon: <VerifiedUserIcon /> },
-        { label: "AI vs 人間比較",       path: "/comparison",        icon: <CompareArrowsIcon /> },
-        { label: "信頼性分析（ICC）",    path: "/reliability",       icon: <VerifiedUserIcon /> },
-      ],
-    },
-    {
-      group: "分析（RQ3）",
-      items: [
-        { label: "コーホート管理",       path: "/cohorts",           icon: <GroupsIcon /> },
-        { label: "縦断分析（LGCM）",     path: "/longitudinal",      icon: <TimelineIcon /> },
-        { label: "SCAT 質的分析",        path: "/scat",              icon: <PsychologyIcon /> },
-        { label: "統計ダッシュボード",   path: "/statistics",        icon: <EqualizerIcon /> },
-        { label: "高度分析ダッシュボード", path: "/advanced",          icon: <ScienceIcon /> },
-      ],
-    },
-    {
-      group: "データ出力",
-      items: [
-        { label: "データエクスポート",   path: "/statistics",        icon: <DownloadIcon /> },
-      ],
-    },
-  ];
+  // ── 管理者（admin）: 管理機能のみ ──
+  if (role === "admin") {
+    return [
+      {
+        group: "システム管理",
+        items: [
+          { label: "管理ダッシュボード", path: "/admin",     icon: <AdminPanelSettingsIcon /> },
+          { label: "ユーザー登録",       path: "/register", icon: <PersonAddIcon /> },
+        ],
+      },
+    ];
+  }
+  return [];
+}
+
+function getNavGroups(roles: UserRole[]): NavGroup[] {
+  const merged = new Map<string, NavItem[]>();
+  roles.forEach(role => {
+    const groups = getNavGroupsForSingleRole(role);
+    groups.forEach(g => {
+      if (!merged.has(g.group)) merged.set(g.group, []);
+      const items = merged.get(g.group)!;
+      g.items.forEach(item => {
+        if (!items.find(i => i.path === item.path)) items.push(item);
+      });
+    });
+  });
+  return Array.from(merged.entries()).map(([group, items]) => ({ group, items }));
 }
 
 // ────────────────────────────────────────────
@@ -291,8 +272,10 @@ export default function AppLayout() {
   const [collapsed, setCollapsed]   = useState<Record<string, boolean>>({});
 
   const user = mockApi.getCurrentUser() as { id: string; name: string; role: UserRole } | null;
-  const role: UserRole = user?.role ?? "student";
-  const navGroups = getNavGroups(role);
+  const roles: UserRole[] = ((user as any)?.roles || [(user as any)?.role || "student"]) ?? ["student"];
+  // 下位互換性のため古い role も fallback として扱う
+  if (user && !user.roles && (user as any).role) roles.push((user as any).role);
+  const navGroups = getNavGroups(roles);
   const allItems  = navGroups.flatMap((g) => g.items);
 
   const handleLogout = async () => {
@@ -306,7 +289,7 @@ export default function AppLayout() {
   const drawer = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "white" }}>
       {/* ロゴ */}
-      <Box sx={{ bgcolor: ROLE_COLOR[role] ?? "primary.main", px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+      <Box sx={{ bgcolor: ROLE_COLOR[roles[0]] ?? "primary.main", px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
         <SchoolIcon sx={{ color: "white", fontSize: 22 }} />
         <Box>
           <Typography variant="caption" color="rgba(255,255,255,0.8)" fontSize={9} display="block" lineHeight={1}>
@@ -325,7 +308,7 @@ export default function AppLayout() {
           <Avatar
             sx={{
               width: 40, height: 40,
-              bgcolor: ROLE_COLOR[role] ?? "primary.main",
+              bgcolor: ROLE_COLOR[roles[0]] ?? "primary.main",
               fontSize: 16, fontWeight: "bold",
               flexShrink: 0,
             }}
@@ -339,12 +322,12 @@ export default function AppLayout() {
               size="small"
               sx={{
                 fontSize: 9, height: 16,
-                bgcolor: ROLE_COLOR[role] ?? "primary.main",
+                bgcolor: ROLE_COLOR[roles[0]] ?? "primary.main",
                 color: "white", mt: 0.3, mb: 0.3,
               }}
             />
             {/* 実習生：学籍番号・学年・実習情報 */}
-            {role === "student" && (
+            {roles.includes("student") && (
               <Box>
                 {(user as { student_number?: string }).student_number && (
                   <Typography variant="caption" display="block" color="text.secondary" fontSize={10} noWrap>
@@ -372,7 +355,7 @@ export default function AppLayout() {
               </Box>
             )}
             {/* 実習生以外：所属・役職 */}
-            {role !== "student" && (
+            {!roles.includes("student") && (
               <Box>
                 {(user as { organization?: string }).organization && (
                   <Typography variant="caption" display="block" color="text.secondary" fontSize={10} sx={{ lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -425,13 +408,13 @@ export default function AppLayout() {
                         sx={{
                           pl: 2, py: 0.6,
                           "&.Mui-selected": {
-                            bgcolor: `${ROLE_COLOR[role] ?? "#1976d2"}18`,
-                            borderRight: `3px solid ${ROLE_COLOR[role] ?? "#1976d2"}`,
-                            "& .MuiListItemIcon-root": { color: ROLE_COLOR[role] ?? "#1976d2" },
-                            "& .MuiListItemText-primary": { color: ROLE_COLOR[role] ?? "#1976d2", fontWeight: 700 },
+                            bgcolor: `${ROLE_COLOR[roles[0]] ?? "#1976d2"}18`,
+                            borderRight: `3px solid ${ROLE_COLOR[roles[0]] ?? "#1976d2"}`,
+                            "& .MuiListItemIcon-root": { color: ROLE_COLOR[roles[0]] ?? "#1976d2" },
+                            "& .MuiListItemText-primary": { color: ROLE_COLOR[roles[0]] ?? "#1976d2", fontWeight: 700 },
                           },
                           "&.Mui-selected:hover": {
-                            bgcolor: `${ROLE_COLOR[role] ?? "#1976d2"}28`,
+                            bgcolor: `${ROLE_COLOR[roles[0]] ?? "#1976d2"}28`,
                           },
                         }}
                       >
@@ -476,7 +459,7 @@ export default function AppLayout() {
         sx={{
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
           ml:    { sm: `${DRAWER_WIDTH}px` },
-          bgcolor: ROLE_COLOR[role] ?? "primary.main",
+          bgcolor: ROLE_COLOR[roles[0]] ?? "primary.main",
           boxShadow: 1,
         }}
       >
@@ -491,11 +474,14 @@ export default function AppLayout() {
           <Typography variant="subtitle1" fontWeight="bold" noWrap sx={{ flexGrow: 1 }}>
             {currentLabel}
           </Typography>
-          <Chip
-            label={ROLE_LABEL[role] ?? role}
-            size="small"
-            sx={{ bgcolor: "rgba(255,255,255,0.25)", color: "white", fontSize: 10, height: 20 }}
-          />
+          {roles.map(r => (
+            <Chip
+              key={r}
+              label={ROLE_LABEL[r] ?? r}
+              size="small"
+              sx={{ bgcolor: "rgba(255,255,255,0.25)", color: "white", fontSize: 10, height: 20, ml: 0.5 }}
+            />
+          ))}
         </Toolbar>
       </AppBar>
 
