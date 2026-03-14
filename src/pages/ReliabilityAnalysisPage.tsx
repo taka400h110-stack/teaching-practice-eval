@@ -263,7 +263,7 @@ export default function ReliabilityAnalysisPage() {
 
       {!data && !isCalculating && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          「信頼性を計算」ボタンを押してください。AI評価スコアと人間評価スコアの比較分析を実行します。
+          「信頼性を計算」ボタンを押してください。AI評価スコアと人間評価スコア（評価者3名の平均値）の比較分析を実行します。
           <br />API（/api/stats/full-reliability）が利用可能な場合はサーバーサイド計算、それ以外は論文掲載値を表示します。
         </Alert>
       )}
@@ -352,7 +352,7 @@ export default function ReliabilityAnalysisPage() {
               <CardContent>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="subtitle1" fontWeight={700}>
-                    Bland-Altman プロット（AI評価 − 人間評価）
+                    Bland-Altman プロット（AI評価 − 人間評価平均）
                   </Typography>
                   <Tooltip title="Bland-Altman: 2手法の一致度を視覚化。データの95%がLoA内に収まれば良好な一致。">
                     <IconButton size="small"><InfoOutlinedIcon /></IconButton>
@@ -416,7 +416,7 @@ export default function ReliabilityAnalysisPage() {
             <Card>
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                  AI評価 vs 人間評価 散布図（Pearson r = {data.total.pearson.r}）
+                  AI評価 vs 人間評価（3名平均） 散布図（Pearson r = {data.total.pearson.r}）
                 </Typography>
                 <ResponsiveContainer width="100%" height={380}>
                   <ScatterChart margin={{ top: 10, right: 30, bottom: 30, left: 20 }}>
@@ -426,7 +426,7 @@ export default function ReliabilityAnalysisPage() {
                       domain={[1, 5]} type="number"
                     />
                     <YAxis dataKey="human" name="人間評価"
-                      label={{ value: "人間評価スコア", angle: -90, position: "insideLeft", offset: 10 }}
+                      label={{ value: "人間評価スコア（平均）", angle: -90, position: "insideLeft", offset: 10 }}
                       domain={[1, 5]}
                     />
                     <RechartTooltip cursor={{ strokeDasharray: "3 3" }} />
@@ -519,7 +519,7 @@ export default function ReliabilityAnalysisPage() {
           <TabPanel value={tab} index={3}>
             <Card>
               <CardContent>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>因子別 Pearson r（AI vs 人間評価）</Typography>
+                <Typography variant="subtitle1" fontWeight={700} mb={2}>因子別 Pearson r（AI vs 人間評価平均）</Typography>
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
                     <TableHead>

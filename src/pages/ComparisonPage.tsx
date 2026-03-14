@@ -95,7 +95,7 @@ export default function ComparisonPage() {
     <Box>
       <Box display="flex" alignItems="center" gap={1} mb={3}>
         <CompareArrowsIcon color="primary" />
-        <Typography variant="h5" fontWeight={700}>AI vs 人間評価 比較分析</Typography>
+        <Typography variant="h5" fontWeight={700}>AI vs 人間評価（3名平均） 比較分析</Typography>
       </Box>
 
       {/* サマリーカード */}
@@ -139,7 +139,7 @@ export default function ComparisonPage() {
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="ai"    fill="#1976d2" name="AI評価" />
-                    <Bar dataKey="human" fill="#7b1fa2" name="人間評価" />
+                    <Bar dataKey="human" fill="#7b1fa2" name="人間評価（3名平均）" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -156,7 +156,7 @@ export default function ComparisonPage() {
                     <PolarGrid />
                     <PolarAngleAxis dataKey="factor" tick={{ fontSize: 12 }} />
                     <Radar dataKey="ai"    stroke="#1976d2" fill="#1976d2" fillOpacity={0.3} name="AI評価" />
-                    <Radar dataKey="human" stroke="#7b1fa2" fill="#7b1fa2" fillOpacity={0.3} name="人間評価" />
+                    <Radar dataKey="human" stroke="#7b1fa2" fill="#7b1fa2" fillOpacity={0.3} name="人間評価（3名平均）" />
                     <Legend />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -211,15 +211,15 @@ export default function ComparisonPage() {
         <Card variant="outlined">
           <CardContent>
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-              AI評価 vs 人間評価 散布図（23項目）
+              AI評価 vs 人間評価（3名平均） 散布図（23項目）
             </Typography>
             <ResponsiveContainer width="100%" height={360}>
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="ai" name="AI評価"
                   label={{ value: "AI評価スコア", position: "insideBottom", offset: -5 }} domain={[1, 4]} />
-                <YAxis dataKey="human" name="人間評価"
-                  label={{ value: "人間評価スコア", angle: -90, position: "insideLeft" }} domain={[1, 4]} />
+                <YAxis dataKey="human" name="人間評価（3名平均）"
+                  label={{ value: "人間評価スコア（3名平均）", angle: -90, position: "insideLeft" }} domain={[1, 4]} />
                 <Tooltip cursor={{ strokeDasharray: "3 3" }} />
                 <ReferenceLine stroke="#888" segment={[{x:1,y:1},{x:4,y:4}]} label="一致線" />
                 <Scatter
@@ -229,7 +229,7 @@ export default function ComparisonPage() {
               </ScatterChart>
             </ResponsiveContainer>
             <Alert severity="success" sx={{ mt: 1 }}>
-              Pearson r = 0.87（p &lt; .001）。AIと人間評価の間に強い正の相関。
+              Pearson r = 0.87（p &lt; .001）。AIと人間評価（3名の平均値）の間に強い正の相関。
             </Alert>
           </CardContent>
         </Card>
