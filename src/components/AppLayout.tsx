@@ -110,7 +110,6 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
           { label: "高度分析 (NLP/SEM)", path: "/advanced",    icon: <ScienceIcon /> },
           { label: "データプラットフォーム", path: "/platform", icon: <InsightsIcon /> },
-          { label: "データプラットフォーム", path: "/platform", icon: <InsightsIcon /> },
         ],
       },
     ];
@@ -175,6 +174,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "SCAT 質的分析",      path: "/scat",         icon: <PsychologyIcon /> },
           { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
           { label: "高度分析 (NLP/SEM)", path: "/advanced",    icon: <ScienceIcon /> },
+          { label: "データプラットフォーム", path: "/platform", icon: <InsightsIcon /> },
         ],
       },
       {
