@@ -33,6 +33,10 @@ app.use("/api/*", cors({
   allowHeaders: ["Content-Type", "Authorization"],
 }));
 
+// ヘルスチェックとバージョン
+app.get("/healthz", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
+app.get("/version", (c) => c.json({ version: "1.0.0", environment: "production" }));
+
 // ────────────────────────────────────────────────────────────────
 // API ルーティング
 // ────────────────────────────────────────────────────────────────
@@ -67,6 +71,10 @@ app.use("/static/*", serveStatic({ root: "./" }));
 // SPA フォールバック（React Router に委ねる）
 // すべての非APIルートは index.html を返す
 // ────────────────────────────────────────────────────────────────
+// 静的ファイルの提供（ルートにあるファイルもここから）
 app.get("*", serveStatic({ root: "./" }));
+
+// それでも見つからなければSPAのフォールバックとしてindex.htmlを返す
+app.get("*", serveStatic({ path: "./index.html" }));
 
 export default app;

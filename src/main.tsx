@@ -8,6 +8,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
 import { theme } from "./theme";
 import App from "./App";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -17,7 +18,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
       </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>
