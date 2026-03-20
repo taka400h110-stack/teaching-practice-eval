@@ -27,6 +27,7 @@ const ReliabilityAnalysisPage = lazy(() => import("./pages/ReliabilityAnalysisPa
 // 成長・分析 (RQ3)
 const GrowthVisualizationPage = lazy(() => import("./pages/GrowthVisualizationPage"));
 const LongitudinalAnalysisPage= lazy(() => import("./pages/LongitudinalAnalysisPage"));
+const PlatformAnalyticsPage   = lazy(() => import("./pages/PlatformAnalyticsPage"));
 const StatisticsPage          = lazy(() => import("./pages/StatisticsPage"));
 const CohortsManagementPage   = lazy(() => import("./pages/CohortsManagementPage"));
 const SCATAnalysisPage        = lazy(() => import("./pages/SCATAnalysisPage"));

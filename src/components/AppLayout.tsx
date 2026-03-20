@@ -27,6 +27,7 @@ import PersonAddIcon          from "@mui/icons-material/PersonAdd";
 import DownloadIcon           from "@mui/icons-material/Download";
 import AccountBalanceIcon     from "@mui/icons-material/AccountBalance";
 import ScienceIcon            from "@mui/icons-material/Science";
+import InsightsIcon from "@mui/icons-material/Insights";
 import mockApi from "../api/client";
 import type { UserRole } from "../types";
 
@@ -108,6 +109,8 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "コーホート管理",     path: "/cohorts",      icon: <GroupsIcon /> },
           { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
           { label: "高度分析 (NLP/SEM)", path: "/advanced",    icon: <ScienceIcon /> },
+          { label: "データプラットフォーム", path: "/platform", icon: <InsightsIcon /> },
+          { label: "データプラットフォーム", path: "/platform", icon: <InsightsIcon /> },
         ],
       },
     ];

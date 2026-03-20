@@ -16,6 +16,7 @@ import { serveStatic } from "hono/cloudflare-workers";
 import openaiRouter from "./api/routes/openai";
 import statsRouter from "./api/routes/stats";
 import dataRouter from "./api/routes/data";
+import analyticsRouter from "./api/routes/analytics";
 
 type Bindings = {
   OPENAI_API_KEY: string;
@@ -41,7 +42,8 @@ app.get("/version", (c) => c.json({ version: "1.0.0", environment: "production" 
 // API ルーティング
 // ────────────────────────────────────────────────────────────────
 app.route("/api/ai",     openaiRouter);
-app.route("/api/ocr",    openaiRouter);  // OCRルートも同じルーターに含む
+app.route("/api/ocr",    openaiRouter);
+app.route("/api/analytics", analyticsRouter);
 app.route("/api/stats",  statsRouter);
 app.route("/api/data",   dataRouter);
 
