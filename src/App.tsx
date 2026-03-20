@@ -100,6 +100,7 @@ export default function App() {
           <Route path="longitudinal"      element={<LongitudinalAnalysisPage />} />
           <Route path="statistics"        element={<StatisticsPage />} />
           <Route path="advanced"          element={<AdvancedAnalyticsPage />} />
+          <Route path="platform"          element={<PlatformAnalyticsPage />} />
           <Route path="cohorts"           element={<CohortsManagementPage />} />
           <Route path="scat"              element={<SCATAnalysisPage />} />
 
