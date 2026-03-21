@@ -742,6 +742,18 @@ const mockApi = {
       throw err;
     }
   },
+  
+  getSavedReliabilityDetails: async (runId: string) => {
+    try {
+      const response = await fetch(`/api/data/reliability-results/${runId}`);
+      if (!response.ok) throw new Error("Failed to fetch reliability details");
+      const data = await response.json();
+      return data.details || [];
+    } catch (err) {
+      console.error("API error fetching reliability details:", err);
+      throw err;
+    }
+  },
   getSavedReliabilityResults: async () => {
     try {
       const response = await fetch("/api/data/reliability-results");

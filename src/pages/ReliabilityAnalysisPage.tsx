@@ -293,8 +293,75 @@ const TabPanel = ({ children, value, index }: TabPanelProps) =>
   value === index ? <Box pt={2}>{children}</Box> : null;
 
 
+
+// 詳細表示モーダルコンポーネント
+// Add Dialog imports at the top if needed
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button as MuiButton } from "@mui/material";
+
+function ReliabilityDetailModal({ runId, open, onClose }: { runId: string | null, open: boolean, onClose: () => void }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["savedReliabilityDetails", runId],
+    queryFn: () => runId ? mockApi.getSavedReliabilityDetails(runId) : Promise.resolve([]),
+    enabled: !!runId && open,
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>詳細分析結果 (Run ID: {runId})</DialogTitle>
+      <DialogContent dividers>
+        {isLoading && <LinearProgress />}
+        {isError && <Alert severity="error">詳細の取得に失敗しました</Alert>}
+        {!isLoading && !isError && data && data.length === 0 && (
+          <Typography color="text.secondary">データが見つかりません</Typography>
+        )}
+        {!isLoading && !isError && data && data.length > 0 && (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: "#f5f5f5" }}>
+                  <TableCell>因子 (factor)</TableCell>
+                  <TableCell>ICC値</TableCell>
+                  <TableCell>ICC 95% CI</TableCell>
+                  <TableCell>Mean Diff</TableCell>
+                  <TableCell>LoA Lower</TableCell>
+                  <TableCell>LoA Upper</TableCell>
+                  <TableCell>N (ペア数)</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.map((row: any) => (
+                  <TableRow key={row.factor}>
+                    <TableCell sx={{ fontWeight: row.factor === 'total' ? 'bold' : 'normal' }}>
+                      {row.factor === 'total' ? 'Overall (Total)' : row.factor}
+                    </TableCell>
+                    <TableCell>{row.icc_value?.toFixed(3)}</TableCell>
+                    <TableCell>
+                      [{row.icc_ci_lower?.toFixed(3)}, {row.icc_ci_upper?.toFixed(3)}]
+                    </TableCell>
+                    <TableCell>{row.mean_diff?.toFixed(3) || "—"}</TableCell>
+                    <TableCell>{row.loa_lower?.toFixed(3) || "—"}</TableCell>
+                    <TableCell>{row.loa_upper?.toFixed(3) || "—"}</TableCell>
+                    <TableCell>{row.subject_count}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <MuiButton onClick={onClose} color="primary">閉じる</MuiButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
 // 保存済み結果一覧コンポーネント
 function SavedReliabilityResults() {
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["savedReliabilityResults"],
     queryFn: mockApi.getSavedReliabilityResults,
@@ -303,41 +370,64 @@ function SavedReliabilityResults() {
   if (isLoading) return <LinearProgress />;
 
   return (
-    <Card sx={{ mt: 4, mb: 4 }}>
-      <CardContent>
-        <Typography variant="h6" fontWeight={700} mb={2}>保存済み信頼性分析結果</Typography>
-        {isError && <Alert severity="error" sx={{ mb: 2 }}>保存済み結果の取得に失敗しました</Alert>}
-        
-        {(!data || data.length === 0) && !isError ? (
-          <Typography color="text.secondary">保存済み結果なし</Typography>
-        ) : (
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: "#f5f5f5" }}>
-                  <TableCell>計算日時 (calculated_at)</TableCell>
-                  <TableCell>データソース (data_source)</TableCell>
-                  <TableCell>ペア数 (paired_count)</TableCell>
-                  <TableCell>Overall ICC</TableCell>
-                  <TableCell>Overall Mean Diff</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data?.map((row: any, i: number) => (
-                  <TableRow key={i}>
-                    <TableCell>{new Date(row.calculated_at).toLocaleString()}</TableCell>
-                    <TableCell>{row.data_source}</TableCell>
-                    <TableCell>{row.paired_count}</TableCell>
-                    <TableCell>{row.overall_icc?.toFixed(3)}</TableCell>
-                    <TableCell>{row.overall_mean_diff !== null ? row.overall_mean_diff?.toFixed(3) : "—"}</TableCell>
+    <>
+      <Card sx={{ mt: 4, mb: 4 }}>
+        <CardContent>
+          <Typography variant="h6" fontWeight={700} mb={2}>保存済み信頼性分析結果</Typography>
+          {isError && <Alert severity="error" sx={{ mb: 2 }}>保存済み結果の取得に失敗しました</Alert>}
+          
+          {(!data || data.length === 0) && !isError ? (
+            <Typography color="text.secondary">保存済み結果なし</Typography>
+          ) : (
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "#f5f5f5" }}>
+                    <TableCell>計算日時 (calculated_at)</TableCell>
+                    <TableCell>Run ID</TableCell>
+                    <TableCell>データソース (data_source)</TableCell>
+                    <TableCell>ペア数 (paired_count)</TableCell>
+                    <TableCell>Overall ICC</TableCell>
+                    <TableCell>Overall Mean Diff</TableCell>
+                    <TableCell>操作</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </CardContent>
-    </Card>
+                </TableHead>
+                <TableBody>
+                  {data?.map((row: any, i: number) => (
+                    <TableRow key={i} hover>
+                      <TableCell>{new Date(row.calculated_at).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Typography variant="caption" color="text.secondary">{row.run_id}</Typography>
+                      </TableCell>
+                      <TableCell>{row.data_source}</TableCell>
+                      <TableCell>{row.paired_count}</TableCell>
+                      <TableCell>{row.overall_icc?.toFixed(3)}</TableCell>
+                      <TableCell>{row.overall_mean_diff !== null ? row.overall_mean_diff?.toFixed(3) : "—"}</TableCell>
+                      <TableCell>
+                        <MuiButton 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => setSelectedRunId(row.run_id)}
+                          disabled={!row.run_id}
+                        >
+                          詳細
+                        </MuiButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </CardContent>
+      </Card>
+      
+      <ReliabilityDetailModal 
+        runId={selectedRunId} 
+        open={!!selectedRunId} 
+        onClose={() => setSelectedRunId(null)} 
+      />
+    </>
   );
 }
 
