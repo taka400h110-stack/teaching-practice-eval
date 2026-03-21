@@ -199,6 +199,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS icc_results (
       id TEXT PRIMARY KEY,
+      run_id TEXT,
       scope TEXT NOT NULL,
       factor TEXT,
       icc_value REAL NOT NULL,
@@ -219,6 +220,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS bland_altman_results (
       id TEXT PRIMARY KEY,
+      run_id TEXT,
       factor TEXT,
       mean_diff REAL,
       sd_diff REAL,
@@ -253,6 +255,9 @@ async function ensureSchema(db: D1Database): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_evaluations_journal ON evaluations(journal_id);
     CREATE INDEX IF NOT EXISTS idx_human_evals_journal ON human_evaluations(journal_id);
     CREATE INDEX IF NOT EXISTS idx_self_evals_student ON self_evaluations(student_id);
+    try { await db.exec("ALTER TABLE icc_results ADD COLUMN run_id TEXT;"); } catch (e) {}
+    try { await db.exec("ALTER TABLE bland_altman_results ADD COLUMN run_id TEXT;"); } catch (e) {}
+
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_student ON chat_sessions(student_id);
     CREATE INDEX IF NOT EXISTS idx_goals_student ON goals(student_id);
     CREATE INDEX IF NOT EXISTS idx_lps_student ON learning_progress_scores(student_id);
@@ -675,6 +680,7 @@ dataRouter.post("/icc-results", async (c) => {
 
   await ensureSchema(db);
   const body = await c.req.json() as {
+    run_id?: string;
     scope: string;
     factor?: string;
     icc_value: number;
@@ -694,11 +700,11 @@ dataRouter.post("/icc-results", async (c) => {
 
   try {
     await db.prepare(`
-      INSERT INTO icc_results (id, scope, factor, icc_value, ci_lower, ci_upper, f_value, df1, df2,
+      INSERT INTO icc_results (id, run_id, scope, factor, icc_value, ci_lower, ci_upper, f_value, df1, df2,
         p_value, interpretation, rater_count, subject_count, krippendorff_alpha, pearson_r, pearson_p, calculated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      genId(), body.scope, body.factor ?? "total",
+      genId(), body.run_id ?? null, body.scope, body.factor ?? "total",
       body.icc_value, body.ci_lower ?? null, body.ci_upper ?? null,
       body.f_value ?? null, body.df1 ?? null, body.df2 ?? null,
       body.p_value ?? null, body.interpretation ?? null,
@@ -753,6 +759,46 @@ dataRouter.get("/growth/:studentId", async (c) => {
 // CSV エクスポート
 // ────────────────────────────────────────────────────────────────
 
+
+// ────────────────────────────────────────────────────────────────
+// Bland-Altman結果保存
+// ────────────────────────────────────────────────────────────────
+dataRouter.post("/bland-altman-results", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+
+  await ensureSchema(db);
+  const body = await c.req.json() as {
+    run_id?: string;
+    factor?: string;
+    mean_diff: number;
+    sd_diff: number;
+    loa_upper: number;
+    loa_lower: number;
+    ci_mean_upper?: number;
+    ci_mean_lower?: number;
+    outlier_ratio?: number;
+    bias_p_value?: number;
+    subject_count?: number;
+  };
+
+  try {
+    await db.prepare(`
+      INSERT INTO bland_altman_results (id, run_id, factor, mean_diff, sd_diff, loa_upper, loa_lower, 
+        ci_mean_upper, ci_mean_lower, outlier_ratio, bias_p_value, subject_count, calculated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      genId(), body.run_id ?? null, body.factor ?? "total",
+      body.mean_diff, body.sd_diff, body.loa_upper, body.loa_lower,
+      body.ci_mean_upper ?? null, body.ci_mean_lower ?? null, body.outlier_ratio ?? null, body.bias_p_value ?? null, body.subject_count ?? null,
+      nowISO()
+    ).run();
+    return c.json({ success: true });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 // ────────────────────────────────────────────────────────────────
 // 保存済み信頼性分析結果の一覧取得
 // ────────────────────────────────────────────────────────────────
@@ -763,14 +809,17 @@ dataRouter.get("/reliability-results", async (c) => {
     const query = `
       SELECT 
         i.calculated_at,
+        i.run_id,
         i.scope AS data_source,
         i.subject_count AS paired_count,
         i.icc_value AS overall_icc,
         b.mean_diff AS overall_mean_diff
       FROM icc_results i
       LEFT JOIN bland_altman_results b 
-        ON datetime(i.calculated_at) = datetime(b.calculated_at) AND i.factor = b.factor
+        ON (i.run_id = b.run_id OR (i.run_id IS NULL AND b.run_id IS NULL AND datetime(i.calculated_at) = datetime(b.calculated_at))) 
+        AND i.factor = b.factor
       WHERE i.factor = 'total' OR i.factor IS NULL
+      GROUP BY i.run_id
       ORDER BY i.calculated_at DESC
     `;
     const results = await db.prepare(query).all();

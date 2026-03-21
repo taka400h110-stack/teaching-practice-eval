@@ -727,6 +727,21 @@ const mockApi = {
     localStorage.removeItem("mock_human_evals");
     localStorage.removeItem("mock_registered_users");
   },
+
+  saveBlandAltmanResults: async (data: any) => {
+    try {
+      const response = await fetch("/api/data/bland-altman-results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to save Bland-Altman results");
+      return await response.json();
+    } catch (err) {
+      console.error("API error saving Bland-Altman results:", err);
+      throw err;
+    }
+  },
   getSavedReliabilityResults: async () => {
     try {
       const response = await fetch("/api/data/reliability-results");
