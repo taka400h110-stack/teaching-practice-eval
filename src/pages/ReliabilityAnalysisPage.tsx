@@ -349,8 +349,35 @@ function ReliabilityDetailModal({ runId, open, onClose }: { runId: string | null
           </TableContainer>
         )}
       </DialogContent>
-      <DialogActions>
-        <MuiButton onClick={onClose} color="primary">閉じる</MuiButton>
+      <DialogActions sx={{ justifyContent: "space-between", px: 3, pb: 2 }}>
+        <MuiButton 
+          variant="outlined" 
+          startIcon={<DownloadIcon />} 
+          onClick={() => {
+            if (!data || data.length === 0) return;
+            const headers = ["factor", "icc_value", "icc_ci_lower", "icc_ci_upper", "mean_diff", "loa_lower", "loa_upper", "subject_count", "calculated_at", "data_source", "run_id"];
+            const csvRows = [
+              headers.join(","),
+              ...data.map((row: any) => headers.map(h => {
+                const val = row[h];
+                if (val === null || val === undefined) return "";
+                return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+              }).join(","))
+            ];
+            const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `reliability_details_${runId}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }}
+          disabled={!data || data.length === 0}
+        >
+          CSV出力
+        </MuiButton>
+        <MuiButton onClick={onClose} color="primary" variant="contained">閉じる</MuiButton>
       </DialogActions>
     </Dialog>
   );
