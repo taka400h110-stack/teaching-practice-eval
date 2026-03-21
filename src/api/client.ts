@@ -727,6 +727,17 @@ const mockApi = {
     localStorage.removeItem("mock_human_evals");
     localStorage.removeItem("mock_registered_users");
   },
+  getSavedReliabilityResults: async () => {
+    try {
+      const response = await fetch("/api/data/reliability-results");
+      if (!response.ok) throw new Error("Failed to fetch reliability results");
+      const data = await response.json();
+      return data.results || [];
+    } catch (err) {
+      console.error("API error fetching reliability results:", err);
+      throw err;
+    }
+  }
 };
 
 export default mockApi;

@@ -752,6 +752,34 @@ dataRouter.get("/growth/:studentId", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // CSV エクスポート
 // ────────────────────────────────────────────────────────────────
+
+// ────────────────────────────────────────────────────────────────
+// 保存済み信頼性分析結果の一覧取得
+// ────────────────────────────────────────────────────────────────
+dataRouter.get("/reliability-results", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const query = `
+      SELECT 
+        i.calculated_at,
+        i.scope AS data_source,
+        i.subject_count AS paired_count,
+        i.icc_value AS overall_icc,
+        b.mean_diff AS overall_mean_diff
+      FROM icc_results i
+      LEFT JOIN bland_altman_results b 
+        ON datetime(i.calculated_at) = datetime(b.calculated_at) AND i.factor = b.factor
+      WHERE i.factor = 'total' OR i.factor IS NULL
+      ORDER BY i.calculated_at DESC
+    `;
+    const results = await db.prepare(query).all();
+    return c.json({ success: true, results: results.results });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 dataRouter.get("/export/evaluations-csv", async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);

@@ -292,6 +292,55 @@ interface TabPanelProps { children: React.ReactNode; value: number; index: numbe
 const TabPanel = ({ children, value, index }: TabPanelProps) =>
   value === index ? <Box pt={2}>{children}</Box> : null;
 
+
+// 保存済み結果一覧コンポーネント
+function SavedReliabilityResults() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["savedReliabilityResults"],
+    queryFn: mockApi.getSavedReliabilityResults,
+  });
+
+  if (isLoading) return <LinearProgress />;
+
+  return (
+    <Card sx={{ mt: 4, mb: 4 }}>
+      <CardContent>
+        <Typography variant="h6" fontWeight={700} mb={2}>保存済み信頼性分析結果</Typography>
+        {isError && <Alert severity="error" sx={{ mb: 2 }}>保存済み結果の取得に失敗しました</Alert>}
+        
+        {(!data || data.length === 0) && !isError ? (
+          <Typography color="text.secondary">保存済み結果なし</Typography>
+        ) : (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: "#f5f5f5" }}>
+                  <TableCell>計算日時 (calculated_at)</TableCell>
+                  <TableCell>データソース (data_source)</TableCell>
+                  <TableCell>ペア数 (paired_count)</TableCell>
+                  <TableCell>Overall ICC</TableCell>
+                  <TableCell>Overall Mean Diff</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data?.map((row: any, i: number) => (
+                  <TableRow key={i}>
+                    <TableCell>{new Date(row.calculated_at).toLocaleString()}</TableCell>
+                    <TableCell>{row.data_source}</TableCell>
+                    <TableCell>{row.paired_count}</TableCell>
+                    <TableCell>{row.overall_icc?.toFixed(3)}</TableCell>
+                    <TableCell>{row.overall_mean_diff !== null ? row.overall_mean_diff?.toFixed(3) : "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ReliabilityAnalysisPage() {
   const [tab, setTab] = useState(0);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -689,6 +738,9 @@ export default function ReliabilityAnalysisPage() {
           </TabPanel>
         </>
       )}
+
+      {/* 保存済み結果一覧（常時表示） */}
+      <SavedReliabilityResults />
 
       {/* スナックバー */}
       <Snackbar
