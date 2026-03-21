@@ -489,6 +489,15 @@ dataRouter.post("/human-evals", async (c) => {
     const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
     const allScores = [...scores.f1, ...scores.f2, ...scores.f3, ...scores.f4];
 
+    // 既存の同一評価者のデータがあれば削除（アイテムも含む）
+    const oldEvals = await db.prepare("SELECT id FROM human_evaluations WHERE journal_id = ? AND evaluator_id = ?").bind(body.journal_id, body.evaluator_id).all();
+    if (oldEvals.results && oldEvals.results.length > 0) {
+      for (const old of oldEvals.results) {
+        await db.prepare("DELETE FROM human_eval_items WHERE human_eval_id = ?").bind(old.id as string).run();
+      }
+      await db.prepare("DELETE FROM human_evaluations WHERE journal_id = ? AND evaluator_id = ?").bind(body.journal_id, body.evaluator_id).run();
+    }
+
     const id = genId();
     await db.prepare(`
       INSERT INTO human_evaluations (id, journal_id, evaluator_id, evaluator_name,
