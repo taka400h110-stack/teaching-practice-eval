@@ -502,6 +502,33 @@ dataRouter.post("/human-evals", async (c) => {
   }
 });
 
+dataRouter.get("/human-evals/:journalId", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const journalId = c.req.param("journalId");
+  
+  try {
+    const evalsResult = await db.prepare(
+      `SELECT * FROM human_evaluations WHERE journal_id = ? ORDER BY created_at DESC`
+    ).bind(journalId).all();
+    
+    const evals = evalsResult.results || [];
+    
+    // itemsを取得
+    for (const ev of evals) {
+      const itemsResult = await db.prepare(
+        `SELECT * FROM human_eval_items WHERE human_eval_id = ? ORDER BY item_number ASC`
+      ).bind(ev.id).all();
+      ev.items = itemsResult.results || [];
+    }
+    
+    return c.json({ evaluations: evals });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 // ────────────────────────────────────────────────────────────────
 // 自己評価（週次）
 // ────────────────────────────────────────────────────────────────

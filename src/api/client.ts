@@ -326,13 +326,51 @@ const mockApi = {
 
   // ── 評価 ──
   getEvaluation: async (journalId: string): Promise<EvaluationResult> => {
-    await delay(500);
-    // journalId に対応する週を判定してリアルなスコアを返す
-    const weekMatch = journalId.match(/journal-0*(\d+)/);
-    const week = weekMatch ? parseInt(weekMatch[1]) : 4;
-    const found = MOCK_ALL_EVALUATIONS.find((e) => e.journal_id === journalId);
-    if (found) return found;
-    return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, id: `eval-${week}` };
+    try {
+      const response = await fetch(`/api/data/evaluations/${journalId}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          // モックフォールバック
+          const weekMatch = journalId.match(/journal-0*(\d+)/);
+          const week = weekMatch ? parseInt(weekMatch[1]) : 4;
+          const found = MOCK_ALL_EVALUATIONS.find((e) => e.journal_id === journalId);
+          if (found) return found;
+          return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, id: `eval-${week}` };
+        }
+        throw new Error("Failed to fetch evaluation");
+      }
+      const data = await response.json();
+      
+      return {
+        id: data.evaluation.id,
+        journal_id: data.evaluation.journal_id,
+        status: "completed",
+        overall_comment: data.evaluation.overall_comment || "",
+        total_score: data.evaluation.total_score,
+        factor_scores: {
+          factor1: data.evaluation.factor1_score,
+          factor2: data.evaluation.factor2_score,
+          factor3: data.evaluation.factor3_score,
+          factor4: data.evaluation.factor4_score,
+        },
+        evaluation_items: data.items.map((item: any) => ({
+          item_number: item.item_number,
+          factor: `factor${item.item_number <= 7 ? 1 : item.item_number <= 13 ? 2 : item.item_number <= 17 ? 3 : 4}`,
+          is_evaluated: !item.is_na,
+          score: item.score,
+          evidence: item.evidence || "",
+          feedback: item.feedback || "",
+          next_level_advice: ""
+        })),
+        evaluated_item_count: data.items.filter((i: any) => !i.is_na).length,
+        tokens_used: 0,
+        halo_check: !!data.evaluation.halo_effect_detected,
+      };
+    } catch (err) {
+      console.error("API error fetching evaluation:", err);
+      // エラー時のフォールバック
+      return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, status: "pending" };
+    }
   },
 
   // 全週分の評価結果を取得
@@ -343,44 +381,113 @@ const mockApi = {
 
   // ── 人間評価 ──
   getHumanEvaluations: async (journalId?: string) => {
+    if (journalId) {
+      try {
+        const response = await fetch(`/api/data/human-evals/${journalId}`);
+        if (!response.ok) throw new Error("Failed to fetch human evaluations");
+        const data = await response.json();
+        return data.evaluations;
+      } catch (err) {
+        console.error("API error fetching human evals:", err);
+        return [];
+      }
+    }
+    // API側で全件取得が必要な場合は別途実装が必要ですが、既存のモック利用箇所を考慮しモックへフォールバック
     await delay();
-    const evals = getHumanEvals();
-    return journalId ? evals.filter((e) => e.journal_id === journalId) : evals;
+    return getHumanEvals();
   },
   saveHumanEvaluation: async (
     journalId: string,
     week: number,
-    items: Array<{ item_number: number; score: number }>
+    items: Array<{ item_number: number; score: number; is_na?: boolean; comment?: string }>
   ) => {
-    await delay(600);
     const user = JSON.parse(localStorage.getItem("user_info") ?? "{}");
-    const evals = getHumanEvals();
-    const existingIdx = evals.findIndex(
-      (e) => e.journal_id === journalId && e.evaluator_id === (user.id ?? "user-008")
-    );
-    const entry: HumanEvalEntry = {
-      evaluator_id:   user.id ?? "user-008",
-      evaluator_name: user.name ?? "評価者",
-      journal_id:     journalId,
-      week,
-      items,
-    };
-    if (existingIdx >= 0) evals[existingIdx] = entry;
-    else evals.push(entry);
-    saveHumanEvals(evals);
-    return entry;
+    
+    try {
+      const response = await fetch("/api/data/human-evals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          journal_id: journalId,
+          evaluator_id: user.id ?? "user-008",
+          evaluator_name: user.name ?? "評価者",
+          items: items,
+        }),
+      });
+      
+      if (!response.ok) throw new Error("Failed to save human evaluation");
+      const data = await response.json();
+      
+      // フロントエンドの互換性のためモックと同じ形式を返す
+      return {
+        evaluator_id: user.id ?? "user-008",
+        evaluator_name: user.name ?? "評価者",
+        journal_id: journalId,
+        week,
+        items,
+        human_eval_id: data.human_eval_id
+      };
+    } catch (err) {
+      console.error("API error saving human eval:", err);
+      throw err;
+    }
   },
 
   // AI評価実行（ステータスを evaluated に更新）
   runEvaluation: async (journalId: string): Promise<EvaluationResult> => {
-    await delay(1500); // AI処理をシミュレート
-    const journals = getJournals();
-    const idx = journals.findIndex((j) => j.id === journalId);
-    if (idx !== -1) {
-      journals[idx] = { ...journals[idx], status: "evaluated" };
-      saveJournals(journals);
+    try {
+      const journals = getJournals();
+      const idx = journals.findIndex((j) => j.id === journalId);
+      const journal = journals[idx];
+      const user = JSON.parse(localStorage.getItem("user_info") ?? "{}");
+
+      // 1. AI評価APIを呼び出す
+      const aiRes = await fetch("/api/ai/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          journal_content: journal?.content || "",
+          student_name: user.name || "学生",
+          week_number: journal?.week_number || 1,
+          journal_id: journalId
+        })
+      });
+      
+      if (!aiRes.ok) throw new Error("Failed to call AI evaluate");
+      const aiData = await aiRes.json();
+
+      // 2. 評価結果を保存する
+      const saveRes = await fetch("/api/data/evaluations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          journal_id: journalId,
+          evaluation: aiData.evaluation,
+          model_name: aiData.model,
+          prompt_version: aiData.prompt_version,
+          temperature: aiData.temperature,
+          token_count: aiData.token_count || 0,
+          duration_ms: 0
+        })
+      });
+      
+      if (!saveRes.ok) throw new Error("Failed to save evaluation");
+
+      // 3. ローカルのステータスを更新する
+      if (idx !== -1) {
+        journals[idx] = { ...journals[idx], status: "evaluated" };
+        saveJournals(journals);
+      }
+
+      // 4. 保存した評価結果を取得して返す
+      return await api.getEvaluation(journalId);
+    } catch (err) {
+      console.error("runEvaluation error:", err);
+      // エラー時のフォールバック
+      return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, status: "failed" };
     }
-    return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, status: "completed" };
   },
 
   // ── 成長データ ──
