@@ -375,8 +375,31 @@ const mockApi = {
 
   // 全週分の評価結果を取得
   getAllEvaluations: async (): Promise<EvaluationResult[]> => {
-    await delay(300);
-    return MOCK_ALL_EVALUATIONS;
+    try {
+      const res = await fetch("/api/data/evaluations");
+      if (!res.ok) throw new Error("Failed to fetch all evaluations");
+      const data = await res.json();
+      return data.evaluations.map((e: any) => ({
+        id: e.id,
+        journal_id: e.journal_id,
+        status: "completed",
+        overall_comment: e.overall_comment || "",
+        total_score: e.total_score,
+        factor_scores: {
+          factor1: e.factor1_score,
+          factor2: e.factor2_score,
+          factor3: e.factor3_score,
+          factor4: e.factor4_score,
+        },
+        evaluation_items: [], // 簡略化のため省略
+        evaluated_item_count: 23,
+        tokens_used: 0,
+        halo_check: !!e.halo_effect_detected
+      }));
+    } catch (err) {
+      console.error(err);
+      return MOCK_ALL_EVALUATIONS;
+    }
   },
 
   // ── 人間評価 ──
@@ -392,9 +415,17 @@ const mockApi = {
         return [];
       }
     }
-    // API側で全件取得が必要な場合は別途実装が必要ですが、既存のモック利用箇所を考慮しモックへフォールバック
-    await delay();
-    return getHumanEvals();
+    
+    // 全件取得
+    try {
+      const response = await fetch("/api/data/human-evals");
+      if (!response.ok) throw new Error("Failed to fetch all human evaluations");
+      const data = await response.json();
+      return data.evaluations;
+    } catch (err) {
+      console.error("API error fetching all human evals:", err);
+      return getHumanEvals();
+    }
   },
   saveHumanEvaluation: async (
     journalId: string,

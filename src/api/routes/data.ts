@@ -429,6 +429,17 @@ dataRouter.post("/evaluations", async (c) => {
   }
 });
 
+dataRouter.get("/evaluations", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const evals = await db.prepare("SELECT * FROM evaluations ORDER BY created_at DESC").all();
+    return c.json({ success: true, evaluations: evals.results });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 dataRouter.get("/evaluations/:journalId", async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -497,6 +508,17 @@ dataRouter.post("/human-evals", async (c) => {
     }
 
     return c.json({ success: true, human_eval_id: id });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.get("/human-evals", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const evals = await db.prepare("SELECT * FROM human_evaluations ORDER BY created_at DESC").all();
+    return c.json({ success: true, evaluations: evals.results });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }

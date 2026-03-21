@@ -96,37 +96,123 @@ const FACTOR_LABELS = {
 // ────────────────────────────────────────────────────────────────
 // 統計API呼び出し（/api/stats/full-reliability）
 // ────────────────────────────────────────────────────────────────
-async function fetchFullReliability(cohorts: ReturnType<typeof mockApi.getCohortProfiles> extends Promise<infer T> ? T : never): Promise<FullReliabilityResult | null> {
-  // コーホートデータからAIスコアと人間スコアを取得
-  const ai_total = cohorts.map((p) => p.final_total);
-  const human_total = cohorts.map((p) => +(p.final_total + (Math.random() - 0.5) * 0.6).toFixed(2));
-
-  const ai_by_factor: Record<string, number[]> = {
-    factor1: cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor1 ?? p.final_total * 0.9),
-    factor2: cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor2 ?? p.final_total * 1.0),
-    factor3: cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor3 ?? p.final_total * 0.95),
-    factor4: cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor4 ?? p.final_total * 1.05),
-  };
-  const human_by_factor: Record<string, number[]> = Object.fromEntries(
-    Object.entries(ai_by_factor).map(([k, v]) => [k, v.map((s) => +(s + (Math.random() - 0.5) * 0.5).toFixed(2))])
-  );
-
+async function fetchFullReliability(cohorts: any): Promise<FullReliabilityResult | null> {
+  // 実データを取得
+  let allEvals = [];
+  let allHumanEvals = [];
+  
   try {
-    const resp = await fetch("/api/stats/full-reliability", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ai_total, human_total,
-        ai_by_factor, human_by_factor,
-        ai_by_item: [], human_by_item: [],
-      }),
-    });
-
-    if (resp.ok) {
-      return await resp.json() as FullReliabilityResult;
+    allEvals = await mockApi.getAllEvaluations();
+    allHumanEvals = await mockApi.getHumanEvaluations();
+  } catch (err) {
+    console.error("Failed to fetch evaluations", err);
+  }
+  
+  // journal_idでマッチング（人間評価が複数ある場合は平均を取るなどの処理が必要だが、ここでは簡単のため最初の1つを使用、あるいは平均化）
+  const matchedPairs: { ai: any, human: any }[] = [];
+  
+  // 人間評価をjournal_idでグループ化し、平均スコアを計算
+  const humanEvalMap = new Map<string, any>();
+  for (const he of allHumanEvals) {
+    if (!humanEvalMap.has(he.journal_id)) {
+      humanEvalMap.set(he.journal_id, {
+        count: 1,
+        total: he.total_score,
+        f1: he.factor1_score,
+        f2: he.factor2_score,
+        f3: he.factor3_score,
+        f4: he.factor4_score
+      });
+    } else {
+      const existing = humanEvalMap.get(he.journal_id);
+      existing.count++;
+      existing.total += he.total_score;
+      existing.f1 += he.factor1_score;
+      existing.f2 += he.factor2_score;
+      existing.f3 += he.factor3_score;
+      existing.f4 += he.factor4_score;
     }
-  } catch {
-    // フォールバック（APIが利用不可の場合は計算をフロントで実行）
+  }
+  
+  // 平均化
+  for (const [journal_id, data] of humanEvalMap.entries()) {
+    humanEvalMap.set(journal_id, {
+      total_score: data.total / data.count,
+      factor1_score: data.f1 / data.count,
+      factor2_score: data.f2 / data.count,
+      factor3_score: data.f3 / data.count,
+      factor4_score: data.f4 / data.count,
+    });
+  }
+
+  // AI評価と人間評価のペアを作成
+  for (const ai of allEvals) {
+    const human = humanEvalMap.get(ai.journal_id);
+    if (human) {
+      matchedPairs.push({ ai, human });
+    }
+  }
+  
+  console.log(`Matched ${matchedPairs.length} pairs for reliability analysis`);
+
+  // マッチしたデータが少なすぎる場合はモックのコホートデータを使う（フォールバック）
+  if (matchedPairs.length < 5) {
+    console.warn("Not enough matched pairs (need at least 5). Using mock fallback.");
+    const ai_total = cohorts.map((p: any) => p.final_total);
+    const human_total = cohorts.map((p: any) => +(p.final_total + (Math.random() - 0.5) * 0.6).toFixed(2));
+
+    const ai_by_factor: Record<string, number[]> = {
+      factor1: cohorts.map((p: any) => p.factor_scores?.factor1 ?? p.final_total * 0.9),
+      factor2: cohorts.map((p: any) => p.factor_scores?.factor2 ?? p.final_total * 1.0),
+      factor3: cohorts.map((p: any) => p.factor_scores?.factor3 ?? p.final_total * 0.95),
+      factor4: cohorts.map((p: any) => p.factor_scores?.factor4 ?? p.final_total * 1.05),
+    };
+    const human_by_factor: Record<string, number[]> = Object.fromEntries(
+      Object.entries(ai_by_factor).map(([k, v]) => [k, v.map((s) => +(s + (Math.random() - 0.5) * 0.5).toFixed(2))])
+    );
+    
+    try {
+      const resp = await fetch("/api/stats/full-reliability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai_total, human_total, ai_by_factor, human_by_factor, ai_by_item: [], human_by_item: [] }),
+      });
+      if (resp.ok) return await resp.json() as FullReliabilityResult;
+    } catch {}
+  } else {
+    // リアルデータでのAPI呼び出し
+    const ai_total = matchedPairs.map(p => p.ai.total_score);
+    const human_total = matchedPairs.map(p => p.human.total_score);
+    
+    const ai_by_factor: Record<string, number[]> = {
+      factor1: matchedPairs.map(p => p.ai.factor_scores.factor1),
+      factor2: matchedPairs.map(p => p.ai.factor_scores.factor2),
+      factor3: matchedPairs.map(p => p.ai.factor_scores.factor3),
+      factor4: matchedPairs.map(p => p.ai.factor_scores.factor4),
+    };
+    
+    const human_by_factor: Record<string, number[]> = {
+      factor1: matchedPairs.map(p => p.human.factor1_score),
+      factor2: matchedPairs.map(p => p.human.factor2_score),
+      factor3: matchedPairs.map(p => p.human.factor3_score),
+      factor4: matchedPairs.map(p => p.human.factor4_score),
+    };
+
+    try {
+      const resp = await fetch("/api/stats/full-reliability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai_total, human_total, ai_by_factor, human_by_factor, ai_by_item: [], human_by_item: [] }),
+      });
+      if (resp.ok) {
+        const result = await resp.json() as FullReliabilityResult;
+        // マッチしたペア数を表示するためのハック
+        (result as any)._matchedCount = matchedPairs.length;
+        return result;
+      }
+    } catch (err) {
+      console.error("API call failed:", err);
+    }
   }
 
   // フロントエンド計算フォールバック（論文記載値を使用）
@@ -265,6 +351,12 @@ export default function ReliabilityAnalysisPage() {
         <Alert severity="info" sx={{ mb: 3 }}>
           「信頼性を計算」ボタンを押してください。AI評価スコアと人間評価スコア（複数評価者の平均値）の比較分析を実行します。
           <br />API（/api/stats/full-reliability）が利用可能な場合はサーバーサイド計算、それ以外は論文掲載値を表示します。
+        </Alert>
+      )}
+      
+      {data && (data as any)._matchedCount !== undefined && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          実データによる比較分析が完了しました。対象日誌数: {(data as any)._matchedCount} 件
         </Alert>
       )}
 
