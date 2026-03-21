@@ -829,6 +829,49 @@ dataRouter.get("/reliability-results", async (c) => {
   }
 });
 
+// ────────────────────────────────────────────────────────────────
+// 保存済み信頼性分析結果の詳細取得 (run_id)
+// ────────────────────────────────────────────────────────────────
+dataRouter.get("/reliability-results/:runId", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  const runId = c.req.param("runId");
+  try {
+    const query = `
+      SELECT 
+        i.factor,
+        i.icc_value,
+        i.ci_lower AS icc_ci_lower,
+        i.ci_upper AS icc_ci_upper,
+        b.mean_diff,
+        b.loa_lower,
+        b.loa_upper,
+        i.subject_count,
+        i.calculated_at,
+        i.scope AS data_source,
+        i.run_id
+      FROM icc_results i
+      LEFT JOIN bland_altman_results b 
+        ON i.run_id = b.run_id AND i.factor = b.factor
+      WHERE i.run_id = ?
+      ORDER BY 
+        CASE i.factor 
+          WHEN 'total' THEN 0 
+          WHEN 'factor1' THEN 1 
+          WHEN 'factor2' THEN 2 
+          WHEN 'factor3' THEN 3 
+          WHEN 'factor4' THEN 4 
+          ELSE 5 
+        END
+    `;
+    const results = await db.prepare(query).bind(runId).all();
+    return c.json({ success: true, details: results.results });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+
 dataRouter.get("/export/evaluations-csv", async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
