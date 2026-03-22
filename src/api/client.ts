@@ -5,7 +5,7 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     ...options.headers,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
-  const res = await apiFetch(url, { ...options, headers });
+  const res = await fetch(url, { ...options, headers });
   if (res.status === 401) {
     localStorage.removeItem("user_info");
     localStorage.removeItem("auth_token");
@@ -143,6 +143,8 @@ const apiClient = {
     if (!res.ok) throw new Error("User not found or invalid credentials");
     const data = await res.json();
     const user = data.user;
+    if (data.token) localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(user));
     
     localStorage.setItem("user_info", JSON.stringify(user));
     localStorage.setItem("auth_token", data.token);
