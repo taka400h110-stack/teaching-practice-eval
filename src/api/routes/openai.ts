@@ -15,6 +15,17 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
+function getAuthContext(c: any) {
+  const auth = c.req.header('Authorization');
+  if (!auth || !auth.startsWith('Bearer ')) return null;
+  try {
+    const token = auth.split(' ')[1];
+    return JSON.parse(atob(token));
+  } catch (e) {
+    return null;
+  }
+}
+
 const openaiRouter = new Hono<{ Bindings: CloudflareBindings }>();
 openaiRouter.use("*", cors());
 
@@ -326,7 +337,6 @@ ${bfiScores ? `
 取得できませんでした。標準的な難易度（Medium）で目標を設定してください。
 `}
 `;
-`;
 
   return `あなたは教育実習における目標設定支援の専門家AIです。以下の対話から来週の SMART 目標を提案してください。
 
@@ -533,11 +543,29 @@ openaiRouter.post("/generate-goal", async (c) => {
 
   try {
     let bfiScores = null;
-    if (body.user_id) {
+    
+    // Auth check
+    const authContext = getAuthContext(c);
+    const authUserId = authContext?.id;
+    
+    // Strictly require authentication for this route to prevent unauthorized BFI access
+    if (!authContext || !authUserId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Ensure the request is explicitly for the authenticated user
+    if (body.user_id && body.user_id !== authUserId) {
+       return c.json({ error: 'Forbidden' }, 403);
+    }
+    
+    // Always use the authenticated user's ID
+    const targetUserId = authUserId;
+
+    if (targetUserId) {
       try {
         const row = await c.env.DB.prepare(
           "SELECT conscientiousness, neuroticism, openness FROM user_bfi_scores WHERE user_id = ?"
-        ).bind(body.user_id).first();
+        ).bind(targetUserId).first();
         if (row) {
           bfiScores = {
             conscientiousness: Number(row.conscientiousness),
