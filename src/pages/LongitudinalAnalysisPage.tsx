@@ -7,7 +7,7 @@
  * CSV エクスポート・APA形式テーブル付き
  */
 import React, { useState, useCallback } from "react";
-import {
+import { MenuItem, Select, FormControl, InputLabel, RadioGroup, Radio,
   Box, Typography, Card, CardContent, Chip, Grid, Paper,
   Tabs, Tab, Alert, LinearProgress, Divider, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -134,6 +134,7 @@ export default function LongitudinalAnalysisPage() {
 
   const [lgcmResult, setLgcmResult] = useState<any>(LGCM_RESULT);
   const [lcgaResult, setLcgaResult] = useState<any>(null);
+  const [lgcmMode, setLgcmMode] = useState<"legacy" | "rigorous">("rigorous");
   const [weeklyStats, setWeeklyStats] = useState<any[]>([]);
   const [lgcmPlotData, setLgcmPlotData] = useState<any[]>([]);
   const [lcgaPlotData, setLcgaPlotData] = useState<any[]>([]);

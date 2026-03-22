@@ -6,7 +6,7 @@
  * CSVエクスポート機能付き
  */
 import React, { useState, useCallback } from "react";
-import {
+import { Select, MenuItem, InputLabel, FormControl, TextField,
   Box, Card, CardContent, Chip, Typography, Tabs, Tab,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Alert, Button, CircularProgress, Stack, Divider, Grid,
@@ -96,7 +96,7 @@ const FACTOR_LABELS = {
 // ────────────────────────────────────────────────────────────────
 // 統計API呼び出し（/api/stats/full-reliability）
 // ────────────────────────────────────────────────────────────────
-async function fetchFullReliability(cohorts: any): Promise<FullReliabilityResult | null> {
+async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL"): Promise<FullReliabilityResult | null> {
   // 実データを取得
   let allEvals: any[] = [];
   let allHumanEvals = [];
@@ -108,6 +108,24 @@ async function fetchFullReliability(cohorts: any): Promise<FullReliabilityResult
     console.error("Failed to fetch evaluations", err);
   }
   
+  
+  let profiles: any[] = [];
+  try {
+    const profRes = await fetch("/api/data/evaluator-profiles");
+    if (profRes.ok) profiles = ((await profRes.json()) as any).profiles || [];
+  } catch (e) {}
+
+  if (experienceGroup !== "ALL") {
+    allHumanEvals = allHumanEvals.filter((he: any) => {
+      const prof = profiles.find((p: any) => p.evaluator_id === he.evaluator_id);
+      const yoe = prof?.years_of_experience || 0;
+      if (experienceGroup === "NOVICE") return yoe <= 3;
+      if (experienceGroup === "MID") return yoe >= 4 && yoe <= 9;
+      if (experienceGroup === "VETERAN") return yoe >= 10;
+      return true;
+    });
+  }
+
   // journal_idでマッチング（人間評価が複数ある場合は平均を取るなどの処理が必要だが、ここでは簡単のため最初の1つを使用、あるいは平均化）
   const matchedPairs: { ai: any, human: any }[] = [];
   
@@ -461,6 +479,20 @@ function SavedReliabilityResults() {
 export default function ReliabilityAnalysisPage() {
   const [tab, setTab] = useState(0);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [experienceGroup, setExperienceGroup] = useState("ALL");
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+  const [evaluatorProfiles, setEvaluatorProfiles] = useState<any[]>([]);
+  const [tempProfile, setTempProfile] = useState<{id: string, yoe: number, tb: string}>({id: "", yoe: 0, tb: ""});
+
+  const loadProfiles = async () => {
+    try {
+      const res = await fetch("/api/data/evaluator-profiles");
+      if (res.ok) setEvaluatorProfiles(((await res.json()) as any).profiles || []);
+    } catch(e) {}
+  };
+  
+  React.useEffect(() => { loadProfiles(); }, []);
+  
   const [result, setResult] = useState<FullReliabilityResult | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, msg: "" });
 
@@ -472,13 +504,13 @@ export default function ReliabilityAnalysisPage() {
   const handleCalculate = useCallback(async () => {
     setIsCalculating(true);
     try {
-      const res = await fetchFullReliability(cohorts);
+      const res = await fetchFullReliability(cohorts, experienceGroup);
       setResult(res);
       setSnackbar({ open: true, msg: "信頼性分析が完了しました" });
     } finally {
       setIsCalculating(false);
     }
-  }, [cohorts]);
+  }, [cohorts, experienceGroup]);
 
   const data = result;
 
@@ -866,6 +898,48 @@ export default function ReliabilityAnalysisPage() {
         onClose={() => setSnackbar({ open: false, msg: "" })}
         message={snackbar.msg}
       />
+    
+      {/* Evaluator Profile Dialog */}
+      <Dialog open={isProfileDialogOpen} onClose={() => setIsProfileDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>評価者属性（経験年数）設定</DialogTitle>
+        <DialogContent dividers>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            RQ2の分析のために、評価者の経験年数とバックグラウンドを設定します。
+          </Alert>
+          <Box display="flex" gap={2} mb={2} alignItems="flex-end">
+            <TextField label="評価者ID" size="small" value={tempProfile.id} onChange={e => setTempProfile({...tempProfile, id: e.target.value})} />
+            <TextField label="経験年数" type="number" size="small" value={tempProfile.yoe} onChange={e => setTempProfile({...tempProfile, yoe: Number(e.target.value)})} />
+            <TextField label="バックグラウンド" size="small" value={tempProfile.tb} onChange={e => setTempProfile({...tempProfile, tb: e.target.value})} />
+            <Button variant="contained" onClick={async () => {
+              await fetch("/api/data/evaluator-profiles", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ evaluator_id: tempProfile.id, years_of_experience: tempProfile.yoe, training_background: tempProfile.tb })
+              });
+              loadProfiles();
+            }}>保存</Button>
+          </Box>
+          <TableContainer component={Paper}>
+            <Table size="small">
+              <TableHead>
+                <TableRow><TableCell>ID</TableCell><TableCell>経験年数</TableCell><TableCell>バックグラウンド</TableCell></TableRow>
+              </TableHead>
+              <TableBody>
+                {evaluatorProfiles.map(p => (
+                  <TableRow key={p.evaluator_id}>
+                    <TableCell>{p.evaluator_id}</TableCell>
+                    <TableCell>{p.years_of_experience}年</TableCell>
+                    <TableCell>{p.training_background}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsProfileDialogOpen(false)}>閉じる</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
+

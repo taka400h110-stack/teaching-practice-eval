@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Box, Card, CardContent, Chip, Typography, Grid, Button,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Select, MenuItem, InputLabel, FormControl,
   Paper, LinearProgress, Tabs, Tab, Alert,
 } from "@mui/material";
 import PeopleIcon      from "@mui/icons-material/People";
@@ -15,6 +15,30 @@ export default function AdminDashboardPage() {
   const [tab, setTab] = useState(0);
   const { data: profiles = [] } = useQuery({ queryKey: ["cohort"], queryFn: () => mockApi.getCohortProfiles() });
   const { data: journals = [] } = useQuery({ queryKey: ["journals"], queryFn: () => mockApi.getJournals() });
+  
+  const { data: jointData = [] } = useQuery({
+    queryKey: ["jointDisplay"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/data/joint-display", { headers: { "X-User-Role": "researcher" } });
+        if (!res.ok) return [];
+        const json = await res.json() as any;
+        return json.jointData || [];
+      } catch (e) {
+        return [];
+      }
+    }
+  });
+  
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const handleChangePage = (event: unknown, newPage: number) => setPage(newPage);
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+  const [jdStudentFilter, setJdStudentFilter] = useState("ALL");
+
 
   const bySchoolType = ["elementary","middle","high","special"].map((t) => ({
     label: { elementary:"小学校", middle:"中学校", high:"高校", special:"特支" }[t as "elementary"],
