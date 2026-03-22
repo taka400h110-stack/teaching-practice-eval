@@ -1303,3 +1303,68 @@ dataRouter.get("/rubric-behaviors/:itemNumber", async (c) => {
 });
 
 export default dataRouter;
+
+// --- BFI Endpoints ---
+app.post('/api/bfi/save', async (c) => {
+  const { env } = c;
+  const body = await c.req.json();
+  const userId = body.userId;
+  const responses = body.responses; // { "1": 5, "2": 3, ... }
+  
+  if (!userId || !responses) return c.json({ error: "Invalid request" }, 400);
+
+  // Validate items and scores
+  for (const [itemId, score] of Object.entries(responses)) {
+    const id = parseInt(itemId, 10);
+    const val = parseInt(score as string, 10);
+    if (id < 1 || id > 29 || val < 1 || val > 5) {
+      return c.json({ error: "Invalid item_id or score. Must be 1-29 and 1-5." }, 400);
+    }
+    await env.DB.prepare(
+      "INSERT INTO namikawa_bfi_responses (user_id, item_id, score) VALUES (?, ?, ?) ON CONFLICT(user_id, item_id) DO UPDATE SET score=excluded.score, updated_at=CURRENT_TIMESTAMP"
+    ).bind(userId, id, val).run();
+  }
+
+  // Calculate scores if complete
+  if (Object.keys(responses).length === 29) {
+    // NAMIKAWA_29_ITEMS mapping
+    const factorMap = {
+      extraversion: [1, 2, 3, 4, -5],
+      neuroticism: [6, 7, 8, 9, 10],
+      openness: [11, 12, 13, 14, 15, 16],
+      agreeableness: [17, 18, 19, -20, -21, -22],
+      conscientiousness: [23, 24, -25, -26, -27, -28, -29]
+    };
+    
+    const scores = {};
+    for (const [factor, items] of Object.entries(factorMap)) {
+      let sum = 0;
+      for (const id of items) {
+        const absId = Math.abs(id);
+        const val = parseInt(responses[absId], 10);
+        sum += id < 0 ? (6 - val) : val;
+      }
+      scores[factor] = sum / items.length;
+    }
+
+    await env.DB.prepare(
+      "INSERT INTO user_bfi_scores (user_id, extraversion, neuroticism, openness, agreeableness, conscientiousness, is_completed) VALUES (?, ?, ?, ?, ?, ?, 1) ON CONFLICT(user_id) DO UPDATE SET extraversion=excluded.extraversion, neuroticism=excluded.neuroticism, openness=excluded.openness, agreeableness=excluded.agreeableness, conscientiousness=excluded.conscientiousness, is_completed=1, updated_at=CURRENT_TIMESTAMP"
+    ).bind(userId, scores.extraversion, scores.neuroticism, scores.openness, scores.agreeableness, scores.conscientiousness).run();
+
+    return c.json({ success: true, isCompleted: true, scores });
+  }
+
+  return c.json({ success: true, isCompleted: false });
+});
+
+app.get('/api/bfi/responses/:userId', async (c) => {
+  const { env } = c;
+  const userId = c.req.param('userId');
+  const res = await env.DB.prepare("SELECT item_id, score FROM namikawa_bfi_responses WHERE user_id = ?").bind(userId).all();
+  const responses = {};
+  for (const row of res.results) {
+    responses[row.item_id] = row.score;
+  }
+  return c.json({ responses });
+});
+

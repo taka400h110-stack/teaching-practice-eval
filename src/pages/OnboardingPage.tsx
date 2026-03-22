@@ -34,7 +34,7 @@ import PsychologyIcon      from "@mui/icons-material/Psychology";
 import TrackChangesIcon    from "@mui/icons-material/TrackChanges";
 import ExpandMoreIcon      from "@mui/icons-material/ExpandMore";
 import BusinessIcon        from "@mui/icons-material/Business";
-import mockApi from "../api/client";
+import mockApi, { bfiApi } from "../api/client";
 import type { UserRole } from "../types";
 
 // ── 役割ラベル ──
@@ -54,7 +54,7 @@ const STUDENT_STEPS = [
   "研究倫理同意",
   "プロフィール設定",
   "実習情報入力",
-  "パーソナリティ測定（BigFive）",
+  "性格特性アンケート（並川ら, 2012）",
   "目標設定",
   "完了",
 ];
@@ -66,50 +66,8 @@ const STAFF_STEPS = [
   "完了",
 ];
 
-// BigFive 質問（各因子5問、計25問）
-const BIG_FIVE_ITEMS = [
-  { id: "e1", factor: "extraversion",      label: "人と話すことが好きだ" },
-  { id: "e2", factor: "extraversion",      label: "グループ活動でリーダーシップを取ることが多い" },
-  { id: "e3", factor: "extraversion",      label: "人と会うとエネルギーが湧いてくる" },
-  { id: "e4", factor: "extraversion",      label: "初対面の人とも積極的に話しかけられる" },
-  { id: "e5", factor: "extraversion",      label: "パーティーや集まりで中心的な存在になりやすい" },
-  { id: "a1", factor: "agreeableness",     label: "他者の気持ちを思いやることができる" },
-  { id: "a2", factor: "agreeableness",     label: "人と協力して物事を進めることが得意だ" },
-  { id: "a3", factor: "agreeableness",     label: "他人を助けることに喜びを感じる" },
-  { id: "a4", factor: "agreeableness",     label: "争いごとを避けて穏やかに解決しようとする" },
-  { id: "a5", factor: "agreeableness",     label: "他人の意見を尊重することができる" },
-  { id: "c1", factor: "conscientiousness", label: "計画を立てて物事を進めることができる" },
-  { id: "c2", factor: "conscientiousness", label: "締め切りや約束を守ることを大切にしている" },
-  { id: "c3", factor: "conscientiousness", label: "整理整頓が得意で几帳面だ" },
-  { id: "c4", factor: "conscientiousness", label: "困難があっても粘り強く取り組める" },
-  { id: "c5", factor: "conscientiousness", label: "物事を丁寧に確認してから行動する" },
-  { id: "n1", factor: "neuroticism",       label: "不安や心配を感じやすい" },
-  { id: "n2", factor: "neuroticism",       label: "ストレスを受けると気分が落ち込みやすい" },
-  { id: "n3", factor: "neuroticism",       label: "感情の起伏が激しい方だ" },
-  { id: "n4", factor: "neuroticism",       label: "批判されると必要以上に気にしてしまう" },
-  { id: "n5", factor: "neuroticism",       label: "緊張しやすく、落ち着かないことが多い" },
-  { id: "o1", factor: "openness",          label: "新しいアイデアや概念を学ぶことが好きだ" },
-  { id: "o2", factor: "openness",          label: "芸術・音楽・文学などに強い関心がある" },
-  { id: "o3", factor: "openness",          label: "想像力豊かで独創的なアイデアを持てる" },
-  { id: "o4", factor: "openness",          label: "物事の多様な側面から考えることができる" },
-  { id: "o5", factor: "openness",          label: "変化や新しい経験を好んで求める" },
-];
+import { NAMIKAWA_29_ITEMS, BIG_FIVE_FACTORS, LIKERT_5_MARKS } from "../constants/bigFive";
 
-const BIG_FIVE_FACTORS = [
-  { key: "extraversion",      label: "外向性（Extraversion）",          color: "#1976d2" },
-  { key: "agreeableness",     label: "協調性（Agreeableness）",          color: "#388e3c" },
-  { key: "conscientiousness", label: "誠実性（Conscientiousness）",      color: "#f57c00" },
-  { key: "neuroticism",       label: "神経症傾向（Neuroticism）",        color: "#d32f2f" },
-  { key: "openness",          label: "開放性（Openness to Experience）", color: "#7b1fa2" },
-];
-
-const LIKERT_MARKS = [
-  { value: 1, label: "全く当てはまらない" },
-  { value: 2, label: "当てはまらない" },
-  { value: 3, label: "どちらともいえない" },
-  { value: 4, label: "当てはまる" },
-  { value: 5, label: "非常に当てはまる" },
-];
 
 // 同意確認項目（全役割共通）
 const CONSENT_ITEMS = [
@@ -155,7 +113,7 @@ export default function OnboardingPage() {
 
   // ── Step 3 (学生): BigFive ──
   const [bigFiveScores, setBigFiveScores] = useState<Record<string, number>>(
-    Object.fromEntries(BIG_FIVE_ITEMS.map((i) => [i.id, 3]))
+    Object.fromEntries(NAMIKAWA_29_ITEMS.map((i) => [i.id, 3]))
   );
 
   // ── Step 4 (学生): 目標 ──
@@ -174,9 +132,16 @@ export default function OnboardingPage() {
   };
 
   const handleNext = () => {
+    const user = mockApi.getCurrentUser();
+    if (user && isStudent && activeStep === 3) {
+      bfiApi.saveResponses(user.id, bigFiveScores);
+    }
     if (activeStep === STEPS.length - 1) {
       const user = mockApi.getCurrentUser();
       if (user) mockApi.completeOnboarding(user.id);
+      if (user.role === "student") {
+        bfiApi.saveResponses(user.id, bigFiveScores);
+      }
       navigate("/dashboard");
     } else {
       setActiveStep((s) => s + 1);
@@ -186,8 +151,11 @@ export default function OnboardingPage() {
 
   // BigFive 因子平均
   const calcFactorAvg = (factorKey: string) => {
-    const items = BIG_FIVE_ITEMS.filter((i) => i.factor === factorKey);
-    const sum = items.reduce((acc, i) => acc + (bigFiveScores[i.id] ?? 3), 0);
+    const items = NAMIKAWA_29_ITEMS.filter((i) => i.factor === factorKey);
+    const sum = items.reduce((acc, i) => {
+      const val = bigFiveScores[i.id] ?? 3;
+      return acc + (i.reverse ? (6 - val) : val);
+    }, 0);
     return (sum / items.length).toFixed(2);
   };
 
@@ -454,7 +422,7 @@ export default function OnboardingPage() {
               </Alert>
 
               {BIG_FIVE_FACTORS.map(({ key, label, color }) => {
-                const items = BIG_FIVE_ITEMS.filter((i) => i.factor === key);
+                const items = NAMIKAWA_29_ITEMS.filter((i) => i.factor === key);
                 return (
                   <Accordion key={key} defaultExpanded sx={{ mb: 1 }}>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -472,7 +440,7 @@ export default function OnboardingPage() {
                           <Slider
                             value={bigFiveScores[item.id] ?? 3}
                             min={1} max={5} step={1}
-                            marks={LIKERT_MARKS.map((m) => ({
+                            marks={LIKERT_5_MARKS.map((m) => ({
                               value: m.value,
                               label: m.value === 1 || m.value === 5 ? m.label : "",
                             }))}

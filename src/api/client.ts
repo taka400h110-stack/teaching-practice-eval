@@ -768,3 +768,29 @@ const mockApi = {
 };
 
 export default mockApi;
+
+export const bfiApi = {
+  saveResponses: async (userId: string, responses: Record<number, number>) => {
+    try {
+      const res = await fetch('/api/bfi/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, responses })
+      });
+      return await res.json();
+    } catch (e) {
+      console.error(e);
+      return { success: false };
+    }
+  },
+  getResponses: async (userId: string) => {
+    try {
+      const res = await fetch(`/api/bfi/responses/${userId}`);
+      const data = await res.json();
+      return data.responses || {};
+    } catch (e) {
+      console.error(e);
+      return {};
+    }
+  }
+};
