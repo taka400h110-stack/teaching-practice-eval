@@ -1302,6 +1302,110 @@ dataRouter.get("/rubric-behaviors/:itemNumber", async (c) => {
   }
 });
 
+
+// POST /api/data/rq3b/save
+dataRouter.post('/rq3b/save', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  let authContext;
+  try {
+    const token = authHeader.split(' ')[1];
+    authContext = JSON.parse(atob(token));
+  } catch (e) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+  
+  if (authContext.role !== 'student') {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+  
+  const body = await c.req.json();
+  const userId = body.userId;
+  
+  if (userId !== authContext.id) {
+    return c.json({ error: 'Forbidden: Cannot update other users data' }, 403);
+  }
+  
+  const { week_number, goal_id, rd_chat_raw_level, rd_chat_category, focus_item_id, previous_score, current_score, delta_score, ga_self_rating, ga_self_binary, ga_evidence_binary, ga_evidence_reason } = body;
+  
+  if (!week_number) {
+    return c.json({ error: 'Missing week_number' }, 400);
+  }
+  
+  const id = `${userId}_wk${week_number}`;
+  
+  const db = c.env.DB as D1Database;
+  
+  try {
+    await db.prepare(`
+      INSERT INTO rq3b_outcomes (
+        id, user_id, week_number, goal_id, 
+        rd_chat_raw_level, rd_chat_category,
+        focus_item_id, previous_score, current_score, delta_score,
+        ga_self_rating, ga_self_binary,
+        ga_evidence_binary, ga_evidence_reason
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, week_number) DO UPDATE SET
+        goal_id = COALESCE(excluded.goal_id, rq3b_outcomes.goal_id),
+        rd_chat_raw_level = COALESCE(excluded.rd_chat_raw_level, rq3b_outcomes.rd_chat_raw_level),
+        rd_chat_category = COALESCE(excluded.rd_chat_category, rq3b_outcomes.rd_chat_category),
+        focus_item_id = COALESCE(excluded.focus_item_id, rq3b_outcomes.focus_item_id),
+        previous_score = COALESCE(excluded.previous_score, rq3b_outcomes.previous_score),
+        current_score = COALESCE(excluded.current_score, rq3b_outcomes.current_score),
+        delta_score = COALESCE(excluded.delta_score, rq3b_outcomes.delta_score),
+        ga_self_rating = COALESCE(excluded.ga_self_rating, rq3b_outcomes.ga_self_rating),
+        ga_self_binary = COALESCE(excluded.ga_self_binary, rq3b_outcomes.ga_self_binary),
+        ga_evidence_binary = COALESCE(excluded.ga_evidence_binary, rq3b_outcomes.ga_evidence_binary),
+        ga_evidence_reason = COALESCE(excluded.ga_evidence_reason, rq3b_outcomes.ga_evidence_reason),
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(
+      id, userId, week_number, goal_id || null,
+      rd_chat_raw_level || null, rd_chat_category || null,
+      focus_item_id || null, previous_score || null, current_score || null, delta_score || null,
+      ga_self_rating || null, ga_self_binary !== undefined ? ga_self_binary : null,
+      ga_evidence_binary !== undefined ? ga_evidence_binary : null, ga_evidence_reason || null
+    ).run();
+    
+    return c.json({ success: true, id });
+  } catch (error) {
+    console.error('RQ3b save error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/data/rq3b/responses/:userId
+dataRouter.get('/rq3b/responses/:userId', async (c) => {
+  const reqUserId = c.req.param('userId');
+  
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  let authContext;
+  try {
+    const token = authHeader.split(' ')[1];
+    authContext = JSON.parse(atob(token));
+  } catch (e) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+  
+  if (authContext.role === 'student' && authContext.id !== reqUserId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+  
+  const db = c.env.DB as D1Database;
+  
+  try {
+    const { results } = await db.prepare('SELECT * FROM rq3b_outcomes WHERE user_id = ? ORDER BY week_number ASC').bind(reqUserId).all();
+    return c.json({ success: true, data: results });
+  } catch (error) {
+    console.error('RQ3b fetch error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 export default dataRouter;
 
 // --- BFI Endpoints ---
