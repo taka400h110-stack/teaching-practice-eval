@@ -20,7 +20,7 @@ statsRouter.use("*", async (c, next) => {
   if (c.req.method === 'OPTIONS') {
     return next();
   }
-  const role = c.req.header("X-User-Role");
+  const role = c.get("user")?.role;
   if (role !== "researcher" && role !== "admin") {
     return c.json({ error: "Forbidden: researcher or admin role required" }, 403);
   }
@@ -961,6 +961,37 @@ statsRouter.post("/full-reliability", async (c) => {
     });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
+  }
+});
+
+
+// AI vs Human 比較 (ComparisonPage 用)
+statsRouter.get("/ai-vs-human", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  try {
+    const { results: aiEvals } = await db.prepare("SELECT * FROM evaluations").all();
+    const { results: humanEvals } = await db.prepare("SELECT * FROM human_evaluations").all();
+    
+    const summaries = [];
+    const aiMap = new Map(aiEvals.map(e => [e.journal_id, e]));
+    for (const he of humanEvals) {
+      const ae = aiMap.get(he.journal_id);
+      if (ae) {
+        summaries.push({
+          journal_id: he.journal_id,
+          evaluator_name: he.evaluator_id,
+          ai_total: ae.total_score || 0,
+          human_total: he.total_score || 0,
+          ai_f1: ae.factor1_score, ai_f2: ae.factor2_score, ai_f3: ae.factor3_score, ai_f4: ae.factor4_score,
+          human_f1: he.factor1_score, human_f2: he.factor2_score, human_f3: he.factor3_score, human_f4: he.factor4_score,
+        });
+      }
+    }
+    return c.json({ summaries, items: [] });
+  } catch(e) {
+    return c.json({ error: String(e) }, 500);
   }
 });
 

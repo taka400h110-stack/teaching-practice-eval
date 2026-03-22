@@ -13,13 +13,13 @@
   
   // Cloudflare D1 データベース
   // 作成方法: npx wrangler d1 create teaching-practice-eval-db
-  // "d1_databases": [
-  //   {
-  //     "binding": "DB",
-  //     "database_name": "teaching-practice-eval-db",
-  //     "database_id": "YOUR_DATABASE_ID_HERE"
-  //   }
-  // ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "teaching-practice-eval-db",
+      "database_id": "YOUR_DATABASE_ID_HERE"
+    }
+  ],
   
   // Cloudflare KV（セッション・キャッシュ用）
   // 作成方法: npx wrangler kv:namespace create teaching_eval_KV

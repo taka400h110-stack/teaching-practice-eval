@@ -1,107 +1,30 @@
+
+export async function apiFetch(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem('auth_token');
+  const headers = {
+    ...options.headers,
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+  const res = await apiFetch(url, { ...options, headers });
+  if (res.status === 401) {
+    localStorage.removeItem("user_info");
+    localStorage.removeItem("auth_token");
+    window.location.href = '/login';
+    throw new Error("Unauthorized or token expired");
+  }
+  return res;
+}
+
 /**
  * src/api/client.ts
  * モックAPIクライアント（将来的に実際のバックエンドに差し替え可能）
  */
-import {
-  MOCK_JOURNALS, MOCK_EVALUATION_RESULT, MOCK_ALL_EVALUATIONS, MOCK_GROWTH_DATA,
-  MOCK_SELF_EVALUATIONS, MOCK_LPS_DATA, MOCK_GOAL_HISTORY,
-  MOCK_CHAT_SESSION, MOCK_COHORT_PROFILES, MOCK_HUMAN_EVALUATIONS,
-} from "../mocks/mockData";
+
 import type {
   JournalEntry, EvaluationResult, GrowthData, SelfEvaluation,
   LpsWeek, GoalEntry, ChatSession, UserRole, ChatMessage, User,
 } from "../types";
 
-const delay = (ms = 300) => new Promise((r) => setTimeout(r, ms));
-
-// ローカルストレージで日誌を永続化
-function getJournals(): JournalEntry[] {
-  try {
-    const raw = localStorage.getItem("mock_journals");
-    if (raw) return JSON.parse(raw) as JournalEntry[];
-  } catch {}
-  return [...MOCK_JOURNALS];
-}
-function saveJournals(journals: JournalEntry[]): void {
-  localStorage.setItem("mock_journals", JSON.stringify(journals));
-}
-
-// 人間評価のローカルストレージ管理
-type HumanEvalEntry = {
-  evaluator_id: string;
-  evaluator_name: string;
-  journal_id: string;
-  week: number;
-  items: Array<{ item_number: number; score: number }>;
-};
-function getHumanEvals(): HumanEvalEntry[] {
-  try {
-    const raw = localStorage.getItem("mock_human_evals");
-    if (raw) return JSON.parse(raw) as HumanEvalEntry[];
-  } catch {}
-  return [...MOCK_HUMAN_EVALUATIONS];
-}
-function saveHumanEvals(evals: HumanEvalEntry[]): void {
-  localStorage.setItem("mock_human_evals", JSON.stringify(evals));
-}
-
-// 登録ユーザーのローカルストレージ管理
-const DEFAULT_REGISTERED_USERS: User[] = [
-  { id: "user-001", email: "student@teaching-eval.jp",      name: "山田 太郎",   roles: ["student"],        student_number: "2023A001", grade: 3 },
-  { id: "user-002", email: "teacher@teaching-eval.jp",      name: "佐藤 花子",   roles: ["univ_teacher"] },
-  { id: "user-003", email: "mentor@teaching-eval.jp",       name: "鈴木 一郎",   roles: ["school_mentor"] },
-  { id: "user-004", email: "admin@teaching-eval.jp",        name: "田中 管理者", roles: ["admin"] },
-  { id: "user-005", email: "researcher@teaching-eval.jp",   name: "伊藤 研究者", roles: ["researcher"] },
-  { id: "user-006", email: "collaborator@teaching-eval.jp", name: "渡辺 協力者", roles: ["collaborator"] },
-  { id: "user-007", email: "board@teaching-eval.jp",        name: "中村 委員",   roles: ["board_observer"] },
-  { id: "user-008", email: "evaluator@teaching-eval.jp",    name: "小林 評価者", roles: ["evaluator"] },
-];
-function getRegisteredUsers(): User[] {
-  try {
-    const raw = localStorage.getItem("mock_registered_users");
-    if (raw) return JSON.parse(raw) as User[];
-  } catch {}
-  return [...DEFAULT_REGISTERED_USERS];
-}
-function saveRegisteredUsers(users: User[]): void {
-  localStorage.setItem("mock_registered_users", JSON.stringify(users));
-}
-
-// ローカルストレージで自己評価を永続化
-function getSelfEvals(): SelfEvaluation[] {
-  try {
-    const raw = localStorage.getItem("mock_self_evaluations");
-    if (raw) return JSON.parse(raw) as SelfEvaluation[];
-  } catch {}
-  return [...MOCK_SELF_EVALUATIONS];
-}
-function saveSelfEvals(evals: SelfEvaluation[]): void {
-  localStorage.setItem("mock_self_evaluations", JSON.stringify(evals));
-}
-
-// ローカルストレージでゴール履歴を永続化
-function getGoals(): GoalEntry[] {
-  try {
-    const raw = localStorage.getItem("mock_goal_history");
-    if (raw) return JSON.parse(raw) as GoalEntry[];
-  } catch {}
-  return [...MOCK_GOAL_HISTORY];
-}
-function saveGoals(goals: GoalEntry[]): void {
-  localStorage.setItem("mock_goal_history", JSON.stringify(goals));
-}
-
-// ローカルストレージでチャットセッションを永続化
-function getChatSessions(): Record<string, ChatSession> {
-  try {
-    const raw = localStorage.getItem("mock_chat_sessions");
-    if (raw) return JSON.parse(raw) as Record<string, ChatSession>;
-  } catch {}
-  return {};
-}
-function saveChatSessions(sessions: Record<string, ChatSession>): void {
-  localStorage.setItem("mock_chat_sessions", JSON.stringify(sessions));
-}
 
 // ══════════════════════════════════════════════════════
 // デモユーザー定義（全役割・オンボーディング完了済み）
@@ -208,53 +131,32 @@ export const DEMO_ACCOUNT_LIST = [
   },
 ];
 
-const mockApi = {
+const apiClient = {
   // ── 認証 ──
-  login: async (email: string, _password: string) => {
-    await delay();
+  login: async (email: string, password: string) => {
     if (!email.includes("@")) throw new Error("Invalid credentials");
-
-    // 複数のメールアドレス対応: DEMO_USERSのキーや値から探索
-    let demo = DEMO_USERS[email];
-    if (!demo) {
-      const demoUser = Object.values(DEMO_USERS).find(d => 
-        d.email && d.email.split(',').map(e => e.trim()).includes(email)
-      );
-      if (demoUser) {
-        demo = demoUser;
-      }
-    }
     
-    const user = demo
-      ? { id: demo.id, email, name: demo.name, role: demo.roles[0] }
-      : { id: "user-001", email, name: "山田 太郎", role: "student" as UserRole };
-
-    const isFirstLogin = demo?.firstLogin ?? false;
-    // デモユーザーのプロフィール情報を user_info に含める
-    const fullUser = demo ? {
-      ...user,
-      student_number: demo.student_number,
-      grade:          demo.grade,
-      organization:   demo.organization,
-      position:       demo.position,
-      school_type:    demo.school_type,
-      internship_type: demo.internship_type,
-      weeks:          demo.weeks,
-    } : user;
-    localStorage.setItem("user_info", JSON.stringify(fullUser));
-    localStorage.setItem("auth_token", "mock-token-001");
-    // デモアカウントは全員オンボーディング完了済みとしてマーク
-    if (demo) {
-      localStorage.setItem(`onboarding_done_${user.id}`, "true");
-    }
+    const res = await apiFetch("/api/data/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    
+    if (!res.ok) throw new Error("User not found or invalid credentials");
+    const data = await res.json();
+    const user = data.user;
+    
+    localStorage.setItem("user_info", JSON.stringify(user));
+    localStorage.setItem("auth_token", data.token);
+    
+    // Check if onboarding is done (for students)
     const onboardingDone = localStorage.getItem(`onboarding_done_${user.id}`);
-    if (!onboardingDone && isFirstLogin) {
+    if (!onboardingDone && user.role === "student") {
       localStorage.setItem("pending_onboarding", "true");
     }
-    return { ...fullUser, requiresOnboarding: !onboardingDone && isFirstLogin };
+    
+    return { ...user, requiresOnboarding: !onboardingDone && user.role === "student" };
   },
   logout: async () => {
-    await delay(100);
+    
     localStorage.removeItem("user_info");
     localStorage.removeItem("auth_token");
     localStorage.removeItem("pending_onboarding");
@@ -263,7 +165,23 @@ const mockApi = {
     const raw = localStorage.getItem("user_info");
     return raw ? JSON.parse(raw) : null;
   },
-  isAuthenticated: () => !!localStorage.getItem("auth_token"),
+  
+  isAuthenticated: () => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return false;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("user_info");
+        return false;
+      }
+      return true;
+    } catch(e) {
+      return false;
+    }
+  },
+
   requiresOnboarding: () => localStorage.getItem("pending_onboarding") === "true",
   completeOnboarding: (userId: string) => {
     localStorage.setItem(`onboarding_done_${userId}`, "true");
@@ -272,135 +190,109 @@ const mockApi = {
 
   // ── 日誌 ──
   getJournals: async (): Promise<JournalEntry[]> => {
-    await delay();
-    return getJournals();
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const role = user.role || "student";
+    let url = "/api/data/journals";
+    if (role === "student") {
+      url += "?student_id=" + user.id;
+    }
+    const res = await apiFetch(url);
+    if (!res.ok) throw new Error("Failed to fetch journals");
+    const data = await res.json();
+    return data.journals || [];
   },
   getJournal: async (id: string): Promise<JournalEntry> => {
-    await delay();
-    const j = getJournals().find((j) => j.id === id);
-    if (!j) throw new Error(`Journal ${id} not found`);
-    return j;
+    const res = await apiFetch(`/api/data/journals/${id}`, { headers: {  } });
+    if (!res.ok) throw new Error(`Journal ${id} not found`);
+    return await res.json();
   },
   createJournal: async (data: Record<string, unknown>): Promise<JournalEntry> => {
-    await delay();
-    const journals = getJournals();
-    const newJ: JournalEntry = {
-      id:              `journal-${Date.now()}`,
-      student_id:      "user-001",
-      title:           (data.title as string) || "新しい日誌",
-      content:         (data.content as string) || "",
-      reflection_text: (data.reflection_text as string) || "",
-      entry_date:      (data.entry_date as string) || new Date().toISOString().split("T")[0],
-      status:          (data.status as JournalEntry["status"]) || "draft",
-      week_number:     (data.week_number as number) || 1,
-      ocr_source:      data.ocr_source as string | undefined,
-      ocr_confidence:  data.ocr_confidence as number | undefined,
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const payload = {
+      ...data,
+      student_id: user.id || "user-001",
+      entry_date: new Date().toISOString(),
+      status: "draft"
     };
-    journals.unshift(newJ);
-    saveJournals(journals);
-    return newJ;
+    const res = await apiFetch("/api/data/journals", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error("Failed to create journal");
+    return await res.json();
   },
   updateJournal: async (id: string, data: Record<string, unknown>): Promise<JournalEntry> => {
-    await delay();
-    const journals = getJournals();
-    const idx = journals.findIndex((j) => j.id === id);
-    if (idx === -1) throw new Error(`Journal ${id} not found`);
-    journals[idx] = { ...journals[idx], ...data } as JournalEntry;
-    saveJournals(journals);
-    return journals[idx];
+    const res = await apiFetch(`/api/data/journals/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error("Failed to update journal");
+    return await res.json();
   },
   deleteJournal: async (id: string): Promise<void> => {
-    await delay();
-    const journals = getJournals().filter((j) => j.id !== id);
-    saveJournals(journals);
+    const res = await apiFetch(`/api/data/journals/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem('auth_token')}` } });
+    if (!res.ok) throw new Error("Failed to delete journal");
   },
 
-  // ── コメント保存（教員・メンター用）──
-  saveComment: async (journalId: string, commentType: "univ_teacher_comment" | "school_mentor_comment" | "teacher_comment", comment: string): Promise<JournalEntry> => {
-    await delay();
-    const journals = getJournals();
-    const idx = journals.findIndex((j) => j.id === journalId);
-    if (idx === -1) throw new Error(`Journal ${journalId} not found`);
-    journals[idx] = { ...journals[idx], [commentType]: comment };
-    saveJournals(journals);
-    return journals[idx];
-  },
+  
 
   // ── 評価 ──
   getEvaluation: async (journalId: string): Promise<EvaluationResult> => {
     try {
-      const response = await fetch(`/api/data/evaluations/${journalId}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          // モックフォールバック
-          const weekMatch = journalId.match(/journal-0*(\d+)/);
-          const week = weekMatch ? parseInt(weekMatch[1]) : 4;
-          const found = MOCK_ALL_EVALUATIONS.find((e) => e.journal_id === journalId);
-          if (found) return found;
-          return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, id: `eval-${week}` };
-        }
-        throw new Error("Failed to fetch evaluation");
-      }
-      const data: any = await response.json();
-      
+      const res = await apiFetch(`/api/data/evaluations/${journalId}`, { headers: {  } });
+      if (!res.ok) throw new Error("Failed to fetch evaluation");
+      const data = await res.json();
       return {
-        id: data.evaluation.id,
-        journal_id: data.evaluation.journal_id,
+        id: data.id,
+        journal_id: data.journal_id,
         status: "completed",
-        overall_comment: data.evaluation.overall_comment || "",
-        total_score: data.evaluation.total_score,
+        overall_score: data.total_score,
         factor_scores: {
-          factor1: data.evaluation.factor1,
-          factor2: data.evaluation.factor2,
-          factor3: data.evaluation.factor3,
-          factor4: data.evaluation.factor4,
+          factor1: data.factor1_score,
+          factor2: data.factor2_score,
+          factor3: data.factor3_score,
+          factor4: data.factor4_score
         },
-        evaluation_items: data.items.map((item: any) => ({
-          item_number: item.item_number,
-          factor: `factor${item.item_number <= 7 ? 1 : item.item_number <= 13 ? 2 : item.item_number <= 17 ? 3 : 4}`,
-          is_evaluated: !item.is_na,
-          score: item.score,
-          evidence: item.evidence || "",
-          feedback: item.feedback || "",
-          next_level_advice: ""
+        items: JSON.parse(data.items_json || "[]").map((i: any) => ({
+          item_number: i.item_number || i.item,
+          score: i.score,
+          evidence: i.evidence,
+          feedback: i.feedback
         })),
-        evaluated_item_count: data.items.filter((i: any) => !i.is_na).length,
-        tokens_used: 0,
-        halo_check: !!data.evaluation.halo_effect_detected,
+        positive_feedback: data.positive_feedback || "",
+        constructive_feedback: data.constructive_feedback || "",
+        created_at: data.created_at
       };
-    } catch (err) {
-      console.error("API error fetching evaluation:", err);
-      // エラー時のフォールバック
-      return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, status: "pending" };
-    }
+    } catch { throw new Error("Evaluation not found"); }
   },
 
   // 全週分の評価結果を取得
   getAllEvaluations: async (): Promise<EvaluationResult[]> => {
     try {
-      const res = await fetch("/api/data/evaluations");
+      const res = await apiFetch("/api/data/evaluations", { headers: {  } });
       if (!res.ok) throw new Error("Failed to fetch all evaluations");
-      const data: any = await res.json();
+      const data = await res.json();
       return data.evaluations.map((e: any) => ({
         id: e.id,
         journal_id: e.journal_id,
         status: "completed",
-        overall_comment: e.overall_comment || "",
-        total_score: e.total_score,
+        overall_score: e.total_score,
         factor_scores: {
-          factor1: e.factor1,
-          factor2: e.factor2,
-          factor3: e.factor3,
-          factor4: e.factor4,
+          factor1: e.factor1_score,
+          factor2: e.factor2_score,
+          factor3: e.factor3_score,
+          factor4: e.factor4_score
         },
-        evaluation_items: [], // 簡略化のため省略
-        evaluated_item_count: 23,
-        tokens_used: 0,
-        halo_check: !!e.halo_effect_detected
+        items: JSON.parse(e.items_json || "[]").map((i: any) => ({
+          item_number: i.item_number || i.item,
+          score: i.score,
+          evidence: i.evidence,
+          feedback: i.feedback
+        })),
+        positive_feedback: e.positive_feedback || "",
+        constructive_feedback: e.constructive_feedback || "",
+        created_at: e.created_at
       }));
-    } catch (err) {
-      console.error(err);
-      return MOCK_ALL_EVALUATIONS;
+    } catch {
+      return [];
     }
   },
 
@@ -408,10 +300,10 @@ const mockApi = {
   getHumanEvaluations: async (journalId?: string) => {
     if (journalId) {
       try {
-        const response = await fetch(`/api/data/human-evals/${journalId}`);
+        const response = await apiFetch(`/api/data/human-evals/${journalId}`, { headers: {  } });
         if (!response.ok) throw new Error("Failed to fetch human evaluations");
-        const data: any = await response.json();
-        return data.evaluations;
+        const data = await response.json();
+        return data.evaluations || [];
       } catch (err) {
         console.error("API error fetching human evals:", err);
         return [];
@@ -420,13 +312,13 @@ const mockApi = {
     
     // 全件取得
     try {
-      const response = await fetch("/api/data/human-evals");
+      const response = await apiFetch("/api/data/human-evals", { headers: {  } });
       if (!response.ok) throw new Error("Failed to fetch all human evaluations");
-      const data: any = await response.json();
-      return data.evaluations;
+      const data = await response.json();
+      return data.evaluations || [];
     } catch (err) {
       console.error("API error fetching all human evals:", err);
-      return getHumanEvals();
+      return [];
     }
   },
   saveHumanEvaluation: async (
@@ -435,35 +327,21 @@ const mockApi = {
     items: Array<{ item_number: number; score: number; is_na?: boolean; comment?: string }>
   ) => {
     const user = JSON.parse(localStorage.getItem("user_info") ?? "{}");
-    
     try {
-      const response = await fetch("/api/data/human-evals", {
+      const response = await apiFetch("/api/data/human-evals", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           journal_id: journalId,
-          evaluator_id: user.id ?? "user-008",
-          evaluator_name: user.name ?? "評価者",
-          items: items,
-        }),
+          evaluator_id: user.id || "evaluator-01",
+          evaluator_name: user.name || "評価者",
+          items
+        })
       });
-      
       if (!response.ok) throw new Error("Failed to save human evaluation");
-      const data: any = await response.json();
-      
-      // フロントエンドの互換性のためモックと同じ形式を返す
-      return {
-        evaluator_id: user.id ?? "user-008",
-        evaluator_name: user.name ?? "評価者",
-        journal_id: journalId,
-        week,
-        items,
-        human_eval_id: data.human_eval_id
-      };
+      return await response.json();
     } catch (err) {
-      console.error("API error saving human eval:", err);
+      console.error(err);
       throw err;
     }
   },
@@ -471,15 +349,13 @@ const mockApi = {
   // AI評価実行（ステータスを evaluated に更新）
   runEvaluation: async (journalId: string): Promise<EvaluationResult> => {
     try {
-      const journals = getJournals();
+      const journals = ([] as any[]);
       const idx = journals.findIndex((j) => j.id === journalId);
       const journal = journals[idx];
       const user = JSON.parse(localStorage.getItem("user_info") ?? "{}");
 
       // 1. AI評価APIを呼び出す
-      const aiRes = await fetch("/api/ai/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const aiRes = await apiFetch("/api/ai/evaluate", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           journal_content: journal?.content || "",
           student_name: user.name || "学生",
@@ -492,9 +368,7 @@ const mockApi = {
       const aiData: any = await aiRes.json();
 
       // 2. 評価結果を保存する
-      const saveRes = await fetch("/api/data/evaluations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const saveRes = await apiFetch("/api/data/evaluations", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           journal_id: journalId,
           evaluation: aiData.evaluation,
@@ -510,27 +384,28 @@ const mockApi = {
 
       // 3. ローカルのステータスを更新する
       if (idx !== -1) {
-        journals[idx] = { ...journals[idx], status: "evaluated" };
-        saveJournals(journals);
+        journals[idx] = { ...journals[idx], status: "completed" };
+        ;
       }
 
       // 4. 保存した評価結果を取得して返す
-      return await mockApi.getEvaluation(journalId);
+      return await apiClient.getEvaluation(journalId);
     } catch (err) {
       console.error("runEvaluation error:", err);
       // エラー時のフォールバック
-      return { ...MOCK_EVALUATION_RESULT, journal_id: journalId, status: "failed" };
+      throw new Error("Evaluation failed");
     }
   },
 
   // ── 成長データ ──
   getGrowthData: async (): Promise<GrowthData> => {
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const userId = user.id || "user-001";
     try {
-      const res = await fetch('/api/data/growth/user-001');
+      const res = await apiFetch(`/api/data/growth/${userId}`, { headers: {  } });
       if (!res.ok) throw new Error('Failed');
-      const data: any = await res.json();
+      const data = await res.json();
       return {
-        
         student_id: data.student_id,
         weekly_scores: data.weekly_scores.map((w: any) => ({
           week: w.week_number,
@@ -538,40 +413,44 @@ const mockApi = {
           factor2: w.factor2,
           factor3: w.factor3,
           factor4: w.factor4,
-          total: w.total
+          total: w.total,
+          ai_total: w.ai_total,
+          journal_id: w.journal_id
         }))
       };
     } catch {
-      return MOCK_GROWTH_DATA;
+      return {  weekly_scores: [] as any[] };
     }
   },
 
   // ── 自己評価 ──
   getSelfEvaluations: async (): Promise<SelfEvaluation[]> => {
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const userId = user.id || "user-001";
     try {
-      const res = await fetch('/api/data/self-evals/user-001');
+      const res = await apiFetch(`/api/data/self-evals/${userId}`, { headers: {  } });
       if (!res.ok) throw new Error('Failed');
-      const data: any = await res.json();
+      const data = await res.json();
       return data.self_evaluations.map((e: any) => ({
         id: e.id,
         week: e.week_number,
         date: e.created_at,
-        factor1: e.factor1,
-        factor2: e.factor2,
-        factor3: e.factor3,
-        factor4: e.factor4,
-        total_score: e.total_score,
-                comment: e.comment
+        factor1: e.factor1_score,
+        factor2: e.factor2_score,
+        factor3: e.factor3_score,
+        factor4: e.factor4_score,
+        total: e.total_score,
+        comment: e.comment
       }));
     } catch {
-      return getSelfEvals();
+      return ([] as any[]);
     }
   },
   saveSelfEvaluation: async (data: Omit<SelfEvaluation, "id">): Promise<SelfEvaluation> => {
     try {
-      const res = await fetch('/api/data/self-evals', {
+      const res = await apiFetch('/api/data/self-evals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           student_id: 'user-001',
           week_number: data.week,
@@ -587,187 +466,112 @@ const mockApi = {
       }
     } catch {}
     
-    // fallback
-    const evals = getSelfEvals();
-    const newEval: SelfEvaluation = { id: `self-eval-${Date.now()}`, ...data };
-    const idx = evals.findIndex((e) => e.week === data.week);
-    if (idx !== -1) evals[idx] = newEval;
-    else evals.push(newEval);
-    saveSelfEvals(evals);
-    return newEval;
+throw new Error("Failed to save self evaluation");
   },
 
-  // ── LPS ──
-  getLpsData: async (): Promise<LpsWeek[]> => {
-    await delay();
-    return MOCK_LPS_DATA;
-  },
+  
 
   // ── ゴール履歴 ──
   getGoalHistory: async (): Promise<GoalEntry[]> => {
-    await delay();
-    return getGoals();
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const userId = user.id || "user-001";
+    const res = await apiFetch(`/api/data/goals/${userId}`, { headers: {  } });
+    if (!res.ok) throw new Error("Failed to fetch goals");
+    const data = await res.json();
+    return data.goals || [];
   },
   createGoal: async (data: { week: number; goal_text: string; is_smart: boolean }): Promise<GoalEntry> => {
-    await delay();
-    const goals = getGoals();
-    const newGoal: GoalEntry = {
-      id:         `goal-${Date.now()}`,
-      week:       data.week,
-      goal_text:  data.goal_text,
-      is_smart:   data.is_smart,
-      achieved:   false,
-      created_at: new Date().toISOString(),
-    };
-    goals.unshift(newGoal);
-    saveGoals(goals);
-    return newGoal;
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const res = await apiFetch("/api/data/goals", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        student_id: user.id || "user-001",
+        week_number: data.week,
+        goal_text: data.goal_text,
+        is_smart: data.is_smart
+      })
+    });
+    if (!res.ok) throw new Error("Failed to create goal");
+    return await res.json();
   },
   updateGoal: async (id: string, data: Partial<GoalEntry>): Promise<GoalEntry> => {
-    await delay();
-    const goals = getGoals();
-    const idx = goals.findIndex((g) => g.id === id);
-    if (idx === -1) throw new Error(`Goal ${id} not found`);
-    goals[idx] = { ...goals[idx], ...data };
-    saveGoals(goals);
-    return goals[idx];
+    const res = await apiFetch(`/api/data/goals/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error("Failed to update goal");
+    return await res.json();
   },
 
   // ── チャット ──
   // 全チャットセッション一覧（journal-004のデモセッション含む）
   getAllChatSessions: async (): Promise<ChatSession[]> => {
-    await delay();
-    const sessions = getChatSessions();
-    // journal-004 のデモセッションがない場合は追加
-    if (!sessions["journal-004"]) {
-      sessions["journal-004"] = { ...MOCK_CHAT_SESSION, journal_id: "journal-004" };
+    try {
+      const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+      const userId = user.id || "user-001";
+      const res = await apiFetch(`/api/data/chat-sessions?student_id=${userId}`, { headers: {  } });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.sessions || [];
+    } catch {
+      return [];
     }
-    return Object.values(sessions).filter((s) => s.messages.length > 0);
   },
   getChatSession: async (journalId: string): Promise<ChatSession> => {
-    await delay();
-    const sessions = getChatSessions();
-    if (sessions[journalId]) return sessions[journalId];
-    // journal-004 はリッチなデモセッション
-    if (journalId === "journal-004") return { ...MOCK_CHAT_SESSION, journal_id: journalId };
-    // それ以外は初期状態のセッションを返す
-    const newSession: ChatSession = {
-      id:         `chat-${Date.now()}`,
-      journal_id: journalId,
-      phase:      "phase0",
-      messages:   [
-        {
-          id:        "init-1",
-          role: "assistant",
-          content:   "【Phase 0: 出来事の記述】\n今週の実習日誌を読みました。今週特に印象に残った出来事を、できるだけ具体的に教えてください。どんな小さなことでも構いません。",
-          timestamp: new Date().toISOString(),
-        },
-      ],
-      created_at: new Date().toISOString(),
-    };
-    sessions[journalId] = newSession;
-    saveChatSessions(sessions);
-    return newSession;
+    const res = await apiFetch(`/api/data/chat-sessions/${journalId}`, { headers: {  } });
+    if (!res.ok) {
+      if (res.status === 404) {
+        return { id: "new", journal_id: journalId, student_id: "user-001", phase: "phase1", messages: [] };
+      }
+      throw new Error("Failed to fetch chat session");
+    }
+    return await res.json();
   },
   sendChatMessage: async (journalId: string, content: string): Promise<{ session: ChatSession; reply: ChatMessage }> => {
-    await delay(800);
-    const sessions = getChatSessions();
-    const session = sessions[journalId] || await mockApi.getChatSession(journalId);
-
-    const userMsg: ChatMessage = {
-      id:        `msg-${Date.now()}`,
-      role: "user",
-      content,
-      timestamp: new Date().toISOString(),
-    };
-
-    // フェーズに応じた返答を生成
-    const phaseReplies: Record<string, string[]> = {
-      phase0: [
-        "それは具体的な場面ですね。その時、あなたはどんな気持ちでしたか？また、その場面でどんな判断をしましたか？",
-        "詳しく教えてくれてありがとうございます。その経験の中で、特に難しかったことは何でしたか？",
-      ],
-      phase1: [
-        "【Phase 1: 省察・分析】\nその判断の背景には、どんな考えがありましたか？もし同じ場面がもう一度あったとしたら、どうしますか？",
-        "なぜそう感じたのか、もう少し深く考えてみましょう。その経験はあなたの教育観とどう結びついていますか？",
-      ],
-      bridge: [
-        "【Bridge】\n実習全体を振り返って、今週の経験と他の週の経験に共通することはありますか？",
-        "これまでの省察を踏まえて、教師としての自分の強みと課題を整理してみましょう。",
-      ],
-      phase2: [
-        "【Phase 2: 概念化・一般化】\nその経験から、教育に関するどんな原則や考え方を導き出せますか？",
-        "✅ 素晴らしい省察です！来週の実践目標をSMART形式で設定してみましょう。\n- Specific（具体的）\n- Measurable（測定可能）\n- Achievable（達成可能）\n- Relevant（関連性）\n- Time-bound（期限あり）",
-      ],
-    };
-
-    const replies = phaseReplies[session.phase] || phaseReplies.phase0;
-    const replyContent = replies[Math.floor(Math.random() * replies.length)];
-
-    const replyMsg: ChatMessage = {
-      id:        `msg-${Date.now() + 1}`,
-      role: "assistant",
-      content:   replyContent,
-      timestamp: new Date().toISOString(),
-    };
-
-    // フェーズ進行ロジック
-    const msgCount = session.messages.length;
-    let nextPhase = session.phase;
-    if (msgCount >= 3 && session.phase === "phase0") nextPhase = "phase1";
-    else if (msgCount >= 7 && session.phase === "phase1") nextPhase = "bridge";
-    else if (msgCount >= 9 && session.phase === "bridge") nextPhase = "phase2";
-    else if (msgCount >= 13 && session.phase === "phase2") nextPhase = "completed";
-
-    const updatedSession: ChatSession = {
-      ...session,
-      phase:    nextPhase as ChatSession["phase"],
-      messages: [...session.messages, userMsg, replyMsg],
-    };
-    sessions[journalId] = updatedSession;
-    saveChatSessions(sessions);
-
-    return { session: updatedSession, reply: replyMsg };
+    // Note: ChatBotPage directly fetches from OpenAI in standard flow, this mock fallback won't be heavily used
+    return { session: { id: "new", journal_id: journalId, student_id: "user-001", phase: "phase1", messages: [] }, reply: { id: "r", role: "assistant", content: "dummy", timestamp: new Date().toISOString() } };
   },
 
   // ── コーホート ──
-  getCohortProfiles: async (): Promise<typeof MOCK_COHORT_PROFILES> => {
+  getCohortProfiles: async (): Promise<any[]> => {
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const role = user.role || "researcher";
     try {
-      const res = await fetch('/api/data/cohorts');
+      const res = await apiFetch('/api/data/cohorts', { headers: {  } });
       if (!res.ok) throw new Error('Failed');
-      const data: any = await res.json();
-      return data.cohorts;
-    } catch {
-      return MOCK_COHORT_PROFILES;
-    }
+      const data = await res.json();
+      return data.cohorts || [];
+    } catch { return []; }
   },
 
   // ── ユーザー管理（管理者用）──
   getRegisteredUsers: async (): Promise<User[]> => {
-    await delay();
-    return getRegisteredUsers();
+    try {
+      const res = await apiFetch('/api/data/users', { headers: {  } });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.users || [];
+    } catch {
+      return [];
+    }
   },
-  registerUser: async (userData: Omit<User, "id"> & { password?: string }): Promise<User> => {
-    await delay(500);
-    const users = getRegisteredUsers();
-    const newUser: User = { ...userData, id: `user-${Date.now()}` };
-    users.push(newUser);
-    saveRegisteredUsers(users);
-    return newUser;
+  createUser: async (user: Omit<User, "id">): Promise<User> => {
+    const res = await apiFetch("/api/data/users", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user)
+    });
+    if (!res.ok) throw new Error("Failed to create user");
+    const data = await res.json();
+    return data.user;
   },
   updateUser: async (id: string, data: Partial<User>): Promise<User> => {
-    await delay(400);
-    const users = getRegisteredUsers();
-    const idx = users.findIndex((u) => u.id === id);
-    if (idx === -1) throw new Error(`User ${id} not found`);
-    users[idx] = { ...users[idx], ...data };
-    saveRegisteredUsers(users);
-    return users[idx];
+    const res = await apiFetch(`/api/data/users/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error("Failed to update user");
+    const resData = await res.json();
+    return resData.user;
   },
   deleteUser: async (id: string): Promise<void> => {
-    await delay(300);
-    const users = getRegisteredUsers().filter((u) => u.id !== id);
-    saveRegisteredUsers(users);
+    const res = await apiFetch(`/api/data/users/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem('auth_token')}` } });
+    if (!res.ok) throw new Error("Failed to delete user");
   },
 
   // ── データリセット（デモ用）──
@@ -782,9 +586,7 @@ const mockApi = {
 
   saveBlandAltmanResults: async (data: any) => {
     try {
-      const response = await fetch("/api/data/bland-altman-results", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await apiFetch("/api/data/bland-altman-results", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       if (!response.ok) throw new Error("Failed to save Bland-Altman results");
@@ -797,7 +599,7 @@ const mockApi = {
   
   getSavedReliabilityDetails: async (runId: string) => {
     try {
-      const response = await fetch(`/api/data/reliability-results/${runId}`);
+      const response = await apiFetch(`/api/data/reliability-results/${runId}`, { headers: {  } });
       if (!response.ok) throw new Error("Failed to fetch reliability details");
       const data: any = await response.json();
       return data.details || [];
@@ -812,7 +614,7 @@ const mockApi = {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
     const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
     try {
-      const response = await fetch('/api/data/rq3b/save', {
+      const response = await apiFetch('/api/data/rq3b/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -831,7 +633,7 @@ const mockApi = {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
     const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
     try {
-      const response = await fetch(`/api/data/rq3b/responses/${userId}`, {
+      const response = await apiFetch(`/api/data/rq3b/responses/${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -847,7 +649,7 @@ const mockApi = {
 
   getSavedReliabilityResults: async () => {
     try {
-      const response = await fetch("/api/data/reliability-results");
+      const response = await apiFetch("/api/data/reliability-results", { headers: {  } });
       if (!response.ok) throw new Error("Failed to fetch reliability results");
       const data: any = await response.json();
       return data.results || [];
@@ -859,42 +661,42 @@ const mockApi = {
 
   // SCAT API
   getScatProjects: async () => {
-    const res = await fetch('/api/data/scat/projects');
+    const res = await apiFetch('/api/data/scat/projects', { headers: {  } });
     if (!res.ok) throw new Error('Failed to fetch projects');
     return res.json();
   },
   createScatProject: async (title: string, description: string, created_by: string) => {
-    const res = await fetch('/api/data/scat/projects', {
+    const res = await apiFetch('/api/data/scat/projects', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description, created_by })
     });
     if (!res.ok) throw new Error('Failed to create project');
     return res.json();
   },
   getScatSegments: async (projectId: string) => {
-    const res = await fetch(`/api/data/scat/projects/${projectId}/segments`);
+    const res = await apiFetch(`/api/data/scat/projects/${projectId}/segments`, { headers: {  } });
     if (!res.ok) throw new Error('Failed to fetch segments');
     return res.json();
   },
   createScatSegments: async (projectId: string, segments: any[]) => {
-    const res = await fetch('/api/data/scat/segments', {
+    const res = await apiFetch('/api/data/scat/segments', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ project_id: projectId, segments })
     });
     if (!res.ok) throw new Error('Failed to save segments');
     return res.json();
   },
   getScatCodes: async (projectId: string) => {
-    const res = await fetch(`/api/data/scat/projects/${projectId}/codes`);
+    const res = await apiFetch(`/api/data/scat/projects/${projectId}/codes`, { headers: {  } });
     if (!res.ok) throw new Error('Failed to fetch codes');
     return res.json();
   },
   saveScatCode: async (codeData: any) => {
-    const res = await fetch('/api/data/scat/codes', {
+    const res = await apiFetch('/api/data/scat/codes', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(codeData)
     });
     if (!res.ok) throw new Error('Failed to save code');
@@ -902,7 +704,7 @@ const mockApi = {
   }
 };
 
-export default mockApi;
+export default apiClient;
 
 export const bfiApi = {
   
@@ -911,7 +713,7 @@ export const bfiApi = {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
     const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
     try {
-      const res = await fetch('/api/data/bfi/save', {
+      const res = await apiFetch('/api/data/bfi/save', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -930,7 +732,7 @@ export const bfiApi = {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
     const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
     try {
-      const res = await fetch(`/api/data/bfi/responses/${userId}`, {
+      const res = await apiFetch(`/api/data/bfi/responses/${userId}`, {
         headers: {
           'Authorization': `Bearer ${authHeader}`
         }

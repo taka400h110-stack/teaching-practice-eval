@@ -24,7 +24,7 @@ import {
   CartesianGrid, Tooltip, Legend, ReferenceLine,
 } from "recharts";
 import { useQuery }       from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { EvaluationItem } from "../types";
 import {
   RUBRIC_ITEMS, REFLECTION_DEPTH_LEVELS, RUBRIC_FACTORS,
@@ -151,7 +151,7 @@ export default function EvaluationResultPage() {
 
   const { data: result, isLoading, isError } = useQuery({
     queryKey: ["evaluation", journalId],
-    queryFn:  () => mockApi.getEvaluation(journalId!),
+    queryFn:  () => apiClient.getEvaluation(journalId!),
     enabled:  !!journalId,
   });
 

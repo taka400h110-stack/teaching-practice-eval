@@ -12,6 +12,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "../api/client";
 
 // 23項目ラベル（4因子）
 const ITEMS = [
@@ -71,7 +72,7 @@ export default function ComparisonPage() {
     queryKey: ["ai-vs-human"],
     queryFn: async () => {
       const role = JSON.parse(localStorage.getItem('user_info') || '{}').role || 'researcher';
-      const res = await fetch('/api/stats/ai-vs-human', { headers: { 'X-User-Role': role } });
+      const res = await apiFetch('/api/stats/ai-vs-human', { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       if (!res.ok) return { summaries: [], items: [] };
       return await res.json() as { summaries: any[], items: any[] };
     }
@@ -81,7 +82,7 @@ export default function ComparisonPage() {
     queryKey: ["cohorts-comp"],
     queryFn: async () => {
       const role = JSON.parse(localStorage.getItem('user_info') || '{}').role || 'researcher';
-      const res = await fetch('/api/data/cohorts', { headers: { 'X-User-Role': role } });
+      const res = await apiFetch('/api/data/cohorts', { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       if (!res.ok) return [];
       const json = await res.json() as any;
       return json.cohorts || [];

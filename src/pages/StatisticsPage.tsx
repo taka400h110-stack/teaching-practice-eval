@@ -15,6 +15,7 @@ import {
   PolarGrid, PolarAngleAxis, PieChart, Pie, Cell, ReferenceLine,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "../api/client";
 
 const COLORS = ["#1976d2", "#43a047", "#fb8c00", "#8e24aa", "#e53935"];
 const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
@@ -53,7 +54,7 @@ export default function StatisticsPage() {
   const { data: cohorts = [], isLoading } = useQuery({
     queryKey: ["cohorts"],
     queryFn: async () => {
-      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.cohorts || [];
     },
@@ -62,7 +63,7 @@ export default function StatisticsPage() {
   const { data: growthData } = useQuery({
     queryKey: ["growth"],
     queryFn: async () => {
-      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return (data.cohorts || []).map((c: any) => c.weekly_scores || []);
     },

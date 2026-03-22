@@ -26,9 +26,15 @@ import VerifiedUserIcon       from "@mui/icons-material/VerifiedUser";
 import PersonAddIcon          from "@mui/icons-material/PersonAdd";
 import DownloadIcon           from "@mui/icons-material/Download";
 import AccountBalanceIcon     from "@mui/icons-material/AccountBalance";
-import ScienceIcon            from "@mui/icons-material/Science";
+import ScienceIcon from "@mui/icons-material/Science";
+import AnalyticsIcon from "@mui/icons-material/Analytics";
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
+import AutoGraphIcon from "@mui/icons-material/AutoGraph";
+import DescriptionIcon from "@mui/icons-material/Description";
+import StorageIcon from "@mui/icons-material/Storage";
+
 import InsightsIcon from "@mui/icons-material/Insights";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { UserRole } from "../types";
 
 const DRAWER_WIDTH = 260;
@@ -63,33 +69,30 @@ const ROLE_COLOR: Record<UserRole, string> = {
 // 役割別ナビゲーション（論文2 RQ2 ＆ 論文3 RQ3）
 // ────────────────────────────────────────────
 function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
-
-  // ── 実習生（student）: 統合ワークフロー ──
   if (role === "student") {
     return [
       {
         group: "週次サイクル（RQ3）",
         items: [
-          { label: "ダッシュボード",              path: "/dashboard",        icon: <DashboardIcon /> },
-          { label: "実習日誌ワークフロー",        path: "/journal-workflow", icon: <MenuBookIcon /> },
-          { label: "手書き日誌OCR読み込み",       path: "/ocr",              icon: <AssessmentIcon /> },
-          { label: "過去の日誌一覧",              path: "/journals",         icon: <AssessmentIcon /> },
-          { label: "チャット履歴",                path: "/chat",             icon: <ChatIcon /> },
+          { label: "ダッシュボード", path: "/dashboard", icon: <DashboardIcon /> },
+          { label: "実習日誌ワークフロー", path: "/journal-workflow", icon: <MenuBookIcon /> },
+          { label: "手書き日誌OCR", path: "/ocr", icon: <AssessmentIcon /> },
+          { label: "過去の日誌一覧", path: "/journals", icon: <AssessmentIcon /> },
+          { label: "チャット履歴", path: "/chat", icon: <ChatIcon /> },
         ],
       },
       {
         group: "自己評価・成長（RQ3）",
         items: [
-          { label: "自己評価入力",               path: "/self-evaluation",  icon: <SelfImprovementIcon /> },
-          { label: "成長グラフ",                  path: "/growth",           icon: <TimelineIcon /> },
-          { label: "目標履歴（SMART）",           path: "/goals",            icon: <TrackChangesIcon /> },
+          { label: "自己評価入力", path: "/self-evaluation", icon: <SelfImprovementIcon /> },
+          { label: "成長グラフ", path: "/growth", icon: <TimelineIcon /> },
+          { label: "目標履歴（SMART）", path: "/goals", icon: <TrackChangesIcon /> },
         ],
       },
     ];
   }
 
-    // ── 大学教員（univ_teacher）: RQ3 学生コメント ──
-  if (role === "univ_teacher") {
+  if (role === "univ_teacher" || role === "school_mentor") {
     return [
       {
         group: "ダッシュボード",
@@ -98,155 +101,76 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
         ],
       },
       {
-        group: "実習生指導（分散実習）",
+        group: "実習生指導",
         items: [
-          { label: "日誌一覧・コメント", path: "/journals", icon: <MenuBookIcon /> },
+          { label: "提出された日誌一覧", path: "/journals", icon: <GroupsIcon /> },
         ],
       },
       {
-        group: "学生管理（RQ3）",
+        group: "学生管理",
         items: [
-          { label: "コーホート管理",     path: "/cohorts",      icon: <GroupsIcon /> },
-          { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
-          { label: "高度分析 (NLP/SEM)", path: "/advanced",    icon: <ScienceIcon /> },
-          { label: "データプラットフォーム", path: "/platform", icon: <InsightsIcon /> },
+          { label: "学生コホート管理", path: "/cohorts", icon: <SchoolIcon /> },
+          { label: "統計サマリー", path: "/statistics", icon: <AnalyticsIcon /> },
         ],
       },
     ];
   }
 
-    // ── 校内指導教員（school_mentor）: 4年生日誌コメント入力 ──
-  if (role === "school_mentor") {
-    return [
-      {
-        group: "ダッシュボード",
-        items: [
-          { label: "教員ダッシュボード", path: "/teacher-dashboard", icon: <DashboardIcon /> },
-        ],
-      },
-      {
-        group: "実習生指導（集中実習）",
-        items: [
-          { label: "日誌一覧・コメント", path: "/journals",  icon: <MenuBookIcon /> },
-        ],
-      },
-    ];
-  }
-
-  // ── 評価者（evaluator）: RQ2 人間評価専担 ──
   if (role === "evaluator") {
     return [
       {
         group: "評価業務（RQ2）",
         items: [
-          { label: "評価一覧",           path: "/evaluations",       icon: <AssessmentIcon /> },
-          { label: "人間評価入力",       path: "/evaluations/journal-001/human", icon: <VerifiedUserIcon /> },
-          { label: "AI vs 人間比較",     path: "/comparison",        icon: <CompareArrowsIcon /> },
-          { label: "信頼性分析（ICC）",  path: "/reliability",       icon: <EqualizerIcon /> },
+          { label: "評価一覧", path: "/evaluations", icon: <AssignmentTurnedInIcon /> },
+          { label: "AI vs 人間比較", path: "/comparison", icon: <CompareArrowsIcon /> },
+          { label: "信頼性分析（ICC）", path: "/reliability", icon: <ScienceIcon /> },
         ],
       },
     ];
   }
 
-  // ── 研究者（researcher）: 全分析機能 ──
-  if (role === "researcher" || role === ("collaborator" as any)) {
+  if (role === "researcher" || role === "collaborator" || role === "board_observer") {
     return [
       {
         group: "研究ダッシュボード",
         items: [
-          { label: "管理者ダッシュボード", path: "/admin", icon: <DashboardIcon /> },
+          { label: "管理者画面", path: "/admin", icon: <DashboardIcon /> },
         ],
       },
       {
-        group: "AI評価信頼性（RQ2）",
+        group: "AI評価信頼性",
         items: [
-          { label: "評価一覧",           path: "/evaluations",  icon: <AssessmentIcon /> },
-          { label: "人間評価入力",       path: "/evaluations/journal-001/human", icon: <VerifiedUserIcon /> },
-          { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
-          { label: "信頼性分析（ICC）",  path: "/reliability",  icon: <EqualizerIcon /> },
+          { label: "評価一覧", path: "/evaluations", icon: <AssignmentTurnedInIcon /> },
+          { label: "AI vs 人間比較", path: "/comparison", icon: <CompareArrowsIcon /> },
+          { label: "信頼性分析（ICC）", path: "/reliability", icon: <ScienceIcon /> },
         ],
       },
       {
-        group: "縦断成長分析（RQ3）",
+        group: "縦断成長分析",
         items: [
-          { label: "コーホート管理",     path: "/cohorts",      icon: <GroupsIcon /> },
-          { label: "縦断分析（LGCM）",   path: "/longitudinal", icon: <TimelineIcon /> },
-          { label: "SCAT 質的分析",      path: "/scat",         icon: <PsychologyIcon /> },
-          { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
-          { label: "高度分析 (NLP/SEM)", path: "/advanced",    icon: <ScienceIcon /> },
-          { label: "データプラットフォーム", path: "/platform", icon: <InsightsIcon /> },
+          { label: "コホート管理", path: "/cohorts", icon: <SchoolIcon /> },
+          { label: "縦断分析（LGCM）", path: "/longitudinal", icon: <AutoGraphIcon /> },
+          { label: "SCAT質的分析", path: "/scat", icon: <DescriptionIcon /> },
+          { label: "統計サマリー", path: "/statistics", icon: <AnalyticsIcon /> },
+          { label: "高度分析 (Beta)", path: "/advanced-analytics", icon: <InsightsIcon /> },
         ],
-      },
-      {
-        group: "国際比較（RQ1）",
-        items: [
-          { label: "国際比較（4カ国）",  path: "/international", icon: <SchoolIcon /> },
-        ],
-      },
-      {
-        group: "データエクスポート",
-        items: [
-          { label: "データ出力（CSV/R/Mplus）", path: "/statistics", icon: <DownloadIcon /> },
-        ],
-      },
+      }
     ];
   }
 
-  // ── 研究協力者（collaborator）: 閲覧・集計のみ ──
-  if (role === ("collaborator" as any)) {
-    return [
-      {
-        group: "データ閲覧",
-        items: [
-          { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
-          { label: "コーホート一覧",     path: "/cohorts",      icon: <GroupsIcon /> },
-          { label: "縦断データ",         path: "/longitudinal", icon: <TimelineIcon /> },
-        ],
-      },
-      {
-        group: "評価参照",
-        items: [
-          { label: "評価一覧（閲覧）",   path: "/evaluations",  icon: <AssessmentIcon /> },
-          { label: "人間評価入力",       path: "/evaluations/journal-001/human", icon: <VerifiedUserIcon /> },
-          { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
-        ],
-      },
-    ];
-  }
-
-  // ── 教育委員会（board_observer）: サマリー・学校別 ──
-  if (role === "board_observer") {
-    return [
-      {
-        group: "統計サマリー",
-        items: [
-          { label: "統計ダッシュボード", path: "/statistics",   icon: <EqualizerIcon /> },
-          { label: "コーホート・学校別", path: "/cohorts",      icon: <AccountBalanceIcon /> },
-          { label: "成長分析（縦断）",   path: "/longitudinal", icon: <TimelineIcon /> },
-        ],
-      },
-      {
-        group: "評価参照",
-        items: [
-          { label: "評価サマリー",       path: "/evaluations",  icon: <AssessmentIcon /> },
-          { label: "AI vs 人間比較",     path: "/comparison",   icon: <CompareArrowsIcon /> },
-        ],
-      },
-    ];
-  }
-
-  // ── 管理者（admin）: 管理機能のみ ──
   if (role === "admin") {
     return [
       {
         group: "システム管理",
         items: [
-          { label: "管理ダッシュボード", path: "/admin",     icon: <AdminPanelSettingsIcon /> },
-          { label: "ユーザー登録",       path: "/register", icon: <PersonAddIcon /> },
+          { label: "管理ダッシュボード", path: "/admin", icon: <AdminPanelSettingsIcon /> },
+          { label: "プラットフォーム分析", path: "/platform-analytics", icon: <StorageIcon /> },
+          { label: "ユーザー登録", path: "/register", icon: <PersonAddIcon /> },
         ],
       },
     ];
   }
+
   return [];
 }
 
@@ -274,7 +198,7 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed]   = useState<Record<string, boolean>>({});
 
-  const user = mockApi.getCurrentUser() as { id: string; name: string; role: UserRole } | null;
+  const user = apiClient.getCurrentUser() as { id: string; name: string; role: UserRole } | null;
   const roles: UserRole[] = ((user as any)?.roles || [(user as any)?.role || "student"]) ?? ["student"];
   // 下位互換性のため古い role も fallback として扱う
   if (user && !(user as any).roles && (user as any).role) roles.push((user as any).role);
@@ -282,7 +206,7 @@ export default function AppLayout() {
   const allItems  = navGroups.flatMap((g) => g.items);
 
   const handleLogout = async () => {
-    await mockApi.logout();
+    await apiClient.logout();
     navigate("/login");
   };
 

@@ -8,7 +8,7 @@ import {
 import SearchIcon     from "@mui/icons-material/Search";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import { useQuery }   from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 
 export default function TeacherDashboardPage() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export default function TeacherDashboardPage() {
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["cohort"],
-    queryFn:  () => mockApi.getCohortProfiles(),
+    queryFn:  () => apiClient.getCohortProfiles(),
   });
 
   const filtered = profiles.filter((p) =>

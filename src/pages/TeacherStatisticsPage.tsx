@@ -18,7 +18,7 @@ import {
   PolarGrid, PolarAngleAxis,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 
 const FACTOR_COLORS = {
   factor1: "#1976d2", factor2: "#43a047", factor3: "#fb8c00", factor4: "#8e24aa",
@@ -37,7 +37,7 @@ export default function TeacherStatisticsPage() {
 
   const { data: cohorts = [], isLoading } = useQuery({
     queryKey: ["cohorts"],
-    queryFn: () => mockApi.getCohortProfiles(),
+    queryFn: () => apiClient.getCohortProfiles(),
   });
 
   if (isLoading) return <LinearProgress />;

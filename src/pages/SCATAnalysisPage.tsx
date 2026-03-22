@@ -23,6 +23,7 @@ import CalculateIcon   from "@mui/icons-material/Calculate";
 import CompareIcon     from "@mui/icons-material/Compare";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, Legend, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "../api/client";
 
 // ────────────────────────────────────────────────────────────────
 // 型定義
@@ -215,7 +216,7 @@ export default function SCATAnalysisPage() {
   const { data: projectsData, isLoading: isLoadingProjects } = useQuery<any>({
     queryKey: ['scat-projects'],
     queryFn: async () => {
-      const res = await fetch("/api/data/scat/projects", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch("/api/data/scat/projects", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.projects || [];
     }
@@ -224,7 +225,7 @@ export default function SCATAnalysisPage() {
   const { data: segmentsData, isLoading: isLoadingSegments } = useQuery<any>({
     queryKey: ['scat-segments', selectedProjectId],
     queryFn: async () => {
-      const res = await fetch(`/api/data/scat/segments/${selectedProjectId}`, { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch(`/api/data/scat/segments/${selectedProjectId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.segments || [];
     },
@@ -234,7 +235,7 @@ export default function SCATAnalysisPage() {
   const { data: codesData, isLoading: isLoadingCodes } = useQuery<any>({
     queryKey: ['scat-codes', selectedProjectId],
     queryFn: async () => {
-      const res = await fetch(`/api/data/scat/codes/${selectedProjectId}`, { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch(`/api/data/scat/codes/${selectedProjectId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.codes || [];
     },
@@ -243,9 +244,9 @@ export default function SCATAnalysisPage() {
 
   const createProjectMut = useMutation<any, Error, any>({
     mutationFn: async (title: string) => {
-      const res = await fetch("/api/data/scat/projects", {
+      const res = await apiFetch("/api/data/scat/projects", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-User-Role": localStorage.getItem("role") || "researcher" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, description: "SCAT Analysis", created_by: researcherId })
       });
       return res.json();
@@ -261,9 +262,9 @@ export default function SCATAnalysisPage() {
   const addSegmentMut = useMutation<any, Error, any>({
     mutationFn: async (text: string) => {
       const segments = [{ segment_order: (segmentsData?.segments?.length || 0) + 1, text_content: text }];
-      const res = await fetch(`/api/data/scat/segments/${selectedProjectId}`, {
+      const res = await apiFetch(`/api/data/scat/segments/${selectedProjectId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-User-Role": localStorage.getItem("role") || "researcher" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ segments })
       });
       return res.json();
@@ -277,9 +278,9 @@ export default function SCATAnalysisPage() {
 
   const saveCodeMut = useMutation<any, Error, any>({
     mutationFn: async (codeData: any) => {
-      const res = await fetch("/api/data/scat/codes", {
+      const res = await apiFetch("/api/data/scat/codes", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-User-Role": localStorage.getItem("role") || "researcher" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(codeData)
       });
       return res.json();

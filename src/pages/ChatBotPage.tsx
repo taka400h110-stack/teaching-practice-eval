@@ -25,8 +25,9 @@ import PsychologyIcon     from "@mui/icons-material/Psychology";
 import TrackChangesIcon   from "@mui/icons-material/TrackChanges";
 import ExpandMoreIcon     from "@mui/icons-material/ExpandMore";
 import { useQuery }       from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { ChatMessage } from "../types";
+import { apiFetch } from "../api/client";
 import {
   RUBRIC_FACTORS as _RUBRIC_FACTORS,
   RUBRIC_ITEMS,
@@ -179,19 +180,19 @@ export default function ChatBotPage() {
 
   const { data: session } = useQuery({
     queryKey: ["chat", journalId],
-    queryFn:  () => mockApi.getChatSession(journalId),
+    queryFn:  () => apiClient.getChatSession(journalId),
   });
 
   // 全チャットセッション一覧
   const { data: allSessions = [] } = useQuery({
     queryKey: ["allChatSessions"],
-    queryFn:  () => (mockApi as unknown as { getAllChatSessions: () => Promise<import("../types").ChatSession[]> }).getAllChatSessions(),
+    queryFn:  () => (apiClient as unknown as { getAllChatSessions: () => Promise<import("../types").ChatSession[]> }).getAllChatSessions(),
   });
 
   // 日誌一覧（セッションに対応する日誌タイトルを表示するため）
   const { data: allJournals = [] } = useQuery({
     queryKey: ["journals"],
-    queryFn:  () => mockApi.getJournals(),
+    queryFn:  () => apiClient.getJournals(),
   });
 
   useEffect(() => {
@@ -238,7 +239,7 @@ export default function ChatBotPage() {
       const journalContent = (journalData as unknown as { content?: string })?.content ?? "";
 
       const [chatResp, cotBResp] = await Promise.allSettled([
-        fetch("/api/ai/chat", {
+        apiFetch("/api/ai/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -251,7 +252,7 @@ export default function ChatBotPage() {
           }),
         }).then((r) => r.json()),
 
-        fetch("/api/ai/reflection-depth", {
+        apiFetch("/api/ai/reflection-depth", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -584,14 +585,14 @@ export default function ChatBotPage() {
                 if (user.id) {
                   try {
                     const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
-                    const res = await fetch("/api/ai/evaluate-session-rd", {
+                    const res = await apiFetch("/api/ai/evaluate-session-rd", {
                       method: "POST",
                       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authHeader}` },
                       body: JSON.stringify({ conversation: messages })
                     });
                     const rdData = await res.json();
                     if (rdData.success) {
-                      await mockApi.saveRq3bOutcomes({
+                      await apiClient.saveRq3bOutcomes({
                         userId: user.id,
                         week_number: weekNum,
                         rd_chat_raw_level: rdData.result.rd_level,

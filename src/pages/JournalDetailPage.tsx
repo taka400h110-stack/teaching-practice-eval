@@ -34,7 +34,7 @@ import {
 } from "recharts";
 import SendIcon from "@mui/icons-material/Send";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { JournalEntry, JournalStatus, HourRecord, EvaluationResult, GrowthData } from "../types";
 
 // ─────────────────────────────────────────────
@@ -496,7 +496,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
 // ─────────────────────────────────────────────
 const useJournalQuery = (id: string) => useQuery<JournalEntry>({
   queryKey: ["journal", id],
-  queryFn:  () => mockApi.getJournal(id) as Promise<JournalEntry>,
+  queryFn:  () => apiClient.getJournal(id) as Promise<JournalEntry>,
   enabled:  !!id,
 });
 
@@ -509,27 +509,27 @@ const JournalDetailPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   // 現在のログインユーザー（ロール判定）
-  const currentUser = mockApi.getCurrentUser() as { id: string; name: string; role: string } | null;
+  const currentUser = apiClient.getCurrentUser() as { id: string; name: string; role: string } | null;
   const userRole = currentUser?.role ?? "student";
 
   const { data: journal, isLoading, isError } = useJournalQuery(journalId ?? "");
 
   const { data: goals = [] } = useQuery({
     queryKey: ["goals"],
-    queryFn: () => mockApi.getGoalHistory()
+    queryFn: () => apiClient.getGoalHistory()
   });
   
   const currentGoal = journal ? goals.find(g => g.week === journal.week_number) : undefined;
 
   const { data: evalData } = useQuery<EvaluationResult>({
     queryKey: ["evaluation", journalId],
-    queryFn:  () => mockApi.getEvaluation(journalId ?? ""),
+    queryFn:  () => apiClient.getEvaluation(journalId ?? ""),
     enabled:  !!journalId && journal?.status === "evaluated",
   });
 
   const { data: selfEvals = [] } = useQuery({
     queryKey: ["selfEvaluations"],
-    queryFn: () => mockApi.getSelfEvaluations(),
+    queryFn: () => apiClient.getSelfEvaluations(),
     enabled: !!journal
   });
   
@@ -537,7 +537,7 @@ const JournalDetailPage: React.FC = () => {
 
   const { data: growthData } = useQuery<GrowthData>({
     queryKey: ["growth"],
-    queryFn:  () => mockApi.getGrowthData(),
+    queryFn:  () => apiClient.getGrowthData(),
     enabled:  !!journalId,
   });
 
@@ -559,7 +559,7 @@ const JournalDetailPage: React.FC = () => {
     mutationFn: async (text: string) => {
       const isIntensive = (journal as any).internship_type === "intensive";
       const field = isIntensive ? "school_mentor_comment" : "univ_teacher_comment";
-      await mockApi.updateJournal(journalId!, { [field]: text } as Record<string, unknown>);
+      await apiClient.updateJournal(journalId!, { [field]: text } as Record<string, unknown>);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["journal", journalId] });

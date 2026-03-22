@@ -9,7 +9,8 @@ import MenuBookIcon    from "@mui/icons-material/MenuBook";
 import AssessmentIcon  from "@mui/icons-material/Assessment";
 import StorageIcon     from "@mui/icons-material/Storage";
 import { useQuery }    from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
+import { apiFetch } from "../api/client";
 
 export default function AdminDashboardPage() {
 
@@ -17,7 +18,7 @@ export default function AdminDashboardPage() {
     try {
       const user = JSON.parse(localStorage.getItem('user_info') || '{}');
       const role = user.role || 'student';
-      const res = await fetch(url, { headers: { 'X-User-Role': role } });
+      const res = await apiFetch(url, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
@@ -35,14 +36,14 @@ export default function AdminDashboardPage() {
   };
 
   const [tab, setTab] = useState(0);
-  const { data: profiles = [] } = useQuery({ queryKey: ["cohort"], queryFn: () => mockApi.getCohortProfiles() });
-  const { data: journals = [] } = useQuery({ queryKey: ["journals"], queryFn: () => mockApi.getJournals() });
+  const { data: profiles = [] } = useQuery({ queryKey: ["cohort"], queryFn: () => apiClient.getCohortProfiles() });
+  const { data: journals = [] } = useQuery({ queryKey: ["journals"], queryFn: () => apiClient.getJournals() });
   
   const { data: jointData = [] } = useQuery({
     queryKey: ["jointDisplay"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/data/joint-display", { headers: { "X-User-Role": "researcher" } });
+        const res = await apiFetch("/api/data/joint-display", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
         if (!res.ok) return [];
         const json = await res.json() as any;
         return json.jointData || [];

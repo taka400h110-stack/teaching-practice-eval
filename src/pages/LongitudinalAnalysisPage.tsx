@@ -23,6 +23,7 @@ import {
   AreaChart, Area, ScatterChart, Scatter,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "../api/client";
 
 // ────────────────────────────────────────────────────────────────
 // 定数
@@ -42,20 +43,7 @@ const FACTOR_LABELS = {
 // ────────────────────────────────────────────────────────────────
 // モック縦断統計生成
 // ────────────────────────────────────────────────────────────────
-function genWeeklyStats(weeks: number) {
-  return Array.from({ length: weeks }, (_, i) => {
-    const t = i / (weeks - 1);
-    return {
-      week: i + 1,
-      f1_mean: +(2.2 + t * 1.1).toFixed(2), f1_sd: +(0.32 + t * 0.05).toFixed(2),
-      f2_mean: +(2.4 + t * 1.2).toFixed(2), f2_sd: +(0.28 + t * 0.04).toFixed(2),
-      f3_mean: +(2.1 + t * 1.0).toFixed(2), f3_sd: +(0.35 + t * 0.05).toFixed(2),
-      f4_mean: +(2.3 + t * 1.1).toFixed(2), f4_sd: +(0.30 + t * 0.04).toFixed(2),
-      total_mean: +(2.25 + t * 1.1).toFixed(2),
-      total_sd: +(0.31 + t * 0.045).toFixed(2),
-    };
-  });
-}
+
 
 function genLCGATrajectories(weeks: number) {
   return (lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || []).map((cls) => ({
@@ -73,7 +61,7 @@ const LGCM_RESULT = { intercept_mean: 0, intercept_variance: 0, slope_mean: 0, s
 // ────────────────────────────────────────────────────────────────
 // CSVダウンロード
 // ────────────────────────────────────────────────────────────────
-function downloadGrowthCSV(weeklyStats: ReturnType<typeof genWeeklyStats>) {
+function downloadGrowthCSV(weeklyStats: any[]) {
   const headers = ["week", "f1_mean", "f1_sd", "f2_mean", "f2_sd", "f3_mean", "f3_sd", "f4_mean", "f4_sd", "total_mean", "total_sd"];
   const rows = weeklyStats.map((w) => headers.map((h) => (w as Record<string, number>)[h] ?? "").join(","));
   const csv = [headers.join(","), ...rows].join("\n");
@@ -124,7 +112,7 @@ export default function LongitudinalAnalysisPage() {
   const { data: cohorts, isLoading } = useQuery({
     queryKey: ["cohorts"],
     queryFn: async () => {
-      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.cohorts || [];
     },
@@ -133,7 +121,7 @@ export default function LongitudinalAnalysisPage() {
   const { data: growthData } = useQuery({
     queryKey: ["growth"],
     queryFn: async () => {
-      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return (data.cohorts || []).map((c: any) => c.weekly_scores || []);
     },
@@ -190,7 +178,7 @@ export default function LongitudinalAnalysisPage() {
       const weeklyMatrix = (cohorts ?? []).slice(0, 30).map((p) =>
         p.weekly_scores.map((ws) => ws.total)
       );
-      const resp = await fetch("/api/stats/lgcm", {
+      const resp = await apiFetch("/api/stats/lgcm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ weekly_scores: weeklyMatrix, factor: "total" }),

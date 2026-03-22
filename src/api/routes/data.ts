@@ -30,24 +30,24 @@ dataRouter.use("*", cors());
 // DB 初期化（初回アクセス時にテーブルを作成）
 // ────────────────────────────────────────────────────────────────
 async function ensureSchema(db: D1Database): Promise<void> {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'student',
       student_number TEXT,
       grade INTEGER,
+      password_hash TEXT,
       created_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS evaluator_profiles (
+    );`,
+    `CREATE TABLE IF NOT EXISTS evaluator_profiles (
       evaluator_id TEXT PRIMARY KEY,
       years_of_experience INTEGER,
       training_background TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS journal_entries (
+    );`,
+    `CREATE TABLE IF NOT EXISTS journal_entries (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       entry_date TEXT NOT NULL,
@@ -61,9 +61,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       UNIQUE(student_id, entry_date)
-    );
-
-    CREATE TABLE IF NOT EXISTS evaluations (
+    );`,
+    `CREATE TABLE IF NOT EXISTS evaluations (
       id TEXT PRIMARY KEY,
       journal_id TEXT NOT NULL,
       eval_type TEXT NOT NULL DEFAULT 'ai',
@@ -82,22 +81,20 @@ async function ensureSchema(db: D1Database): Promise<void> {
       duration_ms INTEGER,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (journal_id) REFERENCES journal_entries(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS evaluation_items (
+    );`,
+    `CREATE TABLE IF NOT EXISTS evaluation_items (
       id TEXT PRIMARY KEY,
       evaluation_id TEXT NOT NULL,
       item_number INTEGER NOT NULL,
       score REAL,
-      rd_level TEXT,          -- RD0/RD1/RD2/RD3/RD4 (2026-03-07追加)
+      rd_level TEXT,
       is_na INTEGER DEFAULT 0,
       evidence TEXT,
       feedback TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (evaluation_id) REFERENCES evaluations(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS human_evaluations (
+    );`,
+    `CREATE TABLE IF NOT EXISTS human_evaluations (
       id TEXT PRIMARY KEY,
       journal_id TEXT NOT NULL,
       evaluator_id TEXT NOT NULL,
@@ -110,36 +107,31 @@ async function ensureSchema(db: D1Database): Promise<void> {
       comment TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (journal_id) REFERENCES journal_entries(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS human_eval_items (
+    );`,
+    `CREATE TABLE IF NOT EXISTS human_eval_items (
       id TEXT PRIMARY KEY,
       human_eval_id TEXT NOT NULL,
       item_number INTEGER NOT NULL,
       score REAL,
-      rd_level TEXT,          -- RD0/RD1/RD2/RD3/RD4 (2026-03-07追加)
+      rd_level TEXT,
       is_na INTEGER DEFAULT 0,
       comment TEXT,
       FOREIGN KEY (human_eval_id) REFERENCES human_evaluations(id)
-    );
-
-    -- ルーブリック行動指標テーブル（2026-03-07追加）
-    -- 全4因子・全23項目×5段階のRD水準行動指標を格納
-    CREATE TABLE IF NOT EXISTS rubric_item_behaviors (
+    );`,
+    `CREATE TABLE IF NOT EXISTS rubric_item_behaviors (
       id TEXT PRIMARY KEY,
       item_number INTEGER NOT NULL,
-      factor TEXT NOT NULL,       -- factor1/factor2/factor3/factor4
+      factor TEXT NOT NULL,
       item_label TEXT NOT NULL,
       item_text TEXT NOT NULL,
       lambda REAL,
-      score INTEGER NOT NULL,     -- 1-5
-      rd_level TEXT NOT NULL,     -- RD0/RD1/RD2/RD3/RD4
-      indicator TEXT NOT NULL,    -- 行動指標（日誌記述の評価基準）
+      score INTEGER NOT NULL,
+      rd_level TEXT NOT NULL,
+      indicator TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(item_number, score)
-    );
-
-    CREATE TABLE IF NOT EXISTS self_evaluations (
+    );`,
+    `CREATE TABLE IF NOT EXISTS self_evaluations (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       week_number INTEGER NOT NULL,
@@ -153,9 +145,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       comment TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(student_id, week_number)
-    );
-
-    CREATE TABLE IF NOT EXISTS chat_sessions (
+    );`,
+    `CREATE TABLE IF NOT EXISTS chat_sessions (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       journal_id TEXT,
@@ -170,9 +161,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       completed INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS chat_messages (
+    );`,
+    `CREATE TABLE IF NOT EXISTS chat_messages (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
       message_order INTEGER NOT NULL,
@@ -183,9 +173,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       question_number INTEGER,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS goals (
+    );`,
+    `CREATE TABLE IF NOT EXISTS goals (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       session_id TEXT,
@@ -205,9 +194,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       adjustment_reason TEXT,
       bfi_context TEXT,
       created_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS icc_results (
+    );`,
+    `CREATE TABLE IF NOT EXISTS icc_results (
       id TEXT PRIMARY KEY,
       run_id TEXT,
       scope TEXT NOT NULL,
@@ -226,9 +214,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       pearson_r REAL,
       pearson_p REAL,
       calculated_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS bland_altman_results (
+    );`,
+    `CREATE TABLE IF NOT EXISTS bland_altman_results (
       id TEXT PRIMARY KEY,
       run_id TEXT,
       factor TEXT,
@@ -242,26 +229,24 @@ async function ensureSchema(db: D1Database): Promise<void> {
       bias_p_value REAL,
       subject_count INTEGER,
       calculated_at TEXT DEFAULT (datetime('now'))
-    );
-
-
-    CREATE TABLE IF NOT EXISTS scat_projects (
+    );`,
+    `CREATE TABLE IF NOT EXISTS scat_projects (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       description TEXT,
       created_by TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS scat_segments (
+    );`,
+    `CREATE TABLE IF NOT EXISTS scat_segments (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       segment_order INTEGER NOT NULL,
       text_content TEXT NOT NULL,
       source_journal_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS scat_codes (
+    );`,
+    `CREATE TABLE IF NOT EXISTS scat_codes (
       id TEXT PRIMARY KEY,
       segment_id TEXT NOT NULL,
       researcher_id TEXT NOT NULL,
@@ -274,8 +259,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(segment_id, researcher_id)
-    );
-\n    CREATE TABLE IF NOT EXISTS learning_progress_scores (
+    );`,
+    `CREATE TABLE IF NOT EXISTS learning_progress_scores (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       week_number INTEGER NOT NULL,
@@ -290,21 +275,72 @@ async function ensureSchema(db: D1Database): Promise<void> {
       growth_pattern TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(student_id, week_number)
-    );
+    );`,
+    `CREATE TABLE IF NOT EXISTS rq3b_outcomes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      goal_id TEXT,
+      stage TEXT NOT NULL,
+      reflection_depth INTEGER,
+      goal_set INTEGER,
+      smart_score INTEGER,
+      created_at TEXT DEFAULT (datetime('now'))
+    );`,
+    `CREATE TABLE IF NOT EXISTS bfi_responses (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      openness REAL,
+      conscientiousness REAL,
+      extraversion REAL,
+      agreeableness REAL,
+      neuroticism REAL,
+      is_completed INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id)
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_journals_student ON journal_entries(student_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_evaluations_journal ON evaluations(journal_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_human_evals_journal ON human_evaluations(journal_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_self_evals_student ON self_evaluations(student_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_chat_sessions_student ON chat_sessions(student_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_goals_student ON goals(student_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_lps_student ON learning_progress_scores(student_id);`
+  ];
 
-    CREATE INDEX IF NOT EXISTS idx_journals_student ON journal_entries(student_id);
-    CREATE INDEX IF NOT EXISTS idx_evaluations_journal ON evaluations(journal_id);
-    CREATE INDEX IF NOT EXISTS idx_human_evals_journal ON human_evaluations(journal_id);
-    CREATE INDEX IF NOT EXISTS idx_self_evals_student ON self_evaluations(student_id);
-    try { await db.exec("ALTER TABLE icc_results ADD COLUMN run_id TEXT;"); } catch (e) {}
-    try { await db.exec("ALTER TABLE bland_altman_results ADD COLUMN run_id TEXT;"); } catch (e) {}
+  try {
+    for (const stmt of statements) {
+      await db.prepare(stmt).run();
+    }
 
-    CREATE INDEX IF NOT EXISTS idx_chat_sessions_student ON chat_sessions(student_id);
-    CREATE INDEX IF NOT EXISTS idx_goals_student ON goals(student_id);
-    CREATE INDEX IF NOT EXISTS idx_lps_student ON learning_progress_scores(student_id);
-  `);
+    
+  try {
+    await db.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT;").run();
+  } catch(e) {
+    // Ignore if column already exists
+  }
+
+    // デモユーザーの初期化
+    const usersCount = await db.prepare("SELECT COUNT(*) as count FROM users").first();
+    if (usersCount && usersCount.count === 0) {
+      await db.prepare(`
+        INSERT INTO users (id, email, name, role, student_number, grade, password_hash) VALUES 
+        ('user-001', 'student@teaching-eval.jp', '山田 太郎', 'student', '2023A001', 3, '$2b$10$lHMsxgQ9lQLjT98iedCPm..oZV4CKKRk3u6sq8XlSmRUEy0weKdh6'),
+        ('user-002', 'teacher@teaching-eval.jp', '佐藤 花子', 'univ_teacher', null, null, '$2b$10$lHMsxgQ9lQLjT98iedCPm..oZV4CKKRk3u6sq8XlSmRUEy0weKdh6'),
+        ('user-003', 'mentor@teaching-eval.jp', '鈴木 一郎', 'school_mentor', null, null, '$2b$10$lHMsxgQ9lQLjT98iedCPm..oZV4CKKRk3u6sq8XlSmRUEy0weKdh6'),
+        ('user-004', 'admin@teaching-eval.jp', '田中 管理者', 'admin', null, null, '$2b$10$lHMsxgQ9lQLjT98iedCPm..oZV4CKKRk3u6sq8XlSmRUEy0weKdh6'),
+        ('user-005', 'researcher@teaching-eval.jp', '伊藤 研究者', 'researcher', null, null, '$2b$10$lHMsxgQ9lQLjT98iedCPm..oZV4CKKRk3u6sq8XlSmRUEy0weKdh6'),
+        ('user-006', 'collaborator@teaching-eval.jp', '渡辺 協力者', 'collaborator', null, null, '$2b$10$lHMsxgQ9lQLjT98iedCPm..oZV4CKKRk3u6sq8XlSmRUEy0weKdh6'),
+        ('user-007', 'observer@teaching-eval.jp', '中村 委員', 'board_observer', null, null, '$2b$10$lHMsxgQ9lQLjT98iedCPm..oZV4CKKRk3u6sq8XlSmRUEy0weKdh6'),
+        ('user-008', 'evaluator@teaching-eval.jp', '小林 評価者', 'evaluator', null, null, '$2b$10$lHMsxgQ9lQLjT98iedCPm..oZV4CKKRk3u6sq8XlSmRUEy0weKdh6')
+      `).run();
+    }
+
+  } catch (err) {
+    console.error("Schema initialization error:", err);
+  }
 }
-
 // ────────────────────────────────────────────────────────────────
 // ヘルパー
 // ────────────────────────────────────────────────────────────────
@@ -805,30 +841,7 @@ dataRouter.get("/cohorts", async (c) => {
     });
   }
 
-  // To avoid empty charts if DB is completely empty (no real usage yet), we generate some deterministic fallback seed data
-  // ONLY if real data is less than 5 students
   let finalCohorts = Object.values(studentsMap);
-  if (finalCohorts.length < 5) {
-    const seed = [];
-    for (let i = 1; i <= 30; i++) {
-      const isHigh = i % 3 === 0;
-      const isLow = i % 3 === 1;
-      const ws = [];
-      let current = isHigh ? 2.0 : isLow ? 2.5 : 2.2;
-      for (let w = 1; w <= 10; w++) {
-        const step = isHigh ? 0.25 : isLow ? 0.05 : 0.15;
-        current += step + (Math.random() * 0.2 - 0.1);
-        current = Math.max(1, Math.min(5, current));
-        ws.push({
-          week: w,
-          factor1: current, factor2: current, factor3: current, factor4: current,
-          total: current
-        });
-      }
-      seed.push({ id: `student-${i}`, name: `Student ${i}`, weekly_scores: ws });
-    }
-    finalCohorts = seed;
-  }
 
   return c.json({ success: true, cohorts: finalCohorts });
 });
@@ -973,7 +986,7 @@ dataRouter.get("/reliability-results/:runId", async (c) => {
 
 dataRouter.get("/export/evaluations-csv", async (c) => {
 
-  const role = c.req.header("X-User-Role");
+  const role = c.get("user")?.role;
   if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
 
   const db = c.env?.DB;
@@ -1020,7 +1033,7 @@ dataRouter.get("/export/evaluations-csv", async (c) => {
 
 dataRouter.get("/export/reliability-csv", async (c) => {
 
-  const role = c.req.header("X-User-Role");
+  const role = c.get("user")?.role;
   if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
 
   const db = c.env?.DB;
@@ -1508,7 +1521,7 @@ dataRouter.get('/rq3b/responses/:userId', async (c) => {
 
 
 dataRouter.get("/export/joint-display-csv", async (c) => {
-  const role = c.req.header("X-User-Role");
+  const role = c.get("user")?.role;
   if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
 
   const db = c.env?.DB;
@@ -1553,7 +1566,7 @@ dataRouter.get("/export/joint-display-csv", async (c) => {
 });
 
 dataRouter.get("/export/chat-goals-csv", async (c) => {
-  const role = c.req.header("X-User-Role");
+  const role = c.get("user")?.role;
   if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
 
   const db = c.env?.DB;
@@ -1631,7 +1644,7 @@ dataRouter.get('/joint-display', async (c) => {
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
   // Basic Auth Check
-  const role = c.req.header("X-User-Role");
+  const role = c.get("user")?.role;
   if (role !== "researcher" && role !== "admin") {
     return c.json({ error: "Forbidden" }, 403);
   }
@@ -1749,6 +1762,156 @@ dataRouter.post("/scat/codes", async (c) => {
   }
 });
 
+
+dataRouter.put("/journals/:id", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  
+  try {
+    const fields = Object.keys(body).filter(k => k !== 'id');
+    if (fields.length === 0) return c.json({ success: true });
+    
+    const setClause = fields.map(k => `${k} = ?`).join(", ");
+    const values = fields.map(k => body[k]);
+    
+    await db.prepare(`UPDATE journal_entries SET ${setClause} WHERE id = ?`)
+      .bind(...values, id)
+      .run();
+      
+    const updated = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(id).first();
+    return c.json(updated);
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.delete("/journals/:id", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const id = c.req.param("id");
+  
+  try {
+    await db.prepare("DELETE FROM journal_entries WHERE id = ?").bind(id).run();
+    return c.json({ success: true });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+
+dataRouter.get("/chat-sessions/:journalId", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const journalId = c.req.param("journalId");
+  
+  try {
+    const session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
+    if (!session) return c.json({ error: "Not found" }, 404);
+    
+    const messages = await db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY message_order ASC").bind(session.id).all();
+    
+    return c.json({
+      id: session.id,
+      journal_id: session.journal_id,
+      student_id: session.student_id,
+      phase: session.phase,
+      messages: messages.results || []
+    });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.post("/chat-sessions/:journalId/messages", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const journalId = c.req.param("journalId");
+  const body = await c.req.json();
+  
+  try {
+    // Session取得か作成
+    let session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
+    if (!session) {
+      const sessionId = "chat-" + Date.now();
+      await db.prepare("INSERT INTO chat_sessions (id, journal_id, student_id, phase, created_at) VALUES (?, ?, ?, ?, ?)")
+        .bind(sessionId, journalId, body.student_id || "user-001", "phase1", new Date().toISOString())
+        .run();
+      session = await db.prepare("SELECT * FROM chat_sessions WHERE id = ?").bind(sessionId).first();
+    }
+    
+    // メッセージ挿入
+    const msgId = "msg-" + Date.now();
+    const order = await db.prepare("SELECT COUNT(*) as c FROM chat_messages WHERE session_id = ?").bind(session.id).first();
+    
+    await db.prepare(`
+      INSERT INTO chat_messages (id, session_id, role, content, message_order, phase, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      msgId, session.id, body.role, body.content, (order.c || 0) + 1, session.phase, new Date().toISOString()
+    ).run();
+    
+    // セッション更新（必要なら）
+    if (body.phase && body.phase !== session.phase) {
+      await db.prepare("UPDATE chat_sessions SET phase = ? WHERE id = ?").bind(body.phase, session.id).run();
+    }
+    
+    return c.json({ success: true, message_id: msgId });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+
+dataRouter.put("/goals/:id", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  
+  try {
+    const fields = Object.keys(body).filter(k => k !== 'id');
+    if (fields.length === 0) return c.json({ success: true });
+    
+    const setClause = fields.map(k => `${k} = ?`).join(", ");
+    const values = fields.map(k => body[k]);
+    
+    await db.prepare(`UPDATE goals SET ${setClause} WHERE id = ?`)
+      .bind(...values, id)
+      .run();
+      
+    const updated = await db.prepare("SELECT * FROM goals WHERE id = ?").bind(id).first();
+    return c.json(updated);
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+
+dataRouter.get("/chat-sessions", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const studentId = c.req.query("student_id");
+  try {
+    let sessions;
+    if (studentId) {
+      sessions = await db.prepare("SELECT * FROM chat_sessions WHERE student_id = ? ORDER BY created_at DESC").bind(studentId).all();
+    } else {
+      sessions = await db.prepare("SELECT * FROM chat_sessions ORDER BY created_at DESC").all();
+    }
+    return c.json({ sessions: sessions.results || [] });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 export default dataRouter;
 
 // --- BFI Endpoints ---
@@ -1819,3 +1982,121 @@ dataRouter.get('/bfi/responses/:userId', async (c) => {
   return c.json({ responses });
 });
 
+
+// ユーザー管理
+dataRouter.get("/users", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  const { results } = await db.prepare("SELECT * FROM users ORDER BY created_at DESC").all();
+  return c.json({ success: true, users: results });
+});
+
+dataRouter.post("/users", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  const body = await c.req.json();
+  const id = body.id || `user-${Date.now()}`;
+  try {
+    await db.prepare(`
+      INSERT INTO users (id, email, name, role, student_number, grade)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(id, body.email, body.name, body.role || 'student', body.student_number || null, body.grade || null).run();
+    return c.json({ success: true, user: { ...body, id } });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.put("/users/:id", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  try {
+    await db.prepare(`
+      UPDATE users SET email = ?, name = ?, role = ?, student_number = ?, grade = ?
+      WHERE id = ?
+    `).bind(body.email, body.name, body.role, body.student_number || null, body.grade || null, id).run();
+    return c.json({ success: true, user: { ...body, id } });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.delete("/users/:id", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  const id = c.req.param("id");
+  try {
+    await db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+    return c.json({ success: true });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+// ── Auth ──
+import bcrypt from "bcryptjs";
+import { sign } from "hono/jwt";
+
+dataRouter.post("/auth/login", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const body = await c.req.json();
+  await ensureSchema(db);
+  const { email, password } = body;
+  
+  if (!email || !password) {
+    return c.json({ error: "Email and password required" }, 400);
+  }
+  
+  try {
+    const user = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+    if (!user) {
+      return c.json({ error: "User not found" }, 401);
+    }
+    
+    // Check password
+    if (user.password_hash) {
+      const isValid = await bcrypt.compare(password, user.password_hash);
+      if (!isValid) {
+        return c.json({ error: "Invalid credentials" }, 401);
+      }
+    } else {
+      // For legacy seed users that don't have password_hash, let's accept 'password' and update hash later ideally, but here just reject
+      if (password !== 'password') {
+        return c.json({ error: "Invalid credentials" }, 401);
+      }
+    }
+    
+    const secret = (c.env as any)?.JWT_SECRET || "default_local_secret_key_for_dev_only";
+    
+    // Generate actual JWT
+    const payload = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours expiration
+    };
+    
+    const token = await sign(payload, secret);
+    
+    return c.json({ 
+      success: true, 
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        student_number: user.student_number,
+        grade: user.grade
+      }, 
+      token 
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});

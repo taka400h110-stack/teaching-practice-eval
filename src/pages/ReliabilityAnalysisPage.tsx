@@ -101,10 +101,10 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
   let allHumanEvals = [];
   
   try {
-    const res1 = await fetch("/api/data/evaluations", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+    const res1 = await apiFetch("/api/data/evaluations", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
     const data1 = await res1.json() as any;
     allEvals = data1.evaluations || [];
-    const res2 = await fetch("/api/data/human-evals", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+    const res2 = await apiFetch("/api/data/human-evals", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
     const data2 = await res2.json() as any;
     allHumanEvals = data2.evaluations || [];
   } catch (err) {
@@ -114,7 +114,7 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
   
   let profiles: any[] = [];
   try {
-    const profRes = await fetch("/api/data/evaluator-profiles");
+    const profRes = await apiFetch("/api/data/evaluator-profiles", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } });
     if (profRes.ok) profiles = ((await profRes.json()) as any).profiles || [];
   } catch (e) {}
 
@@ -193,7 +193,7 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
     );
     
     try {
-      const resp = await fetch("/api/stats/full-reliability", {
+      const resp = await apiFetch("/api/stats/full-reliability", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ai_total, human_total, ai_by_factor, human_by_factor, ai_by_item: [], human_by_item: [] }),
@@ -220,7 +220,7 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
     };
 
     try {
-      const resp = await fetch("/api/stats/full-reliability", {
+      const resp = await apiFetch("/api/stats/full-reliability", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ai_total, human_total, ai_by_factor, human_by_factor, ai_by_item: [], human_by_item: [] }),
@@ -318,13 +318,14 @@ const TabPanel = ({ children, value, index }: TabPanelProps) =>
 // 詳細表示モーダルコンポーネント
 // Add Dialog imports at the top if needed
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button as MuiButton } from "@mui/material";
+import { apiFetch } from "../api/client";
 
 function ReliabilityDetailModal({ runId, open, onClose }: { runId: string | null, open: boolean, onClose: () => void }) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["savedReliabilityDetails", runId],
     queryFn: async () => {
       if (!runId) return [];
-      const res = await fetch(`/api/data/reliability-results/${runId}`, { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch(`/api/data/reliability-results/${runId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.results || [];
     },
@@ -418,7 +419,7 @@ function SavedReliabilityResults() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["savedReliabilityResults"],
     queryFn: async () => {
-      const res = await fetch("/api/data/reliability-results", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch("/api/data/reliability-results", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.results || [];
     },
@@ -498,7 +499,7 @@ export default function ReliabilityAnalysisPage() {
 
   const loadProfiles = async () => {
     try {
-      const res = await fetch("/api/data/evaluator-profiles");
+      const res = await apiFetch("/api/data/evaluator-profiles", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } });
       if (res.ok) setEvaluatorProfiles(((await res.json()) as any).profiles || []);
     } catch(e) {}
   };
@@ -511,7 +512,7 @@ export default function ReliabilityAnalysisPage() {
   const { data: cohorts = [], isLoading } = useQuery({
     queryKey: ["cohort"],
     queryFn: async () => {
-      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.cohorts || [];
     },
@@ -927,7 +928,7 @@ export default function ReliabilityAnalysisPage() {
             <TextField label="経験年数" type="number" size="small" value={tempProfile.yoe} onChange={e => setTempProfile({...tempProfile, yoe: Number(e.target.value)})} />
             <TextField label="バックグラウンド" size="small" value={tempProfile.tb} onChange={e => setTempProfile({...tempProfile, tb: e.target.value})} />
             <Button variant="contained" onClick={async () => {
-              await fetch("/api/data/evaluator-profiles", {
+              await apiFetch("/api/data/evaluator-profiles", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ evaluator_id: tempProfile.id, years_of_experience: tempProfile.yoe, training_background: tempProfile.tb })
               });

@@ -18,7 +18,7 @@ import {
   Radar, PolarGrid, PolarAngleAxis,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { WeeklyScore } from "../types";
 
 const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
@@ -39,11 +39,11 @@ export default function GrowthVisualizationPage() {
 
   const { data: growth, isLoading } = useQuery({
     queryKey: ["growth"],
-    queryFn:  () => mockApi.getGrowthData(),
+    queryFn:  () => apiClient.getGrowthData(),
   });
   const { data: selfEvals = [] } = useQuery({
     queryKey: ["selfEvals"],
-    queryFn:  () => mockApi.getSelfEvaluations(),
+    queryFn:  () => apiClient.getSelfEvaluations(),
   });
 
   if (isLoading) {

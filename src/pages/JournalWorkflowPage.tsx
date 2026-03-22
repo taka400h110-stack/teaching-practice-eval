@@ -45,8 +45,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { JournalEntry, JournalCreateRequest, HourRecord, ChatMessage } from "../types";
+import { apiFetch } from "../api/client";
 import {
   REFLECTION_DEPTH_LEVELS,
   RUBRIC_ITEMS,
@@ -345,24 +346,24 @@ export default function JournalWorkflowPage() {
   // ── データ取得 ──
   const { data: existing, isLoading: loadingJournal } = useQuery<JournalEntry>({
     queryKey: ["journal", journalId],
-    queryFn:  () => mockApi.getJournal(journalId!) as Promise<JournalEntry>,
+    queryFn:  () => apiClient.getJournal(journalId!) as Promise<JournalEntry>,
     enabled:  !!journalId,
   });
 
   // 全日誌一覧（過去日誌選択用）
   const { data: allJournals = [] } = useQuery({
     queryKey: ["journals"],
-    queryFn:  () => mockApi.getJournals(),
+    queryFn:  () => apiClient.getJournals(),
   });
 
   const { data: allEvals = [] } = useQuery({
     queryKey: ["allEvaluations"],
-    queryFn:  () => mockApi.getAllEvaluations(),
+    queryFn:  () => apiClient.getAllEvaluations(),
   });
 
   const { data: chatSession } = useQuery({
     queryKey: ["chat", savedJournalId ?? "journal-004"],
-    queryFn:  () => mockApi.getChatSession(savedJournalId ?? "journal-004"),
+    queryFn:  () => apiClient.getChatSession(savedJournalId ?? "journal-004"),
   });
 
   // 既存データ復元（URLパラメータで日誌を開いた時）
@@ -397,8 +398,8 @@ export default function JournalWorkflowPage() {
   // ── ① 日誌：保存 ──
   const saveMutation = useMutation<JournalEntry, Error, JournalCreateRequest>({
     mutationFn: async (payload) => {
-      if (isEditMode) return mockApi.updateJournal(journalId!, payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
-      return mockApi.createJournal(payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
+      if (isEditMode) return apiClient.updateJournal(journalId!, payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
+      return apiClient.createJournal(payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
     },
     onSuccess: (data, payload) => {
       void queryClient_.invalidateQueries({ queryKey: ["journals"] });
@@ -516,13 +517,13 @@ export default function JournalWorkflowPage() {
       const processRq3b = async () => {
         try {
           // 1. Fetch previous outcomes and goals
-          const outcomesRes = await mockApi.getRq3bOutcomes(user.id);
+          const outcomesRes = await apiClient.getRq3bOutcomes(user.id);
           const outcomes = outcomesRes.data || [];
           const prevOutcome = outcomes.find((o: any) => o.week_number === weekNumber - 1);
           
           if (!prevOutcome) return;
           
-          const goals = await mockApi.getGoalHistory();
+          const goals = await apiClient.getGoalHistory();
           const prevGoal = goals.find((g: any) => g.id === prevOutcome.goal_id);
           
           const updateData: any = {
@@ -547,7 +548,7 @@ export default function JournalWorkflowPage() {
           if (prevGoal && prevOutcome.ga_evidence_binary == null) {
             try {
               const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
-              const res = await fetch("/api/ai/check-evidence", {
+              const res = await apiFetch("/api/ai/check-evidence", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authHeader}` },
                 body: JSON.stringify({
@@ -567,7 +568,7 @@ export default function JournalWorkflowPage() {
           
           // Save only if there's new data
           if (Object.keys(updateData).length > 2) {
-            await mockApi.saveRq3bOutcomes(updateData);
+            await apiClient.saveRq3bOutcomes(updateData);
           }
           
         } catch (e) {
@@ -1183,14 +1184,14 @@ export default function JournalWorkflowPage() {
                         if (user.id) {
                           try {
                             const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
-                            const res = await fetch("/api/ai/evaluate-session-rd", {
+                            const res = await apiFetch("/api/ai/evaluate-session-rd", {
                               method: "POST",
                               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authHeader}` },
                               body: JSON.stringify({ conversation: messages })
                             });
                             const rdData = await res.json();
                             if (rdData.success) {
-                              await mockApi.saveRq3bOutcomes({
+                              await apiClient.saveRq3bOutcomes({
                                 userId: user.id,
                                 week_number: weekNumber,
                                 rd_chat_raw_level: rdData.result.rd_level,

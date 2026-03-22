@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
   ResponsiveContainer, Legend,
@@ -32,7 +32,7 @@ const FACTOR_LABELS = ["指導技術", "自己評価", "学級経営", "学習�
 export default function EvaluationsPage() {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState("all");
-  const user = mockApi.getCurrentUser();
+  const user = apiClient.getCurrentUser();
   const isEvaluator = user?.role === "evaluator";
 
   // 評価者アンケート用State
@@ -58,13 +58,13 @@ export default function EvaluationsPage() {
 
   const { data: journals = [], isLoading } = useQuery({
     queryKey: ["journals"],
-    queryFn: () => mockApi.getJournals(),
+    queryFn: () => apiClient.getJournals(),
   });
 
-  const { data: humanEvals = [] } = useQuery({ queryKey: ["humanEvaluations"], queryFn: () => mockApi.getHumanEvaluations() });
+  const { data: humanEvals = [] } = useQuery({ queryKey: ["humanEvaluations"], queryFn: () => apiClient.getHumanEvaluations() });
   const { data: allEvals = [] } = useQuery({
     queryKey: ["allEvaluations"],
-    queryFn: () => mockApi.getAllEvaluations(),
+    queryFn: () => apiClient.getAllEvaluations(),
   });
 
   // 評価対象は submitted / evaluated ステータスの日誌

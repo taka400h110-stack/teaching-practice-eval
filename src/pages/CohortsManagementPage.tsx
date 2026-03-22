@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import type { StudentProfile } from "../types";
+import { apiFetch } from "../api/client";
 
 const SCHOOL_TYPE_LABELS: Record<string, string> = {
   elementary: "小学校", middle: "中学校", high: "高校", special: "特別支援",
@@ -51,7 +52,7 @@ export default function CohortsManagementPage() {
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["cohorts"],
     queryFn: async () => {
-      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
       return data.cohorts || [];
     },

@@ -30,6 +30,7 @@ import ArrowBackIcon       from "@mui/icons-material/ArrowBack";
 import ExpandMoreIcon      from "@mui/icons-material/ExpandMore";
 import InfoIcon            from "@mui/icons-material/Info";
 import ContentPasteGoIcon  from "@mui/icons-material/ContentPasteGo";
+import { apiFetch } from "../api/client";
 
 // ────────────────────────────────────────────────────────────────
 // 型定義
@@ -102,7 +103,7 @@ async function runOcr(file: File, pageIndex: number): Promise<OcrPageResult> {
     formData.append("image", file);
     formData.append("page_index", String(pageIndex));
 
-    const response = await fetch("/api/ocr/analyze", {
+    const response = await apiFetch("/api/ocr/analyze", {
       method: "POST",
       body: formData,
     });

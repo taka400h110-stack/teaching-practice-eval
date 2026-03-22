@@ -19,7 +19,7 @@ import AutoGraphIcon   from "@mui/icons-material/AutoGraph";
 import TrackChangesIcon from "@mui/icons-material/TrackChanges";
 import SchoolIcon      from "@mui/icons-material/School";
 import { useQuery }    from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { JournalEntry, WeeklyScore } from "../types";
 
 const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
@@ -47,23 +47,23 @@ const statusConfig = {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const user = mockApi.getCurrentUser();
+  const user = apiClient.getCurrentUser();
 
   const { data: journals = [] } = useQuery({
     queryKey: ["journals"],
-    queryFn:  () => mockApi.getJournals(),
+    queryFn:  () => apiClient.getJournals(),
   });
   const { data: growth } = useQuery({
     queryKey: ["growth"],
-    queryFn:  () => mockApi.getGrowthData(),
+    queryFn:  () => apiClient.getGrowthData(),
   });
   const { data: goals = [] } = useQuery({
     queryKey: ["goals"],
-    queryFn:  () => mockApi.getGoalHistory(),
+    queryFn:  () => apiClient.getGoalHistory(),
   });
   const { data: selfEvals = [] } = useQuery({
     queryKey: ["selfEvals"],
-    queryFn:  () => mockApi.getSelfEvaluations(),
+    queryFn:  () => apiClient.getSelfEvaluations(),
   });
 
   const submitted  = journals.filter((j) => j.status === "submitted").length;

@@ -23,7 +23,7 @@ import ExpandLessIcon      from "@mui/icons-material/ExpandLess";
 import AccessTimeIcon      from "@mui/icons-material/AccessTime";
 import TrackChangesIcon    from "@mui/icons-material/TrackChanges";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { JournalEntry, JournalCreateRequest, HourRecord } from "../types";
 
 // ── ユーティリティ ──
@@ -231,13 +231,13 @@ const JournalEditorPage: React.FC = () => {
 
   const { data: existing, isLoading } = useQuery<JournalEntry>({
     queryKey: ["journal", journalId],
-    queryFn:  () => mockApi.getJournal(journalId!) as Promise<JournalEntry>,
+    queryFn:  () => apiClient.getJournal(journalId!) as Promise<JournalEntry>,
     enabled:  !!journalId,
   });
 
   const { data: goals = [] } = useQuery({
     queryKey: ["goals"],
-    queryFn: () => mockApi.getGoalHistory()
+    queryFn: () => apiClient.getGoalHistory()
   });
   
   const currentGoal = goals.find(g => g.week === weekNumber);
@@ -317,8 +317,8 @@ const JournalEditorPage: React.FC = () => {
   }, [isEditMode, location.search]);
   const saveMutation = useMutation<JournalEntry, Error, JournalCreateRequest>({
     mutationFn: async (payload) => {
-      if (isEditMode) return mockApi.updateJournal(journalId!, payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
-      return mockApi.createJournal(payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
+      if (isEditMode) return apiClient.updateJournal(journalId!, payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
+      return apiClient.createJournal(payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
     },
     onSuccess: (data, payload) => {
       void queryClient_.invalidateQueries({ queryKey: ["journals"] });

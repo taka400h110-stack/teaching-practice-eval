@@ -15,7 +15,7 @@ import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import HelpOutlineIcon   from "@mui/icons-material/HelpOutline";
 import StarIcon          from "@mui/icons-material/Star";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { GoalEntry } from "../types";
 import { RUBRIC_ITEMS } from "../constants/rubric";
 
@@ -75,7 +75,7 @@ export default function GoalHistoryPage() {
 
   const { data: goals = [] } = useQuery({
     queryKey: ["goals"],
-    queryFn:  () => mockApi.getGoalHistory(),
+    queryFn:  () => apiClient.getGoalHistory(),
   });
 
   const achieved    = goals.filter((g) => g.achieved).length;
@@ -86,7 +86,7 @@ export default function GoalHistoryPage() {
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const g = await mockApi.createGoal({ week: weekNum, goal_text: newGoal.trim(), is_smart: isSmart });
+      const g = await apiClient.createGoal({ week: weekNum, goal_text: newGoal.trim(), is_smart: isSmart });
       const user = JSON.parse(localStorage.getItem("user_info") || "{}");
       if (focusItemIds.length > 0 && user.id) {
         const updates = focusItemIds.map(fid => ({
@@ -95,7 +95,7 @@ export default function GoalHistoryPage() {
           goal_id: g.id,
           focus_item_id: fid
         }));
-        await mockApi.saveRq3bOutcomes({ userId: user.id, updates });
+        await apiClient.saveRq3bOutcomes({ userId: user.id, updates });
       }
       return g;
     },
@@ -108,7 +108,7 @@ export default function GoalHistoryPage() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (goal: GoalEntry) => mockApi.updateGoal(goal.id, { achieved: !goal.achieved }),
+    mutationFn: (goal: GoalEntry) => apiClient.updateGoal(goal.id, { achieved: !goal.achieved }),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["goals"] }); },
   });
 

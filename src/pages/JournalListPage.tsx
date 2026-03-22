@@ -10,7 +10,7 @@ import AssessmentIcon  from "@mui/icons-material/Assessment";
 import DeleteIcon      from "@mui/icons-material/Delete";
 import MenuBookIcon    from "@mui/icons-material/MenuBook";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import type { JournalEntry } from "../types";
 
 const STATUS_CONFIG = {
@@ -25,15 +25,15 @@ export default function JournalListPage() {
 
   const { data: journals = [], isLoading } = useQuery({
     queryKey: ["journals"],
-    queryFn:  () => mockApi.getJournals(),
+    queryFn:  () => apiClient.getJournals(),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => mockApi.deleteJournal(id),
+    mutationFn: (id: string) => apiClient.deleteJournal(id),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["journals"] }); },
   });
 
-  const currentUser = mockApi.getCurrentUser() as { role: string } | null;
+  const currentUser = apiClient.getCurrentUser() as { role: string } | null;
   const userRole = currentUser?.role ?? "student";
   const isStudent = userRole === "student";
 

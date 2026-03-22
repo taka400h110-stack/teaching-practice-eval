@@ -14,7 +14,7 @@ import GroupsIcon             from "@mui/icons-material/Groups";
 import AccountBalanceIcon     from "@mui/icons-material/AccountBalance";
 import AssessmentIcon         from "@mui/icons-material/Assessment";
 import LoginIcon              from "@mui/icons-material/Login";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 
 // ── デモアカウント定義（全8役割・基本情報入り）──
 const DEMO_ACCOUNTS = [
@@ -145,7 +145,7 @@ export default function LoginPage() {
     setLoggingIn(loginEmail);
     setError("");
     try {
-      const result = await mockApi.login(loginEmail, loginPw);
+      const result = await apiClient.login(loginEmail, loginPw);
       if ((result as { requiresOnboarding?: boolean }).requiresOnboarding) {
         navigate("/onboarding");
       } else {

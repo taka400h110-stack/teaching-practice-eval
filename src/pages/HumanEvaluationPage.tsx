@@ -17,7 +17,7 @@ import ExpandMoreIcon  from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon  from "@mui/icons-material/ExpandLess";
 import VisibilityIcon  from "@mui/icons-material/Visibility";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import mockApi from "../api/client";
+import apiClient from "../api/client";
 import {
   RUBRIC_FACTORS,
   REFLECTION_DEPTH_LEVELS,
@@ -68,7 +68,7 @@ export default function HumanEvaluationPage() {
 
   const { data: journal, isLoading, isError } = useQuery({
     queryKey: ["journal", journalId],
-    queryFn:  () => mockApi.getJournal(journalId!),
+    queryFn:  () => apiClient.getJournal(journalId!),
     enabled:  !!journalId,
   });
 
@@ -80,7 +80,7 @@ export default function HumanEvaluationPage() {
         { item_number: 3, score: scores.factor3 },
         { item_number: 4, score: scores.factor4 },
       ];
-      return mockApi.saveHumanEvaluation(journalId!, journal?.week_number || 1, items);
+      return apiClient.saveHumanEvaluation(journalId!, journal?.week_number || 1, items);
     },
     onSuccess:  () => { setSnackOpen(true); },
   });

@@ -2,7 +2,7 @@ import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { CircularProgress, Box } from "@mui/material";
 import AppLayout from "./components/AppLayout";
-import mockApi from "./api/client";
+import apiClient from "./api/client";
 
 // ── ページ (lazy load) ──
 const LoginPage               = lazy(() => import("./pages/LoginPage"));
@@ -51,9 +51,17 @@ const Spinner = () => (
   </Box>
 );
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  if (!mockApi.isAuthenticated()) return <Navigate to="/login" replace />;
-  if (mockApi.requiresOnboarding()) return <Navigate to="/onboarding" replace />;
+function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
+  if (!apiClient.isAuthenticated()) return <Navigate to="/login" replace />;
+  if (apiClient.requiresOnboarding()) return <Navigate to="/onboarding" replace />;
+  
+  if (allowedRoles && allowedRoles.length > 0) {
+    const user = apiClient.getCurrentUser();
+    if (!user || !allowedRoles.includes(user.role)) {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+  
   return <>{children}</>;
 }
 
@@ -76,7 +84,7 @@ export default function App() {
           {/* ダッシュボード */}
           <Route path="dashboard"         element={<DashboardPage />} />
           <Route path="teacher-dashboard" element={<TeacherDashboardPage />} />
-          <Route path="admin"             element={<AdminDashboardPage />} />
+          <Route path="admin"             element={<PrivateRoute allowedRoles={["admin", "researcher"]}><AdminDashboardPage /></PrivateRoute>} />
 
           {/* 日誌 */}
           <Route path="journals"                    element={<JournalListPage />} />
@@ -89,7 +97,7 @@ export default function App() {
           <Route path="journal-workflow/:journalId"   element={<JournalWorkflowPage />} />
 
           {/* 評価 (RQ2) */}
-          <Route path="evaluations"                         element={<EvaluationsPage />} />
+          <Route path="evaluations"                         element={<PrivateRoute allowedRoles={["admin", "researcher", "evaluator", "teacher", "univ_teacher", "school_mentor"]}><EvaluationsPage /></PrivateRoute>} />
           <Route path="evaluations/:journalId"              element={<EvaluationResultPage />} />
           <Route path="evaluations/:journalId/human"        element={<HumanEvaluationPage />} />
           <Route path="comparison"                          element={<ComparisonPage />} />
@@ -100,7 +108,7 @@ export default function App() {
           <Route path="longitudinal"      element={<LongitudinalAnalysisPage />} />
           <Route path="statistics"        element={<StatisticsPage />} />
           <Route path="advanced"          element={<AdvancedAnalyticsPage />} />
-          <Route path="platform"          element={<PlatformAnalyticsPage />} />
+          <Route path="platform"          element={<PrivateRoute allowedRoles={["admin", "researcher"]}><PlatformAnalyticsPage /></PrivateRoute>} />
           <Route path="cohorts"           element={<CohortsManagementPage />} />
           <Route path="scat"              element={<SCATAnalysisPage />} />
 
@@ -110,7 +118,7 @@ export default function App() {
           <Route path="chat"              element={<ChatBotPage />} />
 
           {/* ユーザー登録 */}
-          <Route path="register"          element={<UserRegistrationPage />} />
+          <Route path="register"          element={<PrivateRoute allowedRoles={["admin"]}><UserRegistrationPage /></PrivateRoute>} />
 
           {/* OCR読み込み */}
           <Route path="ocr"               element={<JournalOCRPage />} />

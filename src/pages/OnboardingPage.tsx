@@ -34,7 +34,7 @@ import PsychologyIcon      from "@mui/icons-material/Psychology";
 import TrackChangesIcon    from "@mui/icons-material/TrackChanges";
 import ExpandMoreIcon      from "@mui/icons-material/ExpandMore";
 import BusinessIcon        from "@mui/icons-material/Business";
-import mockApi, { bfiApi } from "../api/client";
+import apiClient, { bfiApi } from "../api/client";
 import type { UserRole } from "../types";
 
 // ── 役割ラベル ──
@@ -82,7 +82,7 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
 
   // ログイン中ユーザーの役割を取得
-  const currentUser = mockApi.getCurrentUser();
+  const currentUser = apiClient.getCurrentUser();
   const role: UserRole = currentUser?.role ?? "student";
   const isStudent = role === "student";
 
@@ -132,13 +132,13 @@ export default function OnboardingPage() {
   };
 
   const handleNext = () => {
-    const user = mockApi.getCurrentUser();
+    const user = apiClient.getCurrentUser();
     if (user && isStudent && activeStep === 3) {
       bfiApi.saveResponses(user.id, bigFiveScores);
     }
     if (activeStep === STEPS.length - 1) {
-      const user = mockApi.getCurrentUser();
-      if (user) mockApi.completeOnboarding(user.id);
+      const user = apiClient.getCurrentUser();
+      if (user) apiClient.completeOnboarding(user.id);
       if (user.role === "student") {
         bfiApi.saveResponses(user.id, bigFiveScores);
       }

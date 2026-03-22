@@ -5,6 +5,8 @@ import Science from "@mui/icons-material/Science";
 import Security from "@mui/icons-material/Security";
 import Timeline from "@mui/icons-material/Timeline";
 import FormatListNumbered from "@mui/icons-material/FormatListNumbered";
+import { apiFetch } from "../api/client";
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper as MuiPaper } from "@mui/material";
 
 function TabPanel(props: any) {
   const { children, value, index, ...other } = props;
@@ -22,7 +24,7 @@ export default function PlatformAnalyticsPage() {
   const { data: pipelineData, isLoading: pipeLoading } = useQuery<any>({
     queryKey: ["analytics-pipeline"],
     queryFn: async () => {
-      const res = await fetch("/api/analytics/pipeline");
+      const res = await apiFetch("/api/analytics/pipeline", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } });
       return res.json();
     }
   });
@@ -31,7 +33,7 @@ export default function PlatformAnalyticsPage() {
   const { data: fairnessData, isLoading: fairLoading } = useQuery<any>({
     queryKey: ["analytics-fairness"],
     queryFn: async () => {
-      const res = await fetch("/api/analytics/fairness");
+      const res = await apiFetch("/api/analytics/fairness", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } });
       return res.json();
     }
   });
@@ -39,7 +41,7 @@ export default function PlatformAnalyticsPage() {
   // G-Methods mutation
   const gMethodMutation = useMutation<any, any, void>({
     mutationFn: async () => {
-      const res = await fetch("/api/analytics/g-methods", { method: "POST" });
+      const res = await apiFetch("/api/analytics/g-methods", { method: "POST" });
       return res.json();
     }
   });
@@ -48,7 +50,7 @@ export default function PlatformAnalyticsPage() {
     <Box>
       <Typography variant="h4" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
         <Science sx={{ mr: 1 }} />
-        データプラットフォーム分析 (Analytics Platform)
+        データプラットフォーム分析 (準備中) (Analytics Platform)
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
         L1-L4データ層の統合、G-Methodsによる因果推論(IPTW/MSM)、妥当性・公平性監査(Fairness Audit)を行います。
