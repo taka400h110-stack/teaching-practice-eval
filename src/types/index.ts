@@ -168,6 +168,8 @@ export interface ChatMessage {
   role:      "user" | "assistant";
   content:   string;
   timestamp: string;
+  rdLevel?:  number;
+  rdReason?: string;
 }
 
 export interface ChatSession {

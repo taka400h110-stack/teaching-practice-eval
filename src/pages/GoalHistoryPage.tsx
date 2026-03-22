@@ -17,6 +17,7 @@ import StarIcon          from "@mui/icons-material/Star";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import mockApi from "../api/client";
 import type { GoalEntry } from "../types";
+import { RUBRIC_ITEMS } from "../constants/rubric";
 
 const SMART_CRITERIA = [
   { key: "S", label: "Specific（具体的）",   desc: "具体的で明確か？" },
@@ -65,7 +66,8 @@ function GoalCard({ goal, onToggle }: { goal: GoalEntry; onToggle?: () => void }
 }
 
 export default function GoalHistoryPage() {
-  const [newGoal, setNewGoal]   = useState("");
+    const [newGoal, setNewGoal]   = useState("");
+  const [focusItemId, setFocusItemId] = useState<number | "">("");
   const [isSmart, setIsSmart]   = useState(false);
   const [weekNum, setWeekNum]   = useState(1);
   const [snack, setSnack]       = useState(false);
@@ -83,11 +85,24 @@ export default function GoalHistoryPage() {
   const queryClient = useQueryClient();
 
   const addMutation = useMutation({
-    mutationFn: () => mockApi.createGoal({ week: weekNum, goal_text: newGoal.trim(), is_smart: isSmart }),
+    mutationFn: async () => {
+      const g = await mockApi.createGoal({ week: weekNum, goal_text: newGoal.trim(), is_smart: isSmart });
+      const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+      if (focusItemId && user.id) {
+        await mockApi.saveRq3bOutcomes({
+          userId: user.id,
+          week_number: weekNum,
+          goal_id: g.id,
+          focus_item_id: focusItemId
+        });
+      }
+      return g;
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["goals"] });
       setSnack(true);
       setNewGoal("");
+      setFocusItemId("");
     },
   });
 

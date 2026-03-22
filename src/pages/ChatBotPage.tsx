@@ -573,6 +573,30 @@ export default function ChatBotPage() {
             <SendIcon />
           </Button>
         </Box>
+        <Box mt={2} display="flex" justifyContent="center">
+          <Button variant="outlined" color="success" startIcon={<TrackChangesIcon />}
+            onClick={async () => {
+              if (messages.length > 0) {
+                const rdLevels = rdHistory.length > 0 ? rdHistory : [1];
+                const maxRd = Math.max(...rdLevels, 1);
+                const category = maxRd >= 3 ? 'deep' : (maxRd === 2 ? 'somewhat_deep' : 'shallow');
+                const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+                const j = allJournals.find((j) => j.id === journalId);
+                const weekNum = j?.week_number || 1;
+                if (user.id) {
+                  await mockApi.saveRq3bOutcomes({
+                    userId: user.id,
+                    week_number: weekNum,
+                    rd_chat_raw_level: maxRd,
+                    rd_chat_category: category
+                  });
+                }
+              }
+              navigate("/goals");
+            }}>
+            チャットを終了して目標を設定する (RD-Chat保存)
+          </Button>
+        </Box>
       </Card>
     </Box>
   );

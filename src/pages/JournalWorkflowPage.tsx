@@ -312,6 +312,7 @@ const STEPS = [
 // メインコンポーネント
 // ═══════════════════════════════════════════
 export default function JournalWorkflowPage() {
+  const user = JSON.parse(localStorage.getItem("user_info") || "{}");
   const navigate      = useNavigate();
   const { journalId } = useParams<{ journalId?: string }>();
   const queryClient_  = useQueryClient();
@@ -375,6 +376,8 @@ export default function JournalWorkflowPage() {
     if (existing.status === "evaluated") setStep(1);
     else if (existing.status === "submitted") setStep(0);
   }, [existing]);
+
+  
 
   // チャット初期メッセージ（journalId切り替え時もリセット）
   useEffect(() => {
@@ -506,6 +509,61 @@ export default function JournalWorkflowPage() {
   // ── 完成度バッジ ──
   const totalBody   = records.reduce((s, r) => s + r.body.length, 0);
   const hasRefl     = reflection.length >= 20;
+  // RQ3b: GA-Evidence and SI-Focus Calculation
+  useEffect(() => {
+    if (step === 1 && evalData && user?.id && weekNumber > 1) {
+      const processRq3b = async () => {
+        try {
+          // 1. Fetch previous outcomes and goals
+          const outcomesRes = await mockApi.getRq3bOutcomes(user.id);
+          const outcomes = outcomesRes.data || [];
+          const prevOutcome = outcomes.find((o: any) => o.week_number === weekNumber - 1);
+          
+          if (!prevOutcome) return;
+          
+          const goals = await mockApi.getGoalHistory();
+          const prevGoal = goals.find((g: any) => g.id === prevOutcome.goal_id);
+          
+          const updateData: any = {
+            userId: user.id,
+            week_number: weekNumber - 1
+          };
+          
+          // 2. SI-Focus calculation
+          if (prevOutcome.focus_item_id) {
+            // Find current score for the focus item
+            const currentItem = (evalData.evaluation_items || []).find((i: any) => i.item_number === prevOutcome.focus_item_id);
+            if (currentItem && currentItem.score != null) {
+              updateData.current_score = currentItem.score;
+              // previous_score should ideally be fetched from previous week's evaluation
+              // For now, if we have previous_score, we just update current_score and calculate delta
+              const prevScore = prevOutcome.previous_score || 0; // fallback
+              updateData.delta_score = currentItem.score - prevScore;
+            }
+          }
+          
+          // 3. GA-Evidence logic (mock AI judgement)
+          if (prevGoal && prevOutcome.ga_evidence_binary === null) {
+            // Mock AI judgement for GA-Evidence based on evaluation comment or score
+            const isAchieved = evalData.total_score >= 2.5 ? 1 : 0;
+            updateData.ga_evidence_binary = isAchieved;
+            updateData.ga_evidence_reason = isAchieved ? "日誌の評価スコアが基準を満たしています。" : "具体的な達成エビデンスが不足しています。";
+          }
+          
+          // Save only if there's new data
+          if (Object.keys(updateData).length > 2) {
+            await mockApi.saveRq3bOutcomes(updateData);
+          }
+          
+        } catch (e) {
+          console.error("Failed to process RQ3b automated outcomes", e);
+        }
+      };
+      
+      processRq3b();
+    }
+  }, [step, evalData, user, weekNumber]);
+
   const hasEval     = !!evalData;
   const hasChatMsg  = messages.length >= 2;
   const completions = [totalBody >= 30, hasRefl, hasEval, hasChatMsg];
@@ -1104,8 +1162,24 @@ export default function JournalWorkflowPage() {
                   </Typography>
                   <Button size="small" variant="outlined" color="success"
                     startIcon={<TrackChangesIcon />}
-                    onClick={() => navigate("/goals")}>
-                    目標履歴・設定ページへ
+                    onClick={async () => {
+                      if (messages.length > 0) {
+                        const rdLevels = rdHistory.length > 0 ? rdHistory : [1];
+                        const maxRd = Math.max(...rdLevels, 1);
+                        const category = maxRd >= 3 ? 'deep' : (maxRd === 2 ? 'somewhat_deep' : 'shallow');
+                        const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+                        if (user.id) {
+                          await mockApi.saveRq3bOutcomes({
+                            userId: user.id,
+                            week_number: weekNumber,
+                            rd_chat_raw_level: maxRd,
+                            rd_chat_category: category
+                          });
+                        }
+                      }
+                      navigate("/goals");
+                    }}>
+                    チャットを終了して目標を設定する (RD-Chat保存)
                   </Button>
                 </CardContent>
               </Card>

@@ -754,6 +754,45 @@ const mockApi = {
       throw err;
     }
   },
+  
+  // RQ3b APIs
+  saveRq3bOutcomes: async (outcomes: any) => {
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
+    try {
+      const response = await fetch('/api/data/rq3b/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authHeader}`
+        },
+        body: JSON.stringify(outcomes),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to save RQ3b outcomes:', error);
+      return { success: false, error };
+    }
+  },
+  
+  getRq3bOutcomes: async (userId: string) => {
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
+    try {
+      const response = await fetch(`/api/data/rq3b/responses/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authHeader}`
+        }
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to get RQ3b outcomes:', error);
+      return { success: false, error };
+    }
+  },
+
   getSavedReliabilityResults: async () => {
     try {
       const response = await fetch("/api/data/reliability-results");
@@ -770,6 +809,7 @@ const mockApi = {
 export default mockApi;
 
 export const bfiApi = {
+  
   saveResponses: async (userId: string, responses: Record<number, number>) => {
     
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
