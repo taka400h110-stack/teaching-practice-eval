@@ -14,6 +14,19 @@ import { cors } from "hono/cors";
 const statsRouter = new Hono<{ Bindings: CloudflareBindings }>();
 statsRouter.use("*", cors());
 
+statsRouter.use("*", async (c, next) => {
+  // Only apply to actual API endpoints, not health checks or CORS preflights if any
+  if (c.req.method === 'OPTIONS') {
+    return next();
+  }
+  const role = c.req.header("X-User-Role");
+  if (role !== "researcher" && role !== "admin") {
+    return c.json({ error: "Forbidden: researcher or admin role required" }, 403);
+  }
+  await next();
+});
+
+
 // ────────────────────────────────────────────────────────────────
 // 統計ユーティリティ関数
 // ────────────────────────────────────────────────────────────────

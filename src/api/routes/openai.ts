@@ -679,7 +679,7 @@ ${body.journal_content.slice(0, 600)}...
 // POST /api/ocr/analyze  (OCR画像解析)
 // Google Cloud Vision API → Tesseract.js フォールバック
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/ocr", async (c) => {
+openaiRouter.post("/analyze", async (c) => {
   // Cloudflare Workers では FormData パースが可能
   try {
     const formData = await c.req.formData();

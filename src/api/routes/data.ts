@@ -972,6 +972,10 @@ dataRouter.get("/reliability-results/:runId", async (c) => {
 
 
 dataRouter.get("/export/evaluations-csv", async (c) => {
+
+  const role = c.req.header("X-User-Role");
+  if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
+
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -1015,6 +1019,10 @@ dataRouter.get("/export/evaluations-csv", async (c) => {
 });
 
 dataRouter.get("/export/reliability-csv", async (c) => {
+
+  const role = c.req.header("X-User-Role");
+  if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
+
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
