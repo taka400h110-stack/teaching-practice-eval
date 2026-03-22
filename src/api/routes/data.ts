@@ -1661,6 +1661,94 @@ dataRouter.get('/joint-display', async (c) => {
   }
 });
 
+
+// --- SCAT CRUD APIs ---
+dataRouter.get("/scat/projects", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const { results } = await db.prepare("SELECT * FROM scat_projects ORDER BY created_at DESC").all();
+    return c.json({ projects: results });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.post("/scat/projects", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const { title, description, created_by } = await c.req.json();
+    const id = "proj_" + Date.now();
+    await db.prepare("INSERT INTO scat_projects (id, title, description, created_by) VALUES (?, ?, ?, ?)").bind(id, title, description, created_by).run();
+    return c.json({ success: true, id });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.get("/scat/segments/:projectId", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const { results } = await db.prepare("SELECT * FROM scat_segments WHERE project_id = ? ORDER BY created_at ASC").bind(c.req.param("projectId")).all();
+    return c.json({ segments: results });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.post("/scat/segments/:projectId", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const { segments } = await c.req.json();
+    const projectId = c.req.param("projectId");
+    const stmt = db.prepare("INSERT INTO scat_segments (id, project_id, journal_id, text_content) VALUES (?, ?, ?, ?)");
+    const batch = segments.map((s: any) => stmt.bind("seg_" + Math.random().toString(36).substr(2, 9), projectId, s.journal_id || null, s.text_content));
+    if (batch.length > 0) {
+      await db.batch(batch);
+    }
+    return c.json({ success: true });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.get("/scat/codes/:projectId", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const { results } = await db.prepare("SELECT c.* FROM scat_codes c JOIN scat_segments s ON c.segment_id = s.id WHERE s.project_id = ?").bind(c.req.param("projectId")).all();
+    return c.json({ codes: results });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.post("/scat/codes", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const body = await c.req.json();
+    const id = body.id || ("code_" + Date.now());
+    await db.prepare(`
+      INSERT INTO scat_codes (id, segment_id, researcher_id, step1_words, step2_words, step3_concepts, step4_themes, memo, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET
+        step1_words = excluded.step1_words,
+        step2_words = excluded.step2_words,
+        step3_concepts = excluded.step3_concepts,
+        step4_themes = excluded.step4_themes,
+        memo = excluded.memo,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(id, body.segment_id, body.researcher_id, body.step1_words || "", body.step2_words || "", body.step3_concepts || "", body.step4_themes || "", body.memo || "").run();
+    return c.json({ success: true, id });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 export default dataRouter;
 
 // --- BFI Endpoints ---

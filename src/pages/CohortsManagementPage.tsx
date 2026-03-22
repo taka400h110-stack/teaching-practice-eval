@@ -15,7 +15,6 @@ import {
   ScatterChart, Scatter,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import mockApi from "../api/client";
 import type { StudentProfile } from "../types";
 
 const SCHOOL_TYPE_LABELS: Record<string, string> = {
@@ -51,11 +50,15 @@ export default function CohortsManagementPage() {
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["cohorts"],
-    queryFn: () => mockApi.getCohortProfiles(),
+    queryFn: async () => {
+      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.cohorts || [];
+    },
   });
 
   const filtered = useMemo(() =>
-    profiles.filter((p) =>
+    profiles.filter((p: any) =>
       (filterSchool === "all" || p.school_type === filterSchool) &&
       (filterInternship === "all" || p.internship_type === filterInternship) &&
       (search === "" || p.name.includes(search) || p.school_name.includes(search))
@@ -65,7 +68,7 @@ export default function CohortsManagementPage() {
   const stats = useMemo(() => {
     if (!filtered.length) return null;
     const avg = (key: keyof StudentProfile) =>
-      +(filtered.reduce((s, p) => s + (p[key] as number), 0) / filtered.length).toFixed(2);
+      +(filtered.reduce((s: any, p: any) => s + (p[key] as number), 0) / filtered.length).toFixed(2);
     return {
       n: filtered.length,
       avgTotal: avg("final_total"),
@@ -82,7 +85,7 @@ export default function CohortsManagementPage() {
   // 学校種別グループ集計
   const schoolGroups = useMemo(() => {
     const map: Record<string, { n: number; total: number }> = {};
-    profiles.forEach((p) => {
+    profiles.forEach((p: any) => {
       if (!map[p.school_type]) map[p.school_type] = { n: 0, total: 0 };
       map[p.school_type].n++;
       map[p.school_type].total += p.final_total;
@@ -183,7 +186,7 @@ export default function CohortsManagementPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((p) => (
+                  {filtered.map((p: any) => (
                     <TableRow key={p.id} hover selected={selectedStudent?.id === p.id}
                       onClick={() => setSelectedStudent(p)} sx={{ cursor: "pointer" }}>
                       <TableCell>
@@ -320,7 +323,7 @@ export default function CohortsManagementPage() {
                     />
                     <Scatter
                       name="学生"
-                      data={filtered.map((p) => ({
+                      data={filtered.map((p: any) => ({
                         x: p.growth_delta, y: p.final_total,
                         name: p.name,
                       }))}
@@ -343,7 +346,7 @@ export default function CohortsManagementPage() {
                       const bins = [0, 0.1, 0.2, 0.3, 0.4, 0.5];
                       return bins.map((bin, i) => ({
                         range: `${bin.toFixed(1)}–${(bins[i + 1] ?? 0.6).toFixed(1)}`,
-                        count: filtered.filter((p) =>
+                        count: filtered.filter((p: any) =>
                           p.self_eval_gap >= bin && p.self_eval_gap < (bins[i + 1] ?? 99)).length,
                       }));
                     })()}
@@ -376,7 +379,7 @@ export default function CohortsManagementPage() {
                     const labels = ["外向性", "協調性", "誠実性", "神経症傾向", "開放性"];
                     return keys.map((k, i) => ({
                       factor: labels[i],
-                      value: +(profiles.reduce((s, p) => s + p.big_five[k], 0) / (profiles.length || 1)).toFixed(2),
+                      value: +(profiles.reduce((s: any, p: any) => s + p.big_five[k], 0) / (profiles.length || 1)).toFixed(2),
                     }));
                   })()}>
                     <PolarGrid />
@@ -402,7 +405,7 @@ export default function CohortsManagementPage() {
                       label={{ value: "最終スコア", angle: -90, position: "insideLeft" }} />
                     <RechartTooltip />
                     <Scatter
-                      data={filtered.map((p) => ({ x: p.big_five.extraversion, y: p.final_total }))}
+                      data={filtered.map((p: any) => ({ x: p.big_five.extraversion, y: p.final_total }))}
                       fill="#7b1fa2" opacity={0.7}
                     />
                   </ScatterChart>

@@ -1,43 +1,41 @@
 import { Hono } from "hono";
 
-const analyticsRouter = new Hono();
+const analyticsRouter = new Hono<{ Bindings: CloudflareBindings }>();
 
-// L1-L4 Data Pipeline Mock
-analyticsRouter.get("/pipeline", (c) => {
-  return c.json({
-    run_id: crypto.randomUUID(),
-    timestamp: new Date().toISOString(),
-    layers: {
-      L1: { name: "session_logs", count: 12054, missing_flag_handled: true },
-      L2: { name: "chat_sessions & journals", count: 342, missing_flag_handled: true },
-      L3: { name: "goals & achievements", count: 156, missing_flag_handled: true },
-      L4: { name: "weekly_analytics", count: 45, missing_flag_handled: true },
-    }
-  });
+// L1-L4 Data Pipeline Real Count
+analyticsRouter.get("/pipeline", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  try {
+    const [{count: evals}] = await db.prepare("SELECT count(*) as count FROM evaluations").all().then(r => r.results);
+    const [{count: journals}] = await db.prepare("SELECT count(*) as count FROM journal_entries").all().then(r => r.results);
+    const [{count: students}] = await db.prepare("SELECT count(DISTINCT student_id) as count FROM journal_entries").all().then(r => r.results);
+    const [{count: users}] = await db.prepare("SELECT count(*) as count FROM users").all().then(r => r.results);
+
+    return c.json({
+      run_id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      layers: {
+        L1: { name: "users & auth", count: users, missing_flag_handled: true },
+        L2: { name: "students", count: students, missing_flag_handled: true },
+        L3: { name: "journals", count: journals, missing_flag_handled: true },
+        L4: { name: "evaluations", count: evals, missing_flag_handled: true },
+      }
+    });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
 });
 
-// G-Methods (IPTW / MSM) Mock Calculation
+// G-Methods (IPTW / MSM) - Mark as Not Available
 analyticsRouter.post("/g-methods", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  
   return c.json({
     run_id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     method: "IPTW (Inverse Probability of Treatment Weighting)",
-    treatment: "High AI Chat Usage",
-    outcome: "Reflection Depth Score",
-    results: {
-      naive_estimate: 0.45,
-      iptw_estimate: 0.38,
-      confidence_interval: [0.12, 0.64],
-      p_value: 0.012,
-      weights_summary: {
-        mean: 1.02,
-        min: 0.4,
-        max: 3.2
-      }
-    },
-    reproducibility_log: "Seed: 42, Variables: [prior_knowledge, motivation]"
+    status: "not_available",
+    message: "G-methods analysis is currently disabled and requires external statistical software (e.g., R/causalweight)."
   });
 });
 
@@ -46,20 +44,8 @@ analyticsRouter.get("/fairness", (c) => {
   return c.json({
     run_id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
-    convergence: {
-      metric: "RD-Chat x RD-Journal",
-      correlation: 0.78,
-      status: "High Convergence"
-    },
-    longitudinal_invariance: {
-      status: "Passed",
-      rmsea: 0.045,
-      cfi: 0.96
-    },
-    fairness: {
-      school_type_bias: { p_value: 0.34, status: "No significant bias detected" },
-      gender_bias: { p_value: 0.52, status: "No significant bias detected" }
-    }
+    status: "not_available",
+    message: "Automated fairness and validity audit is not fully implemented in-system. Please use exported data for external analysis."
   });
 });
 

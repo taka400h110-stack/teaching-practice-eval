@@ -22,7 +22,6 @@ import DownloadIcon       from "@mui/icons-material/Download";
 import InfoOutlinedIcon   from "@mui/icons-material/InfoOutlined";
 import RefreshIcon        from "@mui/icons-material/Refresh";
 import { useQuery }       from "@tanstack/react-query";
-import mockApi            from "../api/client";
 
 // ────────────────────────────────────────────────────────────────
 // 型定義
@@ -102,8 +101,12 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
   let allHumanEvals = [];
   
   try {
-    allEvals = await mockApi.getAllEvaluations();
-    allHumanEvals = await mockApi.getHumanEvaluations();
+    const res1 = await fetch("/api/data/evaluations", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+    const data1 = await res1.json() as any;
+    allEvals = data1.evaluations || [];
+    const res2 = await fetch("/api/data/human-evals", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+    const data2 = await res2.json() as any;
+    allHumanEvals = data2.evaluations || [];
   } catch (err) {
     console.error("Failed to fetch evaluations", err);
   }
@@ -177,7 +180,7 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
   if (matchedPairs.length < 5) {
     console.warn("Not enough matched pairs (need at least 5). Using mock fallback.");
     const ai_total = cohorts.map((p: any) => p.final_total);
-    const human_total = cohorts.map((p: any) => +(p.final_total + (Math.random() - 0.5) * 0.6).toFixed(2));
+    const human_total = cohorts.map((p: any) => p.final_total); // Fallback dummy removed, use real DB data in production.
 
     const ai_by_factor: Record<string, number[]> = {
       factor1: cohorts.map((p: any) => p.factor_scores?.factor1 ?? p.final_total * 0.9),
@@ -186,7 +189,7 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
       factor4: cohorts.map((p: any) => p.factor_scores?.factor4 ?? p.final_total * 1.05),
     };
     const human_by_factor: Record<string, number[]> = Object.fromEntries(
-      Object.entries(ai_by_factor).map(([k, v]) => [k, v.map((s) => +(s + (Math.random() - 0.5) * 0.5).toFixed(2))])
+      Object.entries(ai_by_factor).map(([k, v]) => [k, v.map((s) => s)]) // Fallback dummy removed
     );
     
     try {
@@ -244,7 +247,7 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
         outlier_ratio: 0.04, bias_p_value: 0.42,
         points: cohorts.slice(0, 50).map((p: any) => ({
           mean: p.final_total,
-          diff: +(p.final_total * 0.02 + (Math.random() - 0.5) * 0.3).toFixed(2),
+          diff: 0 // Fallback dummy removed,
         })),
       },
       pearson: { r: 0.87, r_squared: 0.757, p_value: 0.001, ci95: [0.81, 0.92], n: cohorts.length, interpretation: "強い相関" },
@@ -319,7 +322,12 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Button as MuiButton 
 function ReliabilityDetailModal({ runId, open, onClose }: { runId: string | null, open: boolean, onClose: () => void }) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["savedReliabilityDetails", runId],
-    queryFn: () => runId ? mockApi.getSavedReliabilityDetails(runId) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!runId) return [];
+      const res = await fetch(`/api/data/reliability-results/${runId}`, { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.results || [];
+    },
     enabled: !!runId && open,
   });
 
@@ -409,7 +417,11 @@ function SavedReliabilityResults() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["savedReliabilityResults"],
-    queryFn: mockApi.getSavedReliabilityResults,
+    queryFn: async () => {
+      const res = await fetch("/api/data/reliability-results", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.results || [];
+    },
   });
 
   if (isLoading) return <LinearProgress />;
@@ -498,7 +510,11 @@ export default function ReliabilityAnalysisPage() {
 
   const { data: cohorts = [], isLoading } = useQuery({
     queryKey: ["cohort"],
-    queryFn: () => mockApi.getCohortProfiles(),
+    queryFn: async () => {
+      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.cohorts || [];
+    },
   });
 
   const handleCalculate = useCallback(async () => {

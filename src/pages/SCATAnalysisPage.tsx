@@ -23,7 +23,6 @@ import CalculateIcon   from "@mui/icons-material/Calculate";
 import CompareIcon     from "@mui/icons-material/Compare";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, Legend, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import mockApi from "../api/client";
 
 // ────────────────────────────────────────────────────────────────
 // 型定義
@@ -215,23 +214,42 @@ export default function SCATAnalysisPage() {
 
   const { data: projectsData, isLoading: isLoadingProjects } = useQuery<any>({
     queryKey: ['scat-projects'],
-    queryFn: () => mockApi.getScatProjects()
+    queryFn: async () => {
+      const res = await fetch("/api/data/scat/projects", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.projects || [];
+    }
   });
 
   const { data: segmentsData, isLoading: isLoadingSegments } = useQuery<any>({
     queryKey: ['scat-segments', selectedProjectId],
-    queryFn: () => mockApi.getScatSegments(selectedProjectId),
+    queryFn: async () => {
+      const res = await fetch(`/api/data/scat/segments/${selectedProjectId}`, { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.segments || [];
+    },
     enabled: !!selectedProjectId
   });
 
   const { data: codesData, isLoading: isLoadingCodes } = useQuery<any>({
     queryKey: ['scat-codes', selectedProjectId],
-    queryFn: () => mockApi.getScatCodes(selectedProjectId),
+    queryFn: async () => {
+      const res = await fetch(`/api/data/scat/codes/${selectedProjectId}`, { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.codes || [];
+    },
     enabled: !!selectedProjectId
   });
 
   const createProjectMut = useMutation<any, Error, any>({
-    mutationFn: (title: string) => mockApi.createScatProject(title, "SCAT Analysis", researcherId),
+    mutationFn: async (title: string) => {
+      const res = await fetch("/api/data/scat/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-User-Role": localStorage.getItem("role") || "researcher" },
+        body: JSON.stringify({ title, description: "SCAT Analysis", created_by: researcherId })
+      });
+      return res.json();
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['scat-projects'] });
       setSelectedProjectId(data.id);
@@ -241,9 +259,14 @@ export default function SCATAnalysisPage() {
   });
 
   const addSegmentMut = useMutation<any, Error, any>({
-    mutationFn: (text: string) => {
+    mutationFn: async (text: string) => {
       const segments = [{ segment_order: (segmentsData?.segments?.length || 0) + 1, text_content: text }];
-      return mockApi.createScatSegments(selectedProjectId, segments);
+      const res = await fetch(`/api/data/scat/segments/${selectedProjectId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-User-Role": localStorage.getItem("role") || "researcher" },
+        body: JSON.stringify({ segments })
+      });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scat-segments', selectedProjectId] });
@@ -253,7 +276,14 @@ export default function SCATAnalysisPage() {
   });
 
   const saveCodeMut = useMutation<any, Error, any>({
-    mutationFn: (codeData: any) => mockApi.saveScatCode(codeData),
+    mutationFn: async (codeData: any) => {
+      const res = await fetch("/api/data/scat/codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-User-Role": localStorage.getItem("role") || "researcher" },
+        body: JSON.stringify(codeData)
+      });
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scat-codes', selectedProjectId] });
       setSnackbar({ open: true, msg: "保存しました", severity: "success" });

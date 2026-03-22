@@ -13,7 +13,6 @@ import {
   Tooltip as ReTooltip, Legend, ResponsiveContainer, ScatterChart, Scatter, ZAxis, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import mockApi from "../api/client";
 
 interface TabPanelProps { children: React.ReactNode; value: number; index: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) =>
@@ -50,7 +49,11 @@ const regressionCoefs = [
 
 export default function AdvancedAnalyticsPage() {
   const [tab, setTab] = useState(0);
-  const { data: cohorts = [], isLoading } = useQuery({ queryKey: ["cohorts"], queryFn: () => mockApi.getCohortProfiles() });
+  const { data: cohorts = [], isLoading } = useQuery({ queryKey: ["cohorts"], queryFn: async () => {
+      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.cohorts || [];
+    } });
   const [bfTrait, setBfTrait] = useState("conscientiousness");
 
   if (isLoading) return <LinearProgress />;
@@ -309,19 +312,19 @@ export default function AdvancedAnalyticsPage() {
                     extraversion: "外向性", agreeableness: "協調性", conscientiousness: "誠実性",
                     neuroticism: "神経質傾向", openness: "開放性"
                   };
-                  const scatterData = cohorts.map(p => ({
+                  const scatterData = cohorts.map((p: any) => ({
                     x: (p.big_five as any)[bfTrait] || 0,
                     y: p.growth_delta || 0,
                     name: p.name
                   }));
                   // 相関係数の簡易計算
                   const n = scatterData.length || 1;
-                  const sumX = scatterData.reduce((s, d) => s + d.x, 0);
-                  const sumY = scatterData.reduce((s, d) => s + d.y, 0);
+                  const sumX = scatterData.reduce((s: any, d: any) => s + d.x, 0);
+                  const sumY = scatterData.reduce((s: any, d: any) => s + d.y, 0);
                   const meanX = sumX / n;
                   const meanY = sumY / n;
                   let num = 0, denX = 0, denY = 0;
-                  scatterData.forEach(d => {
+                  scatterData.forEach((d: any) => {
                     num += (d.x - meanX) * (d.y - meanY);
                     denX += (d.x - meanX) ** 2;
                     denY += (d.y - meanY) ** 2;

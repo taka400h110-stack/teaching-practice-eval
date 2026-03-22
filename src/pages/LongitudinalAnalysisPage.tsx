@@ -23,7 +23,6 @@ import {
   AreaChart, Area, ScatterChart, Scatter,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import mockApi from "../api/client";
 
 // ────────────────────────────────────────────────────────────────
 // 定数
@@ -63,7 +62,7 @@ function genLCGATrajectories(weeks: number) {
     ...cls,
     trajectory: Array.from({ length: weeks }, (_, i) => ({
       week: i + 1,
-      score: Math.min(5, +(cls.initScore + cls.slope * i + (Math.random() - 0.5) * 0.05).toFixed(2)),
+      score: Math.min(5, +(cls.initScore + cls.slope * i).toFixed(2)),
     })),
   }));
 }
@@ -124,12 +123,20 @@ export default function LongitudinalAnalysisPage() {
 
   const { data: cohorts, isLoading } = useQuery({
     queryKey: ["cohorts"],
-    queryFn: () => mockApi.getCohortProfiles(),
+    queryFn: async () => {
+      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.cohorts || [];
+    },
   });
 
   const { data: growthData } = useQuery({
     queryKey: ["growth"],
-    queryFn: () => mockApi.getGrowthData(),
+    queryFn: async () => {
+      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return (data.cohorts || []).map((c: any) => c.weekly_scores || []);
+    },
   });
 
   const [lgcmResult, setLgcmResult] = useState<any>(LGCM_RESULT);

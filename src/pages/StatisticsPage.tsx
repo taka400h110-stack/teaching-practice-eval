@@ -15,7 +15,6 @@ import {
   PolarGrid, PolarAngleAxis, PieChart, Pie, Cell, ReferenceLine,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import mockApi from "../api/client";
 
 const COLORS = ["#1976d2", "#43a047", "#fb8c00", "#8e24aa", "#e53935"];
 const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
@@ -53,12 +52,20 @@ export default function StatisticsPage() {
 
   const { data: cohorts = [], isLoading } = useQuery({
     queryKey: ["cohorts"],
-    queryFn: () => mockApi.getCohortProfiles(),
+    queryFn: async () => {
+      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return data.cohorts || [];
+    },
   });
 
   const { data: growthData } = useQuery({
     queryKey: ["growth"],
-    queryFn: () => mockApi.getGrowthData(),
+    queryFn: async () => {
+      const res = await fetch("/api/data/cohorts", { headers: { "X-User-Role": localStorage.getItem("role") || "researcher" } });
+      const data = await res.json() as any;
+      return (data.cohorts || []).map((c: any) => c.weekly_scores || []);
+    },
   });
 
   if (isLoading) return <LinearProgress />;
@@ -76,7 +83,7 @@ export default function StatisticsPage() {
       elementary: "小学校", middle: "中学校", high: "高校", special: "特別支援",
     };
     const genderMap: Record<string, string> = { male: "男性", female: "女性", other: "その他" };
-    const rows = cohorts.map((p) => [
+    const rows = cohorts.map((p: any) => [
       anonymize ? `ID-${p.id.slice(0, 4)}` : (p.student_number ?? p.id),
       anonymize ? "匿名ユーザー" : p.name,
       String(p.grade),
@@ -107,8 +114,8 @@ export default function StatisticsPage() {
   const handleExportWeeklyCSV = () => {
     const headers = ["学籍番号", "氏名", "週", "因子1", "因子2", "因子3", "因子4", "総合"];
     const rows: string[][] = [];
-    cohorts.forEach((p) => {
-      p.weekly_scores.forEach((ws) => {
+    cohorts.forEach((p: any) => {
+      p.weekly_scores.forEach((ws: any) => {
         rows.push([
           anonymize ? `ID-${p.id.slice(0, 4)}` : (p.student_number ?? p.id),
           anonymize ? "匿名ユーザー" : p.name,
@@ -129,7 +136,7 @@ export default function StatisticsPage() {
     const payload = {
       exported_at: new Date().toISOString(),
       n: cohorts.length,
-      cohorts: cohorts.map((p) => ({
+      cohorts: cohorts.map((p: any) => ({
         student_number: anonymize ? `ID-${p.id.slice(0, 4)}` : (p.student_number ?? p.id),
         name: anonymize ? "匿名ユーザー" : p.name,
         grade: p.grade,
@@ -159,9 +166,9 @@ export default function StatisticsPage() {
   };
 
   // 基本統計量
-  const scores  = cohorts.map((p) => p.final_total);
-  const mean    = +(scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2);
-  const variance = +(scores.reduce((s, v) => s + (v - mean) ** 2, 0) / scores.length).toFixed(3);
+  const scores  = cohorts.map((p: any) => p.final_total);
+  const mean    = +(scores.reduce((s: any, v: any) => s + v, 0) / scores.length).toFixed(2);
+  const variance = +(scores.reduce((s: any, v: any) => s + (v - mean) ** 2, 0) / scores.length).toFixed(3);
   const sd      = +Math.sqrt(+variance).toFixed(2);
   const sorted  = [...scores].sort((a, b) => a - b);
   const median  = +(scores.length % 2 === 0
@@ -174,37 +181,37 @@ export default function StatisticsPage() {
   const histBins = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5];
   const histData = histBins.slice(0, -1).map((bin, i) => ({
     range: `${bin}–${histBins[i + 1]}`,
-    count: cohorts.filter((p) => p.final_total >= bin && p.final_total < histBins[i + 1]).length,
+    count: cohorts.filter((p: any) => p.final_total >= bin && p.final_total < histBins[i + 1]).length,
   }));
 
   // 学校種別分布
   const schoolDist = ["elementary", "middle", "high", "special"].map((t) => ({
     name: ({ elementary: "小学校", middle: "中学校", high: "高校", special: "特別支援" } as Record<string,string>)[t],
-    value: cohorts.filter((p) => p.school_type === t).length,
+    value: cohorts.filter((p: any) => p.school_type === t).length,
   }));
 
   // 実習形態別比較
-  const intensive   = cohorts.filter((p) => p.internship_type === "intensive");
-  const distributed = cohorts.filter((p) => p.internship_type === "distributed");
+  const intensive   = cohorts.filter((p: any) => p.internship_type === "intensive");
+  const distributed = cohorts.filter((p: any) => p.internship_type === "distributed");
   const internshipComp = [
-    { name: "集中実習", n: intensive.length,   avg: +(intensive.reduce((s, p) => s + p.final_total, 0)   / (intensive.length || 1)).toFixed(2) },
-    { name: "分散実習", n: distributed.length, avg: +(distributed.reduce((s, p) => s + p.final_total, 0) / (distributed.length || 1)).toFixed(2) },
+    { name: "集中実習", n: intensive.length,   avg: +(intensive.reduce((s: any, p: any) => s + p.final_total, 0)   / (intensive.length || 1)).toFixed(2) },
+    { name: "分散実習", n: distributed.length, avg: +(distributed.reduce((s: any, p: any) => s + p.final_total, 0) / (distributed.length || 1)).toFixed(2) },
   ];
 
   // 週別平均
-  const maxWeeks = Math.max(...cohorts.map((p) => p.weekly_scores.length));
+  const maxWeeks = Math.max(...cohorts.map((p: any) => p.weekly_scores.length));
   const weeklyAvgData = Array.from({ length: Math.min(maxWeeks, 10) }, (_, i) => {
     const weekNum   = i + 1;
     const weekScores = cohorts
-      .map((p) => p.weekly_scores.find((ws) => ws.week === weekNum))
+      .map((p: any) => p.weekly_scores.find((ws: any) => ws.week === weekNum))
       .filter(Boolean);
     return {
       week: weekNum,
-      avg: +(weekScores.reduce((s, ws) => s + (ws?.total ?? 0), 0)   / (weekScores.length || 1)).toFixed(2),
-      f1:  +(weekScores.reduce((s, ws) => s + (ws?.factor1 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
-      f2:  +(weekScores.reduce((s, ws) => s + (ws?.factor2 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
-      f3:  +(weekScores.reduce((s, ws) => s + (ws?.factor3 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
-      f4:  +(weekScores.reduce((s, ws) => s + (ws?.factor4 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
+      avg: +(weekScores.reduce((s: any, ws: any) => s + (ws?.total ?? 0), 0)   / (weekScores.length || 1)).toFixed(2),
+      f1:  +(weekScores.reduce((s: any, ws: any) => s + (ws?.factor1 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
+      f2:  +(weekScores.reduce((s: any, ws: any) => s + (ws?.factor2 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
+      f3:  +(weekScores.reduce((s: any, ws: any) => s + (ws?.factor3 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
+      f4:  +(weekScores.reduce((s: any, ws: any) => s + (ws?.factor4 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
     };
   });
 
@@ -403,9 +410,9 @@ export default function StatisticsPage() {
                     const types  = ["elementary", "middle", "high", "special"];
                     const labels = ["小学校", "中学校", "高校", "特別支援"];
                     return types.map((t, i) => {
-                      const grp = cohorts.filter((p) => p.school_type === t);
+                      const grp = cohorts.filter((p: any) => p.school_type === t);
                       const avg = (key: "final_factor1" | "final_factor2" | "final_factor3" | "final_factor4") =>
-                        +(grp.reduce((s, p) => s + p[key], 0) / (grp.length || 1)).toFixed(2);
+                        +(grp.reduce((s: any, p: any) => s + p[key], 0) / (grp.length || 1)).toFixed(2);
                       return {
                         type: labels[i],
                         f1: avg("final_factor1"),

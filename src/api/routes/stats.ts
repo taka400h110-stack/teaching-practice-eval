@@ -10,6 +10,7 @@
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { statsProvider } from "../services/statsProvider";
 
 const statsRouter = new Hono<{ Bindings: CloudflareBindings }>();
 statsRouter.use("*", cors());
@@ -771,23 +772,10 @@ function computeLGCMSummary(weeklyScores) {
 
 // POST /api/stats/icc
 statsRouter.post("/icc", async (c) => {
-  const body = await c.req.json() as {
-    ratings: number[][];  // [rater][subject]
-    factor?: string;
-  };
-
+  const body = await c.req.json() as { ratings: number[][]; factor?: string };
   try {
-    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
-    if (STATS_API_URL) {
-      const response = await fetch(`${STATS_API_URL}/api/icc`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (response.ok) return c.json(await response.json());
-    }
-    const result = computeICC21(body.ratings);
-    return c.json({ success: true, ...result, factor: body.factor ?? "total" });
+    const result = await statsProvider.computeICC(body.ratings, body.factor || "total", () => computeICC21(body.ratings));
+    return c.json({ success: true, ...result.data, _source: result.source });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -864,24 +852,10 @@ statsRouter.post("/pearson", async (c) => {
 
 // POST /api/stats/bland-altman
 statsRouter.post("/bland-altman", async (c) => {
-  const body = await c.req.json() as {
-    method1: number[];
-    method2: number[];
-    factor?: string;
-  };
+  const body = await c.req.json() as { method1: number[]; method2: number[]; factor?: string };
   try {
-    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
-    if (STATS_API_URL) {
-      const response = await fetch(`${STATS_API_URL}/api/bland-altman`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (response.ok) return c.json(await response.json());
-    }
-
-    const result = computeBlandAltman(body.method1, body.method2);
-    return c.json({ success: true, ...result, factor: body.factor ?? "total" });
+    const result = await statsProvider.computeBlandAltman(body.method1, body.method2, body.factor || "total", () => computeBlandAltman(body.method1, body.method2));
+    return c.json({ success: true, ...result.data, _source: result.source });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -889,80 +863,32 @@ statsRouter.post("/bland-altman", async (c) => {
 
 // POST /api/stats/lgcm
 statsRouter.post("/missing-data-process", async (c) => {
-  const body = await c.req.json() as {
-    data: (number | null)[][];
-    method?: "listwise" | "fcs" | "mean_imputation";
-  };
+  const body = await c.req.json() as { data: (number | null)[][]; method?: string };
   try {
-    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
-    if (STATS_API_URL) {
-      const response = await fetch(`${STATS_API_URL}/api/missing-data`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (response.ok) return c.json(await response.json());
-    }
-    const processed = handleMissingData(body.data, body.method ?? "listwise");
-    return c.json({ success: true, processed_data: processed, method: body.method ?? "listwise" });
+    const result = await statsProvider.computeMissingData(body.data, body.method || "listwise", () => handleMissingData(body.data, (body.method || "listwise") as any));
+    return c.json({ success: true, data: result.data, _source: result.source });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
 });
 
 statsRouter.post("/lcga", async (c) => {
-  const body = await c.req.json() as {
-    weekly_scores: number[][];
-    max_classes?: number;
-  };
+  const body = await c.req.json() as { weekly_scores: (number | null)[][]; max_classes?: number };
   try {
-    const STATS_API_URL = c.env?.STAT_API_URL as string | undefined;
-    if (STATS_API_URL) {
-      const response = await fetch(`${STATS_API_URL}/api/lcga`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (response.ok) return c.json(await response.json());
-    }
-    const result = computeLCGA(body.weekly_scores, body.max_classes ?? 5);
-    return c.json({ success: true, ...result });
+    const imputed = handleMissingData(body.weekly_scores, "mean_imputation");
+    const result = await statsProvider.computeLCGA(imputed, body.max_classes || 5, () => computeLCGA(imputed, body.max_classes || 5));
+    return c.json({ success: true, ...result.data, _source: result.source });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
 });
 
 statsRouter.post("/lgcm", async (c) => {
-  const body = await c.req.json() as {
-    weekly_scores: (number | null)[][];
-    factor?: string;
-    mode?: "legacy" | "rigorous";
-  };
+  const body = await c.req.json() as { weekly_scores: (number | null)[][]; factor?: string };
   try {
-    let result;
-    let missing_data_strategy = "listwise deletion (fallback)";
-    let estimator = "OLS (legacy)";
-    
-    if (body.mode === "rigorous") {
-      result = computeEM_FIML_LGCM(body.weekly_scores);
-      missing_data_strategy = "EM Algorithm (FIML approximation)";
-      estimator = "Two-stage EM-OLS";
-    } else {
-      const cleanData = body.weekly_scores.filter(row => !row.includes(null)) as number[][];
-      const validData = cleanData.length > 0 ? cleanData : body.weekly_scores.map(row => row.map(v => v || 0));
-      result = computeLGCMSummary(validData);
-      missing_data_strategy = cleanData.length > 0 ? "listwise deletion" : "zero imputation";
-      estimator = "Two-stage OLS";
-    }
-    
-    return c.json({ 
-      success: true, 
-      ...result, 
-      factor: body.factor ?? "total",
-      method: body.mode === "rigorous" ? "rigorous" : "legacy",
-      estimator,
-      missing_data_strategy
-    });
+    const imputed = handleMissingData(body.weekly_scores, "mean_imputation");
+    const result = await statsProvider.computeLGCM(imputed, body.factor || "total", () => computeEM_FIML_LGCM(body.weekly_scores));
+    return c.json({ success: true, ...result.data, _source: result.source });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -981,26 +907,20 @@ statsRouter.post("/full-reliability", async (c) => {
   };
 
   try {
-    const [totalICC, totalBA, totalPearson, totalKripp] = await Promise.all([
-      Promise.resolve(computeICC21([body.ai_total, ...(Array.isArray(body.human_total[0]) ? (body.human_total as number[][]) : [body.human_total as number[]])])),
-      Promise.resolve(computeBlandAltman(body.ai_total, Array.isArray(body.human_total[0]) ? body.ai_total.map((_, i) => mean((body.human_total as number[][]).map(r => r[i]))) : body.human_total as number[])),
-      Promise.resolve((() => {
-        const humanAvg = Array.isArray(body.human_total[0]) ? body.ai_total.map((_, i) => mean((body.human_total as number[][]).map(r => r[i]))) : body.human_total as number[];
-        const r = pearsonR(body.ai_total, humanAvg);
-        const n = Math.min(body.ai_total.length, humanAvg.length);
-        return { r: Math.round(r * 1000) / 1000, p: tTestPValue(r, n), ci95: pearsonCI(r, n) };
-      })()),
-      Promise.resolve(computeKrippendorffsAlpha(
-        [body.ai_total, ...(Array.isArray(body.human_total[0]) ? (body.human_total as number[][]) : [body.human_total as number[]])],
-        "interval"
-      )),
+    const humanTotalArr = Array.isArray(body.human_total[0]) ? (body.human_total as number[][]) : [body.human_total as number[]];
+    const humanTotalAvg = Array.isArray(body.human_total[0]) ? body.ai_total.map((_, i) => mean((body.human_total as number[][]).map(r => r[i]))) : body.human_total as number[];
+    
+    const [totalICCRes, totalBARes] = await Promise.all([
+      statsProvider.computeICC([body.ai_total, ...humanTotalArr], "total", () => computeICC21([body.ai_total, ...humanTotalArr])),
+      statsProvider.computeBlandAltman(body.ai_total, humanTotalAvg, "total", () => computeBlandAltman(body.ai_total, humanTotalAvg))
     ]);
+    
+    const rTotal = pearsonR(body.ai_total, humanTotalAvg);
+    const nTotal = Math.min(body.ai_total.length, humanTotalAvg.length);
+    const totalPearson = { r: Math.round(rTotal * 1000) / 1000, p: tTestPValue(rTotal, nTotal), ci95: pearsonCI(rTotal, nTotal) };
+    const totalKripp = computeKrippendorffsAlpha([body.ai_total, ...humanTotalArr], "interval");
 
-    const factorResults: Record<string, {
-      icc: ReturnType<typeof computeICC21>;
-      bland_altman: ReturnType<typeof computeBlandAltman>;
-      pearson: { r: number; p: number; ci95: [number, number] };
-    }> = {};
+    const factorResults: Record<string, any> = {};
 
     for (const factor of Object.keys(body.ai_by_factor)) {
       const ai = body.ai_by_factor[factor];
@@ -1012,9 +932,17 @@ statsRouter.post("/full-reliability", async (c) => {
 
       const r = pearsonR(ai, humanAvgF);
       const n = Math.min(ai.length, humanAvgF.length);
+      
+      const [iccRes, baRes] = await Promise.all([
+        statsProvider.computeICC([ai, ...humanMatrix], factor, () => computeICC21([ai, ...humanMatrix])),
+        statsProvider.computeBlandAltman(ai, humanAvgF, factor, () => computeBlandAltman(ai, humanAvgF))
+      ]);
+      
       factorResults[factor] = {
-        icc: computeICC21([ai, ...humanMatrix]),
-        bland_altman: computeBlandAltman(ai, humanAvgF),
+        icc: iccRes.data,
+        _icc_source: iccRes.source,
+        bland_altman: baRes.data,
+        _ba_source: baRes.source,
         pearson: { r: Math.round(r * 1000) / 1000, p: tTestPValue(r, n), ci95: pearsonCI(r, n) },
       };
     }
@@ -1022,8 +950,10 @@ statsRouter.post("/full-reliability", async (c) => {
     return c.json({
       success: true,
       total: {
-        icc21: totalICC,
-        bland_altman: totalBA,
+        icc21: totalICCRes.data,
+        _icc_source: totalICCRes.source,
+        bland_altman: totalBARes.data,
+        _ba_source: totalBARes.source,
         pearson: totalPearson,
         krippendorff_alpha: totalKripp,
       },

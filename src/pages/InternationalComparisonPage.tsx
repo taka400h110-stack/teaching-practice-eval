@@ -56,13 +56,7 @@ const TOTAL_SCORE = {
 };
 
 // ANOVA結果（論文記載）
-const ANOVA_RESULTS = [
-  { factor: "F1: 指導力",    F: 8.24, df1: 3, df2: 134, p: "< .001", eta2: 0.156, tukey: "JP < US, NL (p<.01)" },
-  { factor: "F2: 自己評価力", F: 7.31, df1: 3, df2: 134, p: "< .001", eta2: 0.141, tukey: "JP < US, NL (p<.01)" },
-  { factor: "F3: 学級経営力", F: 9.12, df1: 3, df2: 134, p: "< .001", eta2: 0.169, tukey: "JP < US, NL (p<.001)" },
-  { factor: "F4: 職務理解",  F: 6.88, df1: 3, df2: 134, p: "< .001", eta2: 0.133, tukey: "JP < US, NL (p<.01)" },
-  { factor: "総合スコア",    F: 8.89, df1: 3, df2: 134, p: "< .001", eta2: 0.165, tukey: "JP < US, NL (p<.001)" },
-];
+const ANOVA_RESULTS: any[] = [];
 
 // 23項目別スコア（論文記載値の近似）
 const ITEM_DATA = Array.from({ length: 23 }, (_, i) => {
@@ -403,16 +397,13 @@ export default function InternationalComparisonPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {ANOVA_RESULTS.map((r) => (
-                    <TableRow key={r.factor} hover>
-                      <TableCell><strong>{r.factor}</strong></TableCell>
-                      <TableCell>F({r.df1},{r.df2})={r.F}</TableCell>
-                      <TableCell><Chip label={r.p} size="small" color="success" /></TableCell>
-                      <TableCell>η²={r.eta2} <Typography variant="caption">(中〜大)</Typography></TableCell>
-                      <TableCell><Typography variant="caption">{r.tukey}</Typography></TableCell>
-                      <TableCell><Chip label="✅ 有意" size="small" color="success" /></TableCell>
-                    </TableRow>
-                  ))}
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      <Alert severity="info" sx={{ my: 2, textAlign: "left" }}>
+                        国際比較用の4カ国データは現在システムに登録されていません。データ投入後、外部の統計ソフトウェア（R/SPSS等）を用いてANOVA・Tukeyの事後検定を実行してください。本システム内での自動ANOVA実行は現在未対応です。
+                      </Alert>
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </TableContainer>
