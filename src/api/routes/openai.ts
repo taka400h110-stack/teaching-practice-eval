@@ -301,9 +301,31 @@ RD4（批判的省察）: 教育的信念・社会的文脈・倫理的観点と
 function buildCoTCPrompt(
   conversation: Array<{ role: string; content: string }>,
   journalContent: string,
-  weekNumber: number
+  weekNumber: number,
+  bfiScores: { conscientiousness?: number; neuroticism?: number; openness?: number } | null = null
 ): string {
   const convText = conversation.slice(-6).map((m) => `${m.role === "user" ? "学生" : "AI"}: ${m.content}`).join("\n");
+  
+  const bfiRules = `
+## BFI特性と目標難易度調整
+以下のパーソナリティ特性（BFIスコア）を考慮し、目標の難易度や粒度を調整してください。
+${bfiScores ? `
+[学生のBFI特性]
+- 誠実性 (Conscientiousness): ${bfiScores.conscientiousness ?? "不明"}
+- 神経症的傾向 (Neuroticism): ${bfiScores.neuroticism ?? "不明"}
+- 開放性 (Openness): ${bfiScores.openness ?? "不明"}
+
+[調整ルール]
+- 神経症的傾向が高い(60以上)場合は、目標を小さく分解し、失敗リスクの低い安全な形（難易度: Low）にする。
+- 誠実性が高い(60以上)場合は、目標をやや高難度にし、実行回数や継続性を求める形（難易度: High）にする。
+- 開放性が高い(60以上)場合は、新しい試行や振り返り、代替行動の検討を含む目標（難易度: Medium）にする。
+- 該当しない場合、またはスコアがない場合は標準的な難易度（Medium）とする。
+` : `
+[学生のBFI特性]
+取得できませんでした。標準的な難易度（Medium）で目標を設定してください。
+`}
+`;
+
   return `あなたは教育実習における目標設定支援の専門家AIです。以下の対話から来週の SMART 目標を提案してください。
 
 ## コンテキスト
@@ -329,7 +351,7 @@ ${convText}
 因子Ⅱ: 自己評価力（項目8-13）
 因子Ⅲ: 学級経営力（項目14-17）
 因子Ⅳ: 職務を理解して行動する力（項目18-23）
-
+${bfiRules}
 ## 出力形式（厳密にJSONで出力）
 {
   "goal_text": "来週、〇〇の場面で〜を実践し、〜を確認する",
@@ -344,6 +366,8 @@ ${convText}
   },
   "is_smart": true,
   "rationale": "目標設定の根拠（30字以内）",
+  "difficulty_level": "Low | Medium | High",
+  "adjustment_reason": "BFI特性を考慮した調整理由（例: 誠実性が高いため...）",
   "target_week": ${weekNumber + 1}
 }`;
 }
@@ -502,10 +526,29 @@ openaiRouter.post("/generate-goal", async (c) => {
     journal_content: string;
     week_number: number;
     session_id: string;
+    user_id?: string;
   };
 
   try {
-    const prompt = buildCoTCPrompt(body.conversation, body.journal_content, body.week_number);
+    let bfiScores = null;
+    if (body.user_id) {
+      try {
+        const row = await c.env.DB.prepare(
+          "SELECT conscientiousness, neuroticism, openness FROM user_bfi_scores WHERE user_id = ?"
+        ).bind(body.user_id).first();
+        if (row) {
+          bfiScores = {
+            conscientiousness: Number(row.conscientiousness),
+            neuroticism: Number(row.neuroticism),
+            openness: Number(row.openness)
+          };
+        }
+      } catch (err) {
+        console.warn("BFI scores fetch failed or table does not exist:", err);
+      }
+    }
+
+    const prompt = buildCoTCPrompt(body.conversation, body.journal_content, body.week_number, bfiScores);
     const raw = await callOpenAI(
       apiKey,
       [{ role: "user", content: prompt }],

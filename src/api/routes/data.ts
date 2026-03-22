@@ -194,6 +194,9 @@ async function ensureSchema(db: D1Database): Promise<void> {
       smart_time_bound INTEGER DEFAULT 1,
       achieved INTEGER DEFAULT 0,
       evidence TEXT,
+      difficulty_level TEXT,
+      adjustment_reason TEXT,
+      bfi_context TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -635,6 +638,9 @@ dataRouter.post("/goals", async (c) => {
     target_factor?: string;
     is_smart?: boolean;
     smart_criteria?: Record<string, boolean>;
+    difficulty_level?: string;
+    adjustment_reason?: string;
+    bfi_context?: any;
   };
 
   try {
@@ -643,14 +649,16 @@ dataRouter.post("/goals", async (c) => {
 
     await db.prepare(`
       INSERT INTO goals (id, student_id, session_id, week_number, goal_text, target_item_id, target_factor,
-        is_smart, smart_specific, smart_measurable, smart_achievable, smart_relevant, smart_time_bound, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_smart, smart_specific, smart_measurable, smart_achievable, smart_relevant, smart_time_bound, difficulty_level, adjustment_reason, bfi_context, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id, body.student_id, body.session_id ?? null, body.week_number, body.goal_text,
       body.target_item_id ?? null, body.target_factor ?? null,
       body.is_smart ? 1 : 0,
       sc.specific ? 1 : 0, sc.measurable ? 1 : 0, sc.achievable ? 1 : 0,
       sc.relevant ? 1 : 0, sc.time_bound ? 1 : 0,
+      body.difficulty_level ?? null, body.adjustment_reason ?? null,
+      body.bfi_context ? JSON.stringify(body.bfi_context) : null,
       nowISO()
     ).run();
 
