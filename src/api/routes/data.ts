@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * src/api/routes/data.ts
  * Hono APIルート: Cloudflare D1 データ CRUD

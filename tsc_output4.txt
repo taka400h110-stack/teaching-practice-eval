@@ -1,0 +1,133 @@
+src/api/client.ts(382,14): error TS18046: 'data' is of type 'unknown'.
+src/api/client.ts(498,23): error TS18046: 'aiData' is of type 'unknown'.
+src/api/client.ts(499,23): error TS18046: 'aiData' is of type 'unknown'.
+src/api/client.ts(500,27): error TS18046: 'aiData' is of type 'unknown'.
+src/api/client.ts(501,24): error TS18046: 'aiData' is of type 'unknown'.
+src/api/client.ts(502,24): error TS18046: 'aiData' is of type 'unknown'.
+src/api/client.ts(843,14): error TS18046: 'data' is of type 'unknown'.
+src/api/routes/data.ts(1475,15): error TS2538: Type 'unknown' cannot be used as an index type.
+src/api/routes/openai.ts(778,18): error TS2304: Cannot find name 'OPENAI_API_KEY'.
+src/api/routes/openai.ts(821,31): error TS18046: 'data' is of type 'unknown'.
+src/api/routes/openai.ts(831,18): error TS2304: Cannot find name 'OPENAI_API_KEY'.
+src/api/routes/openai.ts(877,31): error TS18046: 'data' is of type 'unknown'.
+src/api/routes/stats.ts(605,52): error TS2345: Argument of type '"listwise" | "mean_imputation" | "fcs"' is not assignable to parameter of type '"listwise" | "mean_imputation" | undefined'.
+  Type '"fcs"' is not assignable to type '"listwise" | "mean_imputation" | undefined'.
+src/pages/ChatBotPage.tsx(592,25): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/ChatBotPage.tsx(596,44): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/ChatBotPage.tsx(597,43): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/EvaluationResultPage.tsx(41,17): error TS18047: 'score' is possibly 'null'.
+src/pages/EvaluationResultPage.tsx(41,42): error TS18047: 'score' is possibly 'null'.
+src/pages/EvaluationResultPage.tsx(41,67): error TS18047: 'score' is possibly 'null'.
+src/pages/EvaluationResultPage.tsx(44,14): error TS18047: 'score' is possibly 'null'.
+src/pages/EvaluationResultPage.tsx(67,27): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+src/pages/EvaluationResultPage.tsx(308,17): error TS2304: Cannot find name 'score'.
+src/pages/EvaluationResultPage.tsx(309,8): error TS2304: Cannot find name 'score'.
+src/pages/EvaluationsPage.tsx(86,46): error TS7006: Parameter 'he' implicitly has an 'any' type.
+src/pages/GrowthVisualizationPage.tsx(386,7): error TS2552: Cannot find name 'delta'. Did you mean 'fDelta'?
+src/pages/InternationalComparisonPage.tsx(89,22): error TS2352: Conversion of type '{ factor: string; key: string; JP: { m: number; sd: number; }; US: { m: number; sd: number; }; DE: { m: number; sd: number; }; NL: { m: number; sd: number; }; }' to type 'Record<string, { m: number; sd: number; }>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'factor' is incompatible with index signature.
+    Type 'string' is not comparable to type '{ m: number; sd: number; }'.
+src/pages/InternationalComparisonPage.tsx(311,40): error TS2352: Conversion of type '{ factor: string; key: string; JP: { m: number; sd: number; }; US: { m: number; sd: number; }; DE: { m: number; sd: number; }; NL: { m: number; sd: number; }; }' to type 'Record<string, { m: number; sd: number; }>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'factor' is incompatible with index signature.
+    Type 'string' is not comparable to type '{ m: number; sd: number; }'.
+src/pages/JournalDetailPage.tsx(338,42): error TS2322: Type 'number | null' is not assignable to type 'number'.
+  Type 'null' is not assignable to type 'number'.
+src/pages/JournalDetailPage.tsx(471,32): error TS2322: Type 'number | null' is not assignable to type 'number'.
+  Type 'null' is not assignable to type 'number'.
+src/pages/JournalWorkflowPage.tsx(519,28): error TS18046: 'outcomesRes' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(554,45): error TS2339: Property 'journal_content' does not exist on type 'EvaluationResult'.
+src/pages/JournalWorkflowPage.tsx(558,19): error TS18046: 'evData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(559,49): error TS18046: 'evData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(560,49): error TS18046: 'evData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(1191,33): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(1195,52): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(1196,51): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/LongitudinalAnalysisPage.tsx(154,5): error TS2783: 'week' is specified more than once, so this usage will be overwritten.
+src/pages/PlatformAnalyticsPage.tsx(69,13): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<...> & Omit<...>): Element | null', gave the following error.
+    Type 'unknown' is not assignable to type 'ReactNode'.
+  Overload 2 of 2, '(props: DefaultComponentProps<GridTypeMap<{}, "div">>): Element | null', gave the following error.
+    Type 'unknown' is not assignable to type 'ReactNode'.
+src/pages/PlatformAnalyticsPage.tsx(69,58): error TS2339: Property 'layers' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(70,16): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<...> & Omit<...>): Element | null', gave the following error.
+    Property 'component' is missing in type '{ children: Element; item: true; xs: number; sm: number; md: number; key: any; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<GridTypeMap<{}, "div">>): Element | null', gave the following error.
+    Type '{ children: Element; item: true; xs: number; sm: number; md: number; key: any; }' is not assignable to type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+      Property 'item' does not exist on type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+src/pages/PlatformAnalyticsPage.tsx(81,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<...> & Omit<...>): Element | null', gave the following error.
+    Property 'component' is missing in type '{ children: Element; item: true; xs: number; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<GridTypeMap<{}, "div">>): Element | null', gave the following error.
+    Type '{ children: Element; item: true; xs: number; }' is not assignable to type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+      Property 'item' does not exist on type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+src/pages/PlatformAnalyticsPage.tsx(83,40): error TS2339: Property 'run_id' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(83,76): error TS2339: Property 'timestamp' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(107,91): error TS2339: Property 'method' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(109,18): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<...> & Omit<...>): Element | null', gave the following error.
+    Property 'component' is missing in type '{ children: Element[]; item: true; xs: number; md: number; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<GridTypeMap<{}, "div">>): Element | null', gave the following error.
+    Type '{ children: Element[]; item: true; xs: number; md: number; }' is not assignable to type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+      Property 'item' does not exist on type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+src/pages/PlatformAnalyticsPage.tsx(111,79): error TS2339: Property 'treatment' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(114,79): error TS2339: Property 'outcome' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(116,18): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<...> & Omit<...>): Element | null', gave the following error.
+    Property 'component' is missing in type '{ children: Element; item: true; xs: number; md: number; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<GridTypeMap<{}, "div">>): Element | null', gave the following error.
+    Type '{ children: Element; item: true; xs: number; md: number; }' is not assignable to type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+      Property 'item' does not exist on type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+src/pages/PlatformAnalyticsPage.tsx(120,46): error TS2339: Property 'results' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(122,56): error TS2339: Property 'results' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(126,54): error TS2339: Property 'results' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(128,77): error TS2339: Property 'results' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(129,54): error TS2339: Property 'results' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(136,47): error TS2339: Property 'run_id' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(136,79): error TS2339: Property 'reproducibility_log' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(147,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<...> & Omit<...>): Element | null', gave the following error.
+    Property 'component' is missing in type '{ children: Element; item: true; xs: number; md: number; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<GridTypeMap<{}, "div">>): Element | null', gave the following error.
+    Type '{ children: Element; item: true; xs: number; md: number; }' is not assignable to type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+      Property 'item' does not exist on type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+src/pages/PlatformAnalyticsPage.tsx(153,72): error TS2339: Property 'convergence' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(153,153): error TS2339: Property 'convergence' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(158,45): error TS2339: Property 'longitudinal_invariance' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(158,98): error TS2339: Property 'longitudinal_invariance' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(160,77): error TS2339: Property 'longitudinal_invariance' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(166,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<...> & Omit<...>): Element | null', gave the following error.
+    Property 'component' is missing in type '{ children: Element; item: true; xs: number; md: number; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<GridTypeMap<{}, "div">>): Element | null', gave the following error.
+    Type '{ children: Element; item: true; xs: number; md: number; }' is not assignable to type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+      Property 'item' does not exist on type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+src/pages/PlatformAnalyticsPage.tsx(172,73): error TS2339: Property 'fairness' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(173,96): error TS2339: Property 'fairness' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(177,73): error TS2339: Property 'fairness' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(178,96): error TS2339: Property 'fairness' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(183,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<...> & Omit<...>): Element | null', gave the following error.
+    Property 'component' is missing in type '{ children: Element; item: true; xs: number; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<GridTypeMap<{}, "div">>): Element | null', gave the following error.
+    Type '{ children: Element; item: true; xs: number; }' is not assignable to type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+      Property 'item' does not exist on type 'IntrinsicAttributes & GridBaseProps & { sx?: SxProps<Theme> | undefined; } & SystemProps<Theme> & Omit<...>'.
+src/pages/PlatformAnalyticsPage.tsx(185,40): error TS2339: Property 'run_id' does not exist on type '{}'.
+src/pages/PlatformAnalyticsPage.tsx(185,76): error TS2339: Property 'timestamp' does not exist on type '{}'.
+src/pages/ReliabilityAnalysisPage.tsx(101,7): error TS7034: Variable 'allEvals' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/pages/ReliabilityAnalysisPage.tsx(149,20): error TS7005: Variable 'allEvals' implicitly has an 'any[]' type.
+src/pages/ReliabilityAnalysisPage.tsx(227,43): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/pages/SCATAnalysisPage.tsx(180,16): error TS2352: Conversion of type 'ScatRow' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ScatRow'.
+src/renderer.tsx(3,37): error TS2345: Argument of type '({ children }: PropsWithChildren<{ Layout: FC; }>) => Element' is not assignable to parameter of type 'ComponentWithChildren'.
+  Type 'Element' is not assignable to type 'HtmlEscapedString | Promise<HtmlEscapedString>'.
+src/renderer.tsx(9,13): error TS2322: Type 'Child' is not assignable to type 'ReactNode'.
+  Type 'JSXNode' is not assignable to type 'ReactNode'.
+    Type 'JSXNode' is not assignable to type 'ReactPortal'.
+      Types of property 'children' are incompatible.
+        Type 'Child[]' is not assignable to type 'ReactNode'.
+          Type 'Child[]' is not assignable to type 'Iterable<ReactNode>'.
+            The types returned by '[Symbol.iterator]().next(...)' are incompatible between these types.
+              Type 'IteratorResult<Child, undefined>' is not assignable to type 'IteratorResult<ReactNode, any>'.
+                Type 'IteratorYieldResult<Child>' is not assignable to type 'IteratorResult<ReactNode, any>'.

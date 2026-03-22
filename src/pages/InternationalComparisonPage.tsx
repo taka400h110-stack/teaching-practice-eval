@@ -86,7 +86,7 @@ function downloadComparisonCSV() {
   const rows: string[] = [headers.join(",")];
   for (const fd of FACTOR_DATA) {
     for (const c of COUNTRIES) {
-      const stats = (fd as Record<string, { m: number; sd: number }>)[c.code];
+      const stats = (fd as unknown as unknown as Record<string, { m: number; sd: number }>)[c.code];
       rows.push([fd.factor, c.name, c.n, stats.m, stats.sd].join(","));
     }
   }
@@ -308,7 +308,7 @@ export default function InternationalComparisonPage() {
                     <TableRow key={fd.factor} hover>
                       <TableCell><strong>{fd.factor}</strong></TableCell>
                       {COUNTRIES.map((c) => {
-                        const stats = (fd as Record<string, { m: number; sd: number }>)[c.code];
+                        const stats = (fd as unknown as unknown as Record<string, { m: number; sd: number }>)[c.code];
                         return (
                           <TableCell key={c.code}>
                             {stats.m.toFixed(2)} <Typography component="span" variant="caption" color="text.secondary">

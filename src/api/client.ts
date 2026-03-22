@@ -227,7 +227,7 @@ const mockApi = {
     
     const user = demo
       ? { id: demo.id, email, name: demo.name, role: demo.roles[0] }
-      : { id: "user-001", email, name: "山田 太郎", roles: ["student"] as UserRole };
+      : { id: "user-001", email, name: "山田 太郎", role: "student" as UserRole };
 
     const isFirstLogin = demo?.firstLogin ?? false;
     // デモユーザーのプロフィール情報を user_info に含める
@@ -339,7 +339,7 @@ const mockApi = {
         }
         throw new Error("Failed to fetch evaluation");
       }
-      const data = await response.json();
+      const data: any = await response.json();
       
       return {
         id: data.evaluation.id,
@@ -378,7 +378,7 @@ const mockApi = {
     try {
       const res = await fetch("/api/data/evaluations");
       if (!res.ok) throw new Error("Failed to fetch all evaluations");
-      const data = await res.json();
+      const data: any = await res.json();
       return data.evaluations.map((e: any) => ({
         id: e.id,
         journal_id: e.journal_id,
@@ -408,7 +408,7 @@ const mockApi = {
       try {
         const response = await fetch(`/api/data/human-evals/${journalId}`);
         if (!response.ok) throw new Error("Failed to fetch human evaluations");
-        const data = await response.json();
+        const data: any = await response.json();
         return data.evaluations;
       } catch (err) {
         console.error("API error fetching human evals:", err);
@@ -420,7 +420,7 @@ const mockApi = {
     try {
       const response = await fetch("/api/data/human-evals");
       if (!response.ok) throw new Error("Failed to fetch all human evaluations");
-      const data = await response.json();
+      const data: any = await response.json();
       return data.evaluations;
     } catch (err) {
       console.error("API error fetching all human evals:", err);
@@ -449,7 +449,7 @@ const mockApi = {
       });
       
       if (!response.ok) throw new Error("Failed to save human evaluation");
-      const data = await response.json();
+      const data: any = await response.json();
       
       // フロントエンドの互換性のためモックと同じ形式を返す
       return {
@@ -487,7 +487,7 @@ const mockApi = {
       });
       
       if (!aiRes.ok) throw new Error("Failed to call AI evaluate");
-      const aiData = await aiRes.json();
+      const aiData: any = await aiRes.json();
 
       // 2. 評価結果を保存する
       const saveRes = await fetch("/api/data/evaluations", {
@@ -513,7 +513,7 @@ const mockApi = {
       }
 
       // 4. 保存した評価結果を取得して返す
-      return await api.getEvaluation(journalId);
+      return await mockApi.getEvaluation(journalId);
     } catch (err) {
       console.error("runEvaluation error:", err);
       // エラー時のフォールバック
@@ -747,7 +747,7 @@ const mockApi = {
     try {
       const response = await fetch(`/api/data/reliability-results/${runId}`);
       if (!response.ok) throw new Error("Failed to fetch reliability details");
-      const data = await response.json();
+      const data: any = await response.json();
       return data.details || [];
     } catch (err) {
       console.error("API error fetching reliability details:", err);
@@ -797,7 +797,7 @@ const mockApi = {
     try {
       const response = await fetch("/api/data/reliability-results");
       if (!response.ok) throw new Error("Failed to fetch reliability results");
-      const data = await response.json();
+      const data: any = await response.json();
       return data.results || [];
     } catch (err) {
       console.error("API error fetching reliability results:", err);
@@ -839,7 +839,7 @@ export const bfiApi = {
           'Authorization': `Bearer ${authHeader}`
         }
       });
-      const data = await res.json();
+      const data: any = await res.json();
       return data.responses || {};
     } catch (e) {
       console.error(e);

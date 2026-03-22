@@ -19,7 +19,7 @@ export default function PlatformAnalyticsPage() {
   const [tabIndex, setTabIndex] = useState(0);
 
   // Fetch L1-L4 Pipeline
-  const { data: pipelineData, isLoading: pipeLoading } = useQuery({
+  const { data: pipelineData, isLoading: pipeLoading } = useQuery<any>({
     queryKey: ["analytics-pipeline"],
     queryFn: async () => {
       const res = await fetch("/api/analytics/pipeline");
@@ -28,7 +28,7 @@ export default function PlatformAnalyticsPage() {
   });
 
   // Fetch Fairness & Validity
-  const { data: fairnessData, isLoading: fairLoading } = useQuery({
+  const { data: fairnessData, isLoading: fairLoading } = useQuery<any>({
     queryKey: ["analytics-fairness"],
     queryFn: async () => {
       const res = await fetch("/api/analytics/fairness");
@@ -37,7 +37,7 @@ export default function PlatformAnalyticsPage() {
   });
 
   // G-Methods mutation
-  const gMethodMutation = useMutation({
+  const gMethodMutation = useMutation<any, any, void>({
     mutationFn: async () => {
       const res = await fetch("/api/analytics/g-methods", { method: "POST" });
       return res.json();
@@ -67,7 +67,7 @@ export default function PlatformAnalyticsPage() {
         {pipeLoading ? <CircularProgress /> : (
           <Grid container spacing={3}>
             {pipelineData && Object.entries(pipelineData.layers).map(([layer, info]: any) => (
-              <Grid item xs={12} sm={6} md={3} key={layer}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} key={layer}>
                 <Card sx={{ height: "100%", borderTop: "4px solid #1976d2" }}>
                   <CardContent>
                     <Typography variant="h6" color="primary">{layer}</Typography>
@@ -78,7 +78,7 @@ export default function PlatformAnalyticsPage() {
                 </Card>
               </Grid>
             ))}
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }} >
               <Typography variant="caption" color="text.secondary">
                 Run ID: {pipelineData?.run_id} | Timestamp: {pipelineData?.timestamp}
               </Typography>
@@ -106,14 +106,14 @@ export default function PlatformAnalyticsPage() {
             <CardContent>
               <Typography variant="h6" gutterBottom>G-Methods 実行結果: {gMethodMutation.data.method}</Typography>
               <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }} >
                   <Typography variant="subtitle2" color="text.secondary">トリートメント (介入)</Typography>
                   <Typography variant="body1" paragraph>{gMethodMutation.data.treatment}</Typography>
                   
                   <Typography variant="subtitle2" color="text.secondary">アウトカム (結果)</Typography>
                   <Typography variant="body1" paragraph>{gMethodMutation.data.outcome}</Typography>
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }} >
                   <Box sx={{ p: 2, bgcolor: "#f5f5f5", borderRadius: 1 }}>
                     <Typography variant="subtitle2">因果効果の推定値 (ATE)</Typography>
                     <Typography variant="h5" color="primary" gutterBottom>
@@ -144,45 +144,45 @@ export default function PlatformAnalyticsPage() {
       <TabPanel value={tabIndex} index={2}>
         {fairLoading ? <CircularProgress /> : (
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }} >
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>測定の妥当性 (Validity Checks)</Typography>
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="subtitle2">RD-Chat × RD-Journal 収束妥当性</Typography>
-                    <Typography variant="body1">相関: r = {fairnessData?.convergence.correlation} <Chip size="small" color="primary" label={fairnessData?.convergence.status} sx={{ ml: 1 }}/></Typography>
+                    <Typography variant="body1">相関: r = {(fairnessData as any)?.convergence.correlation} <Chip size="small" color="primary" label={(fairnessData as any)?.convergence.status} sx={{ ml: 1 }}/></Typography>
                   </Box>
                   <Box>
                     <Typography variant="subtitle2">縦断的測定不変性 (Longitudinal Invariance)</Typography>
                     <Typography variant="body1">
-                      RMSEA: {fairnessData?.longitudinal_invariance.rmsea} / CFI: {fairnessData?.longitudinal_invariance.cfi}
+                      RMSEA: {(fairnessData as any)?.longitudinal_invariance.rmsea} / CFI: {(fairnessData as any)?.longitudinal_invariance.cfi}
                     </Typography>
-                    <Chip size="small" color="success" label={fairnessData?.longitudinal_invariance.status} sx={{ mt: 1 }} />
+                    <Chip size="small" color="success" label={(fairnessData as any)?.longitudinal_invariance.status} sx={{ mt: 1 }} />
                   </Box>
                 </CardContent>
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }} >
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>公平性監査 (Fairness Audits)</Typography>
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="subtitle2">学校種別 (School Type) バイアス</Typography>
-                    <Typography variant="body2">p-value: {fairnessData?.fairness.school_type_bias.p_value}</Typography>
-                    <Chip size="small" color="success" variant="outlined" label={fairnessData?.fairness.school_type_bias.status} sx={{ mt: 0.5 }} />
+                    <Typography variant="body2">p-value: {(fairnessData as any)?.fairness.school_type_bias.p_value}</Typography>
+                    <Chip size="small" color="success" variant="outlined" label={(fairnessData as any)?.fairness.school_type_bias.status} sx={{ mt: 0.5 }} />
                   </Box>
                   <Box>
                     <Typography variant="subtitle2">性別 (Gender) バイアス</Typography>
-                    <Typography variant="body2">p-value: {fairnessData?.fairness.gender_bias.p_value}</Typography>
-                    <Chip size="small" color="success" variant="outlined" label={fairnessData?.fairness.gender_bias.status} sx={{ mt: 0.5 }} />
+                    <Typography variant="body2">p-value: {(fairnessData as any)?.fairness.gender_bias.p_value}</Typography>
+                    <Chip size="small" color="success" variant="outlined" label={(fairnessData as any)?.fairness.gender_bias.status} sx={{ mt: 0.5 }} />
                   </Box>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }} >
               <Typography variant="caption" color="text.secondary">
-                Run ID: {fairnessData?.run_id} | Timestamp: {fairnessData?.timestamp}
+                Run ID: {(fairnessData as any)?.run_id} | Timestamp: {(fairnessData as any)?.timestamp}
               </Typography>
             </Grid>
           </Grid>

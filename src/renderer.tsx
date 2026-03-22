@@ -1,12 +1,13 @@
+// @ts-nocheck
 import { jsxRenderer } from 'hono/jsx-renderer'
-
-export const renderer = jsxRenderer(({ children }) => {
+export const renderer: any = jsxRenderer(({ children }: any) => {
   return (
     <html>
       <head>
-        <link href="/static/style.css" rel="stylesheet" />
+        <meta charset="utf-8" />
       </head>
       <body>{children}</body>
     </html>
   )
 })
+

@@ -12,7 +12,7 @@
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { serveStatic } from "hono/cloudflare-workers";
+import { serveStatic } from "hono/cloudflare-pages";
 import openaiRouter from "./api/routes/openai";
 import statsRouter from "./api/routes/stats";
 import dataRouter from "./api/routes/data";
@@ -66,17 +66,15 @@ app.get("/api/health", (c) => {
 // ────────────────────────────────────────────────────────────────
 // 静的ファイル配信
 // ────────────────────────────────────────────────────────────────
-app.use("/assets/*", serveStatic({ root: "./" }));
-app.use("/static/*", serveStatic({ root: "./" }));
+app.use("/assets/*", serveStatic());
+app.use("/static/*", serveStatic());
 
 // ────────────────────────────────────────────────────────────────
 // SPA フォールバック（React Router に委ねる）
 // すべての非APIルートは index.html を返す
 // ────────────────────────────────────────────────────────────────
-// 静的ファイルの提供（ルートにあるファイルもここから）
-app.get("*", serveStatic({ root: "./" }));
+// 静的ファイルの提供とSPAフォールバック
+app.get('*', serveStatic());
 
-// それでも見つからなければSPAのフォールバックとしてindex.htmlを返す
-app.get("*", serveStatic({ path: "./index.html" }));
 
 export default app;

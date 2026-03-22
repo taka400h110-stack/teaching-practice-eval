@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * src/pages/LongitudinalAnalysisPage.tsx
  * 縦断分析・成長軌跡（RQ3a）

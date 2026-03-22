@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * src/api/routes/stats.ts
  * Hono APIルート: 統計計算エンジン

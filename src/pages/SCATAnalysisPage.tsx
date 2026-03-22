@@ -177,7 +177,7 @@ const FACTOR_LABELS: Record<string, string> = {
 function downloadScatCSV(rows: ScatRow[]) {
   const headers = ["id", "week", "factor", "text", "keywords", "thesaurus", "concept", "theme", "memo", "coder_id"];
   const data = rows.map((r) => headers.map((h) => {
-    const v = (r as Record<string, unknown>)[h] ?? "";
+    const v = (r as unknown as unknown as Record<string, unknown>)[h] ?? "";
     const s = String(v);
     return s.includes(",") || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
   }).join(","));

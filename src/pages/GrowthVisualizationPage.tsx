@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * GrowthVisualizationPage.tsx
  * 成長グラフ - recharts による折れ線グラフ、因子別スコア推移

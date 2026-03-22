@@ -1,0 +1,32 @@
+src/api/routes/data.ts(1475,15): error TS2538: Type 'unknown' cannot be used as an index type.
+src/api/routes/openai.ts(778,18): error TS2304: Cannot find name 'OPENAI_API_KEY'.
+src/api/routes/openai.ts(831,18): error TS2304: Cannot find name 'OPENAI_API_KEY'.
+src/api/routes/stats.ts(605,52): error TS2345: Argument of type '"listwise" | "mean_imputation" | "fcs"' is not assignable to parameter of type '"listwise" | "mean_imputation" | undefined'.
+  Type '"fcs"' is not assignable to type '"listwise" | "mean_imputation" | undefined'.
+src/pages/ChatBotPage.tsx(592,25): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/ChatBotPage.tsx(596,44): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/ChatBotPage.tsx(597,43): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/EvaluationResultPage.tsx(95,22): error TS2322: Type 'number | null' is not assignable to type 'number'.
+  Type 'null' is not assignable to type 'number'.
+src/pages/EvaluationResultPage.tsx(99,22): error TS2322: Type 'number | null' is not assignable to type 'number'.
+  Type 'null' is not assignable to type 'number'.
+src/pages/EvaluationResultPage.tsx(308,18): error TS2304: Cannot find name 'score'.
+src/pages/EvaluationResultPage.tsx(309,8): error TS2304: Cannot find name 'score'.
+src/pages/EvaluationsPage.tsx(86,46): error TS7006: Parameter 'he' implicitly has an 'any' type.
+src/pages/GrowthVisualizationPage.tsx(386,7): error TS2552: Cannot find name 'delta'. Did you mean 'fDelta'?
+src/pages/JournalDetailPage.tsx(338,42): error TS2322: Type 'number | null' is not assignable to type 'number'.
+  Type 'null' is not assignable to type 'number'.
+src/pages/JournalDetailPage.tsx(471,32): error TS2322: Type 'number | null' is not assignable to type 'number'.
+  Type 'null' is not assignable to type 'number'.
+src/pages/JournalWorkflowPage.tsx(519,28): error TS18046: 'outcomesRes' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(558,19): error TS18046: 'evData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(559,49): error TS18046: 'evData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(560,49): error TS18046: 'evData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(1191,33): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(1195,52): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/JournalWorkflowPage.tsx(1196,51): error TS18046: 'rdData' is of type 'unknown'.
+src/pages/LongitudinalAnalysisPage.tsx(154,5): error TS2783: 'week' is specified more than once, so this usage will be overwritten.
+src/renderer.tsx(2,42): error TS2345: Argument of type '({ children }: any) => JSX.Element' is not assignable to parameter of type 'ComponentWithChildren'.
+  Type 'Element' is not assignable to type 'HtmlEscapedString | Promise<HtmlEscapedString>'.
+src/renderer.tsx(6,15): error TS2322: Type '{ charset: string; }' is not assignable to type 'DetailedHTMLProps<MetaHTMLAttributes<HTMLMetaElement>, HTMLMetaElement>'.
+  Property 'charset' does not exist on type 'DetailedHTMLProps<MetaHTMLAttributes<HTMLMetaElement>, HTMLMetaElement>'. Did you mean 'charSet'?

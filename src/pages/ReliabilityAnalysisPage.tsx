@@ -98,7 +98,7 @@ const FACTOR_LABELS = {
 // ────────────────────────────────────────────────────────────────
 async function fetchFullReliability(cohorts: any): Promise<FullReliabilityResult | null> {
   // 実データを取得
-  let allEvals = [];
+  let allEvals: any[] = [];
   let allHumanEvals = [];
   
   try {
@@ -224,7 +224,7 @@ async function fetchFullReliability(cohorts: any): Promise<FullReliabilityResult
         ci_mean_upper: 0.07, ci_mean_lower: -0.03,
         ci_loa_upper_upper: 0.43, ci_loa_lower_lower: -0.39,
         outlier_ratio: 0.04, bias_p_value: 0.42,
-        points: cohorts.slice(0, 50).map((p) => ({
+        points: cohorts.slice(0, 50).map((p: any) => ({
           mean: p.final_total,
           diff: +(p.final_total * 0.02 + (Math.random() - 0.5) * 0.3).toFixed(2),
         })),
@@ -690,7 +690,7 @@ export default function ReliabilityAnalysisPage() {
                     <RechartTooltip cursor={{ strokeDasharray: "3 3" }} />
                     <ReferenceLine stroke="#888" segment={[{x:1,y:1},{x:5,y:5}]} strokeDasharray="4 4" />
                     <Scatter
-                      data={data.total.bland_altman.points.map((p) => ({
+                      data={data.total.bland_altman.points.map((p: any) => ({
                         ai: p.mean + p.diff / 2,
                         human: p.mean - p.diff / 2,
                       }))}
