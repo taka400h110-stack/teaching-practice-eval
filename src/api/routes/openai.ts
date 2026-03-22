@@ -306,24 +306,26 @@ function buildCoTCPrompt(
 ): string {
   const convText = conversation.slice(-6).map((m) => `${m.role === "user" ? "学生" : "AI"}: ${m.content}`).join("\n");
   
+
   const bfiRules = `
-## BFI特性と目標難易度調整
-以下のパーソナリティ特性（BFIスコア）を考慮し、目標の難易度や粒度を調整してください。
+## 性格特性（並川ら, 2012 短縮版）と目標難易度調整
+以下のパーソナリティ特性（5件法スコア: 1.0～5.0）を考慮し、目標の難易度や粒度を調整してください。
 ${bfiScores ? `
-[学生のBFI特性]
-- 誠実性 (Conscientiousness): ${bfiScores.conscientiousness ?? "不明"}
-- 神経症的傾向 (Neuroticism): ${bfiScores.neuroticism ?? "不明"}
-- 開放性 (Openness): ${bfiScores.openness ?? "不明"}
+[学生の性格特性]
+- 誠実性 (Conscientiousness): ${bfiScores.conscientiousness?.toFixed(2) ?? "不明"} / 5.0
+- 情緒不安定性 (Neuroticism): ${bfiScores.neuroticism?.toFixed(2) ?? "不明"} / 5.0
+- 開放性 (Openness): ${bfiScores.openness?.toFixed(2) ?? "不明"} / 5.0
 
 [調整ルール]
-- 神経症的傾向が高い(60以上)場合は、目標を小さく分解し、失敗リスクの低い安全な形（難易度: Low）にする。
-- 誠実性が高い(60以上)場合は、目標をやや高難度にし、実行回数や継続性を求める形（難易度: High）にする。
-- 開放性が高い(60以上)場合は、新しい試行や振り返り、代替行動の検討を含む目標（難易度: Medium）にする。
+- 情緒不安定性が高い(3.5以上)場合は、目標を小さく分解し、失敗リスクの低い安全な形（難易度: Low）にする。
+- 誠実性が高い(3.5以上)場合は、目標をやや高難度にし、実行回数や継続性を求める形（難易度: High）にする。
+- 開放性が高い(3.5以上)場合は、新しい試行や振り返り、代替行動の検討を含む目標（難易度: Medium）にする。
 - 該当しない場合、またはスコアがない場合は標準的な難易度（Medium）とする。
 ` : `
-[学生のBFI特性]
+[学生の性格特性]
 取得できませんでした。標準的な難易度（Medium）で目標を設定してください。
 `}
+`;
 `;
 
   return `あなたは教育実習における目標設定支援の専門家AIです。以下の対話から来週の SMART 目標を提案してください。
@@ -367,7 +369,7 @@ ${bfiRules}
   "is_smart": true,
   "rationale": "目標設定の根拠（30字以内）",
   "difficulty_level": "Low | Medium | High",
-  "adjustment_reason": "BFI特性を考慮した調整理由（例: 誠実性が高いため...）",
+  "adjustment_reason": "性格特性を考慮した調整理由（例: 誠実性が高いため...）",
   "target_week": ${weekNumber + 1}
 }`;
 }
