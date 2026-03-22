@@ -238,7 +238,38 @@ async function ensureSchema(db: D1Database): Promise<void> {
       calculated_at TEXT DEFAULT (datetime('now'))
     );
 
-    CREATE TABLE IF NOT EXISTS learning_progress_scores (
+
+    CREATE TABLE IF NOT EXISTS scat_projects (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      created_by TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS scat_segments (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      segment_order INTEGER NOT NULL,
+      text_content TEXT NOT NULL,
+      source_journal_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS scat_codes (
+      id TEXT PRIMARY KEY,
+      segment_id TEXT NOT NULL,
+      researcher_id TEXT NOT NULL,
+      step1_keywords TEXT,
+      step2_thesaurus TEXT,
+      step3_concept TEXT,
+      step4_theme TEXT,
+      memo TEXT,
+      factor TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(segment_id, researcher_id)
+    );
+\n    CREATE TABLE IF NOT EXISTS learning_progress_scores (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       week_number INTEGER NOT NULL,

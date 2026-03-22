@@ -22,6 +22,8 @@ import DownloadIcon    from "@mui/icons-material/Download";
 import CalculateIcon   from "@mui/icons-material/Calculate";
 import CompareIcon     from "@mui/icons-material/Compare";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, Legend, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import mockApi from "../api/client";
 
 // ────────────────────────────────────────────────────────────────
 // 型定義
@@ -199,48 +201,133 @@ const TabPanel = ({ children, value, index }: TabPanelProps) =>
 // ────────────────────────────────────────────────────────────────
 // メインコンポーネント
 // ────────────────────────────────────────────────────────────────
+
 export default function SCATAnalysisPage() {
   const [tab, setTab] = useState(0);
-  const [rows, setRows] = useState<ScatRow[]>(SAMPLE_SCAT);
-  const [nextId, setNextId] = useState(SAMPLE_SCAT.length + 1);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [researcherId, setResearcherId] = useState<string>("researcher-A");
+  const [newProjectTitle, setNewProjectTitle] = useState("");
+  const [newSegmentText, setNewSegmentText] = useState("");
+  const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" as any });
   const [kappaResult, setKappaResult] = useState<{ kappa: number; agreement: number; interpretation: string; n: number } | null>(null);
-  const [isCalcKappa, setIsCalcKappa] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, msg: "" });
 
-  // コーダー間一致率計算（コーダー1=自動ラベル, コーダー2=手動修正後）
-  const handleCalcKappa = useCallback(async () => {
-    setIsCalcKappa(true);
-    await new Promise((r) => setTimeout(r, 800));
+  const queryClient = useQueryClient();
 
-    // デモ: 同じデータの一部を変えてコーダー間差異を模擬
-    const coder1 = rows.map((r) => ({ id: r.id, code: r.theme }));
-    const coder2 = rows.map((r, i) => ({ id: r.id, code: i % 5 === 0 ? (r.theme + "（変更）") : r.theme })); // 20%不一致模擬
+  const { data: projectsData, isLoading: isLoadingProjects } = useQuery<any>({
+    queryKey: ['scat-projects'],
+    queryFn: () => mockApi.getScatProjects()
+  });
 
-    const result = computeCohenKappa(coder1, coder2);
+  const { data: segmentsData, isLoading: isLoadingSegments } = useQuery<any>({
+    queryKey: ['scat-segments', selectedProjectId],
+    queryFn: () => mockApi.getScatSegments(selectedProjectId),
+    enabled: !!selectedProjectId
+  });
+
+  const { data: codesData, isLoading: isLoadingCodes } = useQuery<any>({
+    queryKey: ['scat-codes', selectedProjectId],
+    queryFn: () => mockApi.getScatCodes(selectedProjectId),
+    enabled: !!selectedProjectId
+  });
+
+  const createProjectMut = useMutation<any, Error, any>({
+    mutationFn: (title: string) => mockApi.createScatProject(title, "SCAT Analysis", researcherId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['scat-projects'] });
+      setSelectedProjectId(data.id);
+      setNewProjectTitle("");
+      setSnackbar({ open: true, msg: "プロジェクトを作成しました", severity: "success" });
+    }
+  });
+
+  const addSegmentMut = useMutation<any, Error, any>({
+    mutationFn: (text: string) => {
+      const segments = [{ segment_order: (segmentsData?.segments?.length || 0) + 1, text_content: text }];
+      return mockApi.createScatSegments(selectedProjectId, segments);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scat-segments', selectedProjectId] });
+      setNewSegmentText("");
+      setSnackbar({ open: true, msg: "セグメントを追加しました", severity: "success" });
+    }
+  });
+
+  const saveCodeMut = useMutation<any, Error, any>({
+    mutationFn: (codeData: any) => mockApi.saveScatCode(codeData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scat-codes', selectedProjectId] });
+      setSnackbar({ open: true, msg: "保存しました", severity: "success" });
+    }
+  });
+
+  const handleCreateProject = () => {
+    if (newProjectTitle.trim()) {
+      createProjectMut.mutate(newProjectTitle.trim());
+    }
+  };
+
+  const handleAddSegment = () => {
+    if (newSegmentText.trim() && selectedProjectId) {
+      addSegmentMut.mutate(newSegmentText.trim());
+    }
+  };
+
+  const handleSaveCode = (segmentId: string, field: string, value: string, currentCode: any) => {
+    const payload = {
+      segment_id: segmentId,
+      researcher_id: researcherId,
+      step1_keywords: currentCode?.step1_keywords || "",
+      step2_thesaurus: currentCode?.step2_thesaurus || "",
+      step3_concept: currentCode?.step3_concept || "",
+      step4_theme: currentCode?.step4_theme || "",
+      memo: currentCode?.memo || "",
+      factor: currentCode?.factor || "",
+      [field]: value
+    };
+    saveCodeMut.mutate(payload);
+  };
+
+  const handleCalcKappa = () => {
+    if (!codesData?.codes) return;
+    const codes = codesData.codes as any[];
+    // Get unique segments
+    const segmentIds = Array.from(new Set(codes.map(c => c.segment_id)));
+    
+    // We need 2 distinct coders
+    const coders = Array.from(new Set(codes.map(c => c.researcher_id)));
+    if (coders.length < 2) {
+      setSnackbar({ open: true, msg: "コーダーが2名以上必要です", severity: "warning" });
+      return;
+    }
+
+    const coder1Id = coders[0];
+    const coder2Id = coders[1];
+
+    const coder1Codes = codes.filter(c => c.researcher_id === coder1Id).map(c => ({ id: c.segment_id, code: c.step4_theme || "" }));
+    const coder2Codes = codes.filter(c => c.researcher_id === coder2Id).map(c => ({ id: c.segment_id, code: c.step4_theme || "" }));
+
+    const result = computeCohenKappa(coder1Codes, coder2Codes);
     setKappaResult(result);
-    setIsCalcKappa(false);
-    setSnackbar({ open: true, msg: `Cohen's κ = ${result.kappa}（${result.interpretation}）` });
-  }, [rows]);
-
-  const addRow = () => {
-    setRows((prev) => [...prev, {
-      id: nextId, text: "", keywords: "", thesaurus: "", concept: "", theme: "", memo: "",
-    }]);
-    setNextId((n) => n + 1);
   };
 
-  const removeRow = (id: number) => {
-    setRows((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  const updateRow = (id: number, field: keyof ScatRow, value: string) => {
-    setRows((prev) => prev.map((r) => r.id === id ? { ...r, [field]: value } : r));
-  };
+  // Convert for charts
+  const rows: ScatRow[] = (segmentsData?.segments || []).map((seg: any) => {
+    const code = (codesData?.codes || []).find((c: any) => c.segment_id === seg.id && c.researcher_id === researcherId);
+    return {
+      id: seg.id,
+      text: seg.text_content,
+      keywords: code?.step1_keywords || "",
+      thesaurus: code?.step2_thesaurus || "",
+      concept: code?.step3_concept || "",
+      theme: code?.step4_theme || "",
+      memo: code?.memo || "",
+      factor: code?.factor || "",
+      coder_id: researcherId
+    };
+  });
 
   const themes = aggregateThemes(rows);
   const concepts = aggregateConcepts(rows);
-
-  // 因子別分布
   const factorDist = Object.entries(FACTOR_LABELS).map(([key, label]) => ({
     factor: label.split(": ")[0],
     count: rows.filter((r) => r.factor === key).length,
@@ -248,114 +335,140 @@ export default function SCATAnalysisPage() {
 
   return (
     <Box>
-      {/* ヘッダー */}
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
         <Box display="flex" alignItems="center" gap={1}>
           <PsychologyIcon color="primary" sx={{ fontSize: 32 }} />
           <Box>
-            <Typography variant="h5" fontWeight={700}>SCAT質的分析</Typography>
+            <Typography variant="h5" fontWeight={700}>SCAT質的分析 (Project: {projectsData?.projects?.find((p:any) => p.id === selectedProjectId)?.title || "未選択"})</Typography>
             <Typography variant="body2" color="text.secondary">
               Steps for Coding and Theorization — コーダー間一致率（Cohen's κ）付き
             </Typography>
           </Box>
         </Box>
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="contained"
-            startIcon={isCalcKappa ? <CircularProgress size={16} color="inherit" /> : <CalculateIcon />}
-            onClick={handleCalcKappa}
-            disabled={isCalcKappa}
+        <Stack direction="row" spacing={1} alignItems="center">
+          <TextField 
+            select 
+            size="small" 
+            label="プロジェクト" 
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            SelectProps={{ native: true }}
+            sx={{ minWidth: 150 }}
           >
-            κ計算
+            <option value="">-- 選択 --</option>
+            {projectsData?.projects?.map((p: any) => (
+              <option key={p.id} value={p.id}>{p.title}</option>
+            ))}
+          </TextField>
+          <TextField 
+            size="small" 
+            label="新規作成" 
+            value={newProjectTitle}
+            onChange={(e) => setNewProjectTitle(e.target.value)}
+          />
+          <Button variant="contained" onClick={handleCreateProject} disabled={!newProjectTitle.trim()}>
+            作成
           </Button>
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => downloadScatCSV(rows)}>
-            CSV出力
-          </Button>
+
+          <TextField
+            select
+            size="small"
+            label="研究者"
+            value={researcherId}
+            onChange={(e) => setResearcherId(e.target.value)}
+            SelectProps={{ native: true }}
+            sx={{ minWidth: 120, ml: 2 }}
+          >
+            <option value="researcher-A">研究者A</option>
+            <option value="researcher-B">研究者B</option>
+          </TextField>
         </Stack>
       </Box>
 
-      {/* カッパ係数結果 */}
-      {kappaResult && (
-        <Alert
-          severity={kappaResult.kappa >= 0.6 ? "success" : "warning"}
-          sx={{ mb: 2 }}
-          onClose={() => setKappaResult(null)}
-        >
-          <strong>コーダー間一致率 (Cohen's κ):</strong> κ = {kappaResult.kappa}、
-          一致率 = {(kappaResult.agreement * 100).toFixed(1)}% (N={kappaResult.n})、
-          解釈: {kappaResult.interpretation}
-          （κ≥0.6 が目安）
-        </Alert>
-      )}
-
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
-        <Tab label="コーディング表" />
-        <Tab label="テーマ・概念集計" />
-        <Tab label="因子別分析" />
-        <Tab label="量×質 統合" />
+        <Tab label="コーディング表" disabled={!selectedProjectId} />
+        <Tab label="テーマ・概念集計" disabled={!selectedProjectId} />
+        <Tab label="因子別分析" disabled={!selectedProjectId} />
+        <Tab label="量×質 統合" disabled={!selectedProjectId} />
       </Tabs>
 
-      {/* ━━ コーディング表 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <TabPanel value={tab} index={0}>
         <Alert severity="info" sx={{ mb: 2 }}>
           SCAT（大谷, 2007/2011）：①元テキスト → ②注目語句 → ③テキスト外語句 → ④構成概念 → ⑤テーマ の順に分析します。
         </Alert>
-        {rows.map((row) => (
-          <Accordion key={row.id} sx={{ mb: 1 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ ".MuiAccordionSummary-content": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", pr: 2 } }}>
-              <Box display="flex" alignItems="center" gap={1} sx={{ width: "100%", overflow: "hidden" }}>
-                <Chip label={`#${row.id}`} size="small" variant="outlined" />
-                {row.week && <Chip label={`第${row.week}週`} size="small" />}
-                {row.factor && <Chip label={FACTOR_LABELS[row.factor]?.split(": ")[0]} size="small" color="primary" />}
-                <Typography variant="body2" sx={{ flex: 1, minWidth: 0, ml: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{row.text || "（空欄）"}</Typography>
-                <IconButton size="small" onClick={(e) => { e.stopPropagation(); removeRow(row.id); }}>
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12 }}>
-                  <TextField label="① 元テキスト（日誌記述）" value={row.text} fullWidth multiline rows={3}
-                    onChange={(e) => updateRow(row.id, "text", e.target.value)} />
+        
+        <Box mb={3} display="flex" gap={1}>
+          <TextField 
+            fullWidth 
+            size="small" 
+            label="新規セグメントテキストを追加" 
+            value={newSegmentText}
+            onChange={(e) => setNewSegmentText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAddSegment();
+            }}
+          />
+          <Button variant="contained" onClick={handleAddSegment} disabled={!newSegmentText.trim()}>
+            追加
+          </Button>
+        </Box>
+
+        {isLoadingSegments ? <CircularProgress /> : segmentsData?.segments?.map((seg: any) => {
+          const code = (codesData?.codes || []).find((c: any) => c.segment_id === seg.id && c.researcher_id === researcherId) || {};
+          return (
+            <Accordion key={seg.id} sx={{ mb: 1 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ ".MuiAccordionSummary-content": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", pr: 2 } }}>
+                <Box display="flex" alignItems="center" gap={1} sx={{ width: "100%", overflow: "hidden" }}>
+                  <Chip label={`#${seg.segment_order}`} size="small" variant="outlined" />
+                  <Typography variant="body2" sx={{ flex: 1, minWidth: 0, ml: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{seg.text_content || "（空欄）"}</Typography>
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Grid container spacing={2}>
+                  <Grid size={{xs: 12, sm: 6}}>
+                    <TextField label="② 注目する語句" value={code.step1_keywords || ""} fullWidth
+                      onBlur={(e) => handleSaveCode(seg.id, "step1_keywords", e.target.value, code)}
+                      onChange={(e) => {
+                        // Optimistic update omitted for simplicity, use onBlur to save
+                        const input = e.target;
+                      }}
+                      defaultValue={code.step1_keywords || ""}
+                      helperText="テキスト中の重要語句を抜き出す" />
+                  </Grid>
+                  <Grid size={{xs: 12, sm: 6}}>
+                    <TextField label="③ テキスト外の語句（類語・上位概念）" defaultValue={code.step2_thesaurus || ""} fullWidth
+                      onBlur={(e) => handleSaveCode(seg.id, "step2_thesaurus", e.target.value, code)}
+                      helperText="類語・上位概念・専門用語に置き換える" />
+                  </Grid>
+                  <Grid size={{xs: 12, sm: 6}}>
+                    <TextField label="④ 構成概念" defaultValue={code.step3_concept || ""} fullWidth
+                      onBlur={(e) => handleSaveCode(seg.id, "step3_concept", e.target.value, code)}
+                      helperText="概念化・抽象化" />
+                  </Grid>
+                  <Grid size={{xs: 12, sm: 6}}>
+                    <TextField label="⑤ テーマ・カテゴリ" defaultValue={code.step4_theme || ""} fullWidth
+                      onBlur={(e) => handleSaveCode(seg.id, "step4_theme", e.target.value, code)}
+                      helperText="上位テーマに統合" />
+                  </Grid>
+                  <Grid size={{xs: 12, sm: 6}}>
+                    <TextField label="対応する因子" defaultValue={code.factor || ""} fullWidth
+                      onBlur={(e) => handleSaveCode(seg.id, "factor", e.target.value, code)}
+                      helperText="例: factor1" />
+                  </Grid>
+                  <Grid size={{xs: 12, sm: 6}}>
+                    <TextField label="⑥ メモ・注記" defaultValue={code.memo || ""} fullWidth
+                      onBlur={(e) => handleSaveCode(seg.id, "memo", e.target.value, code)} />
+                  </Grid>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField label="② 注目する語句" value={row.keywords} fullWidth
-                    onChange={(e) => updateRow(row.id, "keywords", e.target.value)}
-                    helperText="テキスト中の重要語句を抜き出す" />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField label="③ テキスト外の語句（類語・上位概念）" value={row.thesaurus} fullWidth
-                    onChange={(e) => updateRow(row.id, "thesaurus", e.target.value)}
-                    helperText="類語・上位概念・専門用語に置き換える" />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField label="④ 構成概念" value={row.concept} fullWidth
-                    onChange={(e) => updateRow(row.id, "concept", e.target.value)}
-                    helperText="概念化・抽象化" />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField label="⑤ テーマ・カテゴリ" value={row.theme} fullWidth
-                    onChange={(e) => updateRow(row.id, "theme", e.target.value)}
-                    helperText="上位テーマに統合" />
-                </Grid>
-                <Grid size={{ xs: 12 }}>
-                  <TextField label="⑥ メモ・注記" value={row.memo} fullWidth
-                    onChange={(e) => updateRow(row.id, "memo", e.target.value)} />
-                </Grid>
-              </Grid>
-            </AccordionDetails>
-          </Accordion>
-        ))}
-        <Button startIcon={<AddIcon />} onClick={addRow} sx={{ mt: 1 }} variant="outlined">
-          行を追加
-        </Button>
+              </AccordionDetails>
+            </Accordion>
+          );
+        })}
       </TabPanel>
 
-      {/* ━━ テーマ・概念集計 ━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <TabPanel value={tab} index={1}>
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Box display="flex" alignItems="center" gap={1} mb={2}>
@@ -374,7 +487,7 @@ export default function SCATAnalysisPage() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>構成概念一覧</Typography>
@@ -391,50 +504,30 @@ export default function SCATAnalysisPage() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{xs: 12}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>コーダー間一致率（Cohen's κ）</Typography>
-                <TableContainer component={Paper} variant="outlined" sx={{ overflowX: "auto" }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ bgcolor: "grey.100" }}>
-                        {["コーダーペア", "κ値", "一致率", "解釈", "基準"].map((h) => (
-                          <TableCell key={h} sx={{ fontWeight: 700 }}>{h}</TableCell>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {kappaResult ? (
-                        <TableRow hover>
-                          <TableCell>コーダー1 vs コーダー2</TableCell>
-                          <TableCell><Chip label={kappaResult.kappa.toFixed(3)} size="small" color={kappaResult.kappa >= 0.6 ? "success" : "warning"} /></TableCell>
-                          <TableCell>{(kappaResult.agreement * 100).toFixed(1)}%</TableCell>
-                          <TableCell>{kappaResult.interpretation}</TableCell>
-                          <TableCell><Typography variant="caption">κ≥0.6</Typography></TableCell>
-                        </TableRow>
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5}>
-                            <Button size="small" onClick={handleCalcKappa} startIcon={<CalculateIcon />}>
-                              κを計算
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                {kappaResult && (
+                  <Alert severity={kappaResult.kappa >= 0.6 ? "success" : "warning"} sx={{ mb: 2 }}>
+                    <strong>コーダー間一致率 (Cohen's κ):</strong> κ = {kappaResult.kappa}、
+                    一致率 = {(kappaResult.agreement * 100).toFixed(1)}% (N={kappaResult.n})、
+                    解釈: {kappaResult.interpretation}
+                    （κ≥0.6 が目安）
+                  </Alert>
+                )}
+                <Button size="small" onClick={handleCalcKappa} startIcon={<CalculateIcon />} variant="outlined">
+                  研究者Aと研究者Bのκを計算
+                </Button>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       </TabPanel>
 
-      {/* ━━ 因子別分析 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <TabPanel value={tab} index={2}>
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>ルーブリック因子別 記述件数</Typography>
@@ -450,7 +543,7 @@ export default function SCATAnalysisPage() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{xs: 12, md: 6}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>因子別 SCAT記述一覧</Typography>
@@ -462,7 +555,6 @@ export default function SCATAnalysisPage() {
                       <Chip label={label} size="small" color="primary" sx={{ mb: 1 }} />
                       {factorRows.map((r) => (
                         <Paper key={r.id} variant="outlined" sx={{ p: 1, mb: 0.5 }}>
-                          <Typography variant="caption" color="text.secondary">第{r.week}週</Typography>
                           <Typography variant="body2">{r.concept || r.text.slice(0, 50)}</Typography>
                           <Typography variant="caption" color="primary">テーマ: {r.theme}</Typography>
                         </Paper>
@@ -476,13 +568,12 @@ export default function SCATAnalysisPage() {
         </Grid>
       </TabPanel>
 
-      {/* ━━ 量×質 統合 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <TabPanel value={tab} index={3}>
         <Alert severity="success" sx={{ mb: 3 }}>
           <strong>量的・質的混合分析（収束デザイン）</strong>：AIルーブリック評価スコア（量的）と日誌SCAT分析（質的）の対応関係を可視化します。
         </Alert>
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{xs: 12}}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} mb={2}>
@@ -523,37 +614,13 @@ export default function SCATAnalysisPage() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                  混合研究法 統合フレームワーク（論文 3.8節）
-                </Typography>
-                {[
-                  { phase: "Phase 1", label: "量的データ収集", desc: "AIルーブリック評価（CoT-A）・人間評価・自己評価スコア", color: "#1976d2" },
-                  { phase: "Phase 2", label: "質的データ収集", desc: "実習日誌テキスト（OCR読み込み対応）・省察チャット記録", color: "#43a047" },
-                  { phase: "Phase 3", label: "SCAT分析", desc: "コーディング → 構成概念 → テーマ化（2名コーダー、κ確認）", color: "#fb8c00" },
-                  { phase: "Phase 4", label: "混合統合", desc: "スコア変化（量的）と省察テーマ変化（質的）の対応分析", color: "#7b1fa2" },
-                ].map((p) => (
-                  <Paper key={p.phase} sx={{ p: 2, mb: 1, borderLeft: `4px solid ${p.color}` }}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <Chip label={p.phase} size="small" sx={{ bgcolor: p.color, color: "white" }} />
-                      <Typography variant="subtitle2" fontWeight={700}>{p.label}</Typography>
-                    </Box>
-                    <Typography variant="body2" color="text.secondary" mt={0.5}>{p.desc}</Typography>
-                  </Paper>
-                ))}
-              </CardContent>
-            </Card>
-          </Grid>
         </Grid>
       </TabPanel>
 
-      {/* スナックバー */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
-        onClose={() => setSnackbar({ open: false, msg: "" })}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
         message={snackbar.msg}
       />
     </Box>
