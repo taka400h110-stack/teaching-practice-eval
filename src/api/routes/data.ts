@@ -1492,6 +1492,86 @@ dataRouter.get('/rq3b/responses/:userId', async (c) => {
   }
 });
 
+
+dataRouter.get("/export/joint-display-csv", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+
+  try {
+    const { results } = await db.prepare(`
+      SELECT
+        sc.segment_id, sc.researcher_id,
+        sc.step1_keywords, sc.step2_thesaurus, sc.step3_concept, sc.step4_theme, sc.memo, sc.factor,
+        ss.text_content,
+        je.student_id, je.week_number, je.id as journal_id,
+        e.total_score as ai_total_score,
+        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4,
+        se.total_score as self_total_score,
+        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4
+      FROM scat_codes sc
+      JOIN scat_segments ss ON sc.segment_id = ss.id
+      LEFT JOIN journal_entries je ON ss.source_journal_id = je.id
+      LEFT JOIN evaluations e ON je.id = e.journal_id
+      LEFT JOIN self_evaluations se ON je.student_id = se.student_id AND je.week_number = se.week_number
+      ORDER BY je.student_id, je.week_number, ss.segment_order
+    `).all();
+
+    if (!results || results.length === 0) return c.text("No data", 404);
+
+    const headers = Object.keys(results[0]);
+    const csv = [
+      headers.join(","),
+      ...results.map(r => headers.map(h => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    return new Response("\uFEFF" + csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": "attachment; filename=joint_display.csv"
+      }
+    });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+dataRouter.get("/export/chat-goals-csv", async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+
+  try {
+    const { results } = await db.prepare(`
+      SELECT
+        cm.session_id as chat_session_id, cm.role as message_role, cm.content as message_text, cm.created_at, cm.message_order, cm.phase, cm.reflection_depth,
+        cs.student_id, cs.journal_id, cs.total_turns, cs.max_rd_chat_level,
+        je.week_number,
+        g.id as goal_id, g.goal_text, g.target_factor as goal_type, g.target_item_id as focus_item_id, g.achieved as achievement_status, g.created_at as goal_time
+      FROM chat_messages cm
+      JOIN chat_sessions cs ON cm.session_id = cs.id
+      LEFT JOIN journal_entries je ON cs.journal_id = je.id
+      LEFT JOIN goals g ON cs.id = g.session_id
+      ORDER BY cs.student_id, je.week_number, cm.session_id, cm.message_order
+    `).all();
+
+    if (!results || results.length === 0) return c.text("No data", 404);
+
+    const headers = Object.keys(results[0]);
+    const csv = [
+      headers.join(","),
+      ...results.map(r => headers.map(h => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    return new Response("\uFEFF" + csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": "attachment; filename=chat_goals.csv"
+      }
+    });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 export default dataRouter;
 
 // --- BFI Endpoints ---

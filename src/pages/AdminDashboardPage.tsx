@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  Box, Card, CardContent, Chip, Typography, Grid,
+  Box, Card, CardContent, Chip, Typography, Grid, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, LinearProgress, Tabs, Tab, Alert,
 } from "@mui/material";
@@ -56,11 +56,44 @@ export default function AdminDashboardPage() {
         システム稼働中 — 最終同期: {new Date().toLocaleString("ja-JP")}
       </Alert>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label="学校種別統計" />
         <Tab label="ユーザー管理" />
         <Tab label="システム情報" />
+        <Tab label="データエクスポート" />
       </Tabs>
+
+      {tab === 3 && (
+        <Card>
+          <CardContent>
+            <Typography variant="subtitle1" fontWeight="bold" mb={2}>研究用データエクスポート</Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Box p={2} border="1px solid" borderColor="divider" borderRadius={1}>
+                  <Typography variant="subtitle2" fontWeight="bold">Joint Display (質的×量的)</Typography>
+                  <Typography variant="body2" color="text.secondary" mb={2}>
+                    SCATのコーディング結果と、AI評価・自己評価の量的スコアを結合したデータを出力します。
+                  </Typography>
+                  <Button variant="contained" href="/api/data/export/joint-display-csv" target="_blank" rel="noopener noreferrer">
+                    Joint Display CSV をダウンロード
+                  </Button>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Box p={2} border="1px solid" borderColor="divider" borderRadius={1}>
+                  <Typography variant="subtitle2" fontWeight="bold">Chat & Goals (対話と目標)</Typography>
+                  <Typography variant="body2" color="text.secondary" mb={2}>
+                    CoT-Cチャットログと設定されたSMART目標（RQ3b）の全データを出力します。
+                  </Typography>
+                  <Button variant="contained" href="/api/data/export/chat-goals-csv" target="_blank" rel="noopener noreferrer">
+                    Chat & Goals CSV をダウンロード
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 学校種別 */}
       {tab === 0 && (
