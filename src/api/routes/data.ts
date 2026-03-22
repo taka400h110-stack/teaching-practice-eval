@@ -1305,10 +1305,12 @@ dataRouter.get("/rubric-behaviors/:itemNumber", async (c) => {
 export default dataRouter;
 
 // --- BFI Endpoints ---
-app.post('/api/bfi/save', async (c) => {
+dataRouter.post('/bfi/save', async (c) => {
+  const authUserId = c.req.header('x-user-id');
   const { env } = c;
   const body = await c.req.json();
   const userId = body.userId;
+  if (userId !== authUserId) return c.json({ error: 'Unauthorized' }, 401);
   const responses = body.responses; // { "1": 5, "2": 3, ... }
   
   if (!userId || !responses) return c.json({ error: "Invalid request" }, 400);
@@ -1336,7 +1338,7 @@ app.post('/api/bfi/save', async (c) => {
       conscientiousness: [23, 24, -25, -26, -27, -28, -29]
     };
     
-    const scores = {};
+    const scores: Record<string, number> = {};
     for (const [factor, items] of Object.entries(factorMap)) {
       let sum = 0;
       for (const id of items) {
@@ -1357,11 +1359,13 @@ app.post('/api/bfi/save', async (c) => {
   return c.json({ success: true, isCompleted: false });
 });
 
-app.get('/api/bfi/responses/:userId', async (c) => {
+dataRouter.get('/bfi/responses/:userId', async (c) => {
+  const authUserId = c.req.header('x-user-id');
   const { env } = c;
   const userId = c.req.param('userId');
+  if (userId !== authUserId) return c.json({ error: 'Unauthorized' }, 401);
   const res = await env.DB.prepare("SELECT item_id, score FROM namikawa_bfi_responses WHERE user_id = ?").bind(userId).all();
-  const responses = {};
+  const responses: Record<number, number> = {};
   for (const row of res.results) {
     responses[row.item_id] = row.score;
   }
