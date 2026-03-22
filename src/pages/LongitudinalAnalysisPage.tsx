@@ -547,7 +547,10 @@ export default function LongitudinalAnalysisPage() {
           <Grid size={{ xs: 12 }}>
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                  注記: 以下のLCGA（潜在クラス成長分析）の結果は、外部ソフトウェア（Mplus/R等）で算出された結果の表示用モックです。本システム内での自動計算は行われていません。
+                </Alert>
+<Typography variant="subtitle1" fontWeight={700} gutterBottom>
                   LCGA 潜在クラス別 成長軌跡（3クラスモデル）
                 </Typography>
                 <ResponsiveContainer width="100%" height={320}>
@@ -572,7 +575,7 @@ export default function LongitudinalAnalysisPage() {
                   </LineChart>
                 </ResponsiveContainer>
                 <Alert severity="info" sx={{ mt: 1 }}>
-                  LCGA 3クラスモデル（BIC基準で最適）。高成長群({(lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || [])[0].pct}%)・中成長群({(lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || [])[1].pct}%)・低成長群({(lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || [])[2].pct}%)。
+                  LCGA 3クラスモデル（BIC基準で最適）。高成長群(((({(lcgaResult?.classes?.map((c: any) => ({ pct: Math.round(c.proportion*100) })) || [{pct: 45}, {pct: 35}, {pct: 20}])[2].pct}%)。
                   実装: mplus/lavaan形式CSVエクスポート対応。
                 </Alert>
               </CardContent>
@@ -587,7 +590,10 @@ export default function LongitudinalAnalysisPage() {
           <Grid size={{ xs: 12 }}>
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                  注記: 以下のペアt検定およびCohen's dの効果量は、外部ソフトウェアで算出された結果の表示用モックです。
+                </Alert>
+<Typography variant="subtitle1" fontWeight={700} gutterBottom>
                   ペアt検定 結果（実習前後 差の検定）
                 </Typography>
                 <TableContainer>
