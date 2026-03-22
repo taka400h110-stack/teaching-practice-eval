@@ -64,6 +64,8 @@ export interface JournalEntry {
   entry_date:             string;
   status:                 JournalStatus;
   week_number:            number;
+  ocr_source?:            string;
+  ocr_confidence?:        number;
   student_grade?:         number;           // 実習生の学年（1-4）
   // コメント分岐：1-3年→大学教員コメント / 4年→実習先コメント
   univ_teacher_comment?:  string;           // 大学教員コメント（1-3年生用）
@@ -85,6 +87,8 @@ export interface JournalCreateRequest {
   entry_date:      string;
   week_number:     number;
   status:          JournalStatus;
+  ocr_source?:     string;
+  ocr_confidence?: number;
 }
 
 export interface JournalListResponse {

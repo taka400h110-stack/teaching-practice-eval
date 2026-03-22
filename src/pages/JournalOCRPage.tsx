@@ -343,6 +343,14 @@ export default function JournalOCRPage() {
 
     sessionStorage.setItem("ocr_form_data", JSON.stringify(formData));
     sessionStorage.setItem("ocr_raw_text", ocrResults.map((r) => r.rawText).join("\n\n--- ページ区切り ---\n\n"));
+    
+    // OCRソースと信頼度の保存 (複数ページある場合は最初のページのものを採用するか平均を取るが、ここでは簡略化して最初のもの)
+    if (ocrResults.length > 0) {
+      sessionStorage.setItem("ocr_source", ocrResults[0].ocrSource);
+      const avgConfidence = ocrResults.reduce((acc, r) => acc + r.overallConfidence, 0) / ocrResults.length;
+      sessionStorage.setItem("ocr_confidence", avgConfidence.toString());
+    }
+
     setSnackbar({ open: true, message: "日誌編集フォームに反映しました", severity: "success" });
     setActiveStep(3);
     setTimeout(() => navigate("/journals/new?from=ocr"), 1200);

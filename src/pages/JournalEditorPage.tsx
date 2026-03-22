@@ -4,7 +4,7 @@
  * 各時限ブロック：教科・活動 ＋ 授業内容・活動内容 のみ表示
  */
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   Box, Button, Card, CardContent, CircularProgress,
   TextField, Typography, Alert, Snackbar, Chip,
@@ -212,6 +212,7 @@ function HourBlock({
 // ── メインコンポーネント ──
 const JournalEditorPage: React.FC = () => {
   const navigate      = useNavigate();
+  const location      = useLocation();
   const { journalId } = useParams<{ journalId: string }>();
   const queryClient_  = useQueryClient();
   const isEditMode    = !!journalId;
@@ -220,6 +221,7 @@ const JournalEditorPage: React.FC = () => {
   const [reflection, setReflection] = useState("");
   const [entryDate,  setEntryDate]  = useState(new Date().toISOString().split("T")[0]);
   const [weekNumber, setWeekNumber] = useState(1);
+  const [ocrMeta, setOcrMeta] = useState<{ source?: string; confidence?: number }>({});
   const [errors,     setErrors]     = useState<{ content?: string; date?: string }>({});
   const [snackbarOpen,    setSnackbarOpen]    = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -249,6 +251,70 @@ const JournalEditorPage: React.FC = () => {
     setWeekNumber(existing.week_number ?? 1);
   }, [existing]);
 
+
+  useEffect(() => {
+    if (isEditMode) return;
+    
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get("from") === "ocr") {
+      try {
+        const ocrDataStr = sessionStorage.getItem("ocr_form_data");
+        const ocrRawText = sessionStorage.getItem("ocr_raw_text");
+        
+        if (ocrDataStr) {
+          const formData = JSON.parse(ocrDataStr) as Record<string, string>;
+          
+          const newRecords: HourRecord[] = [];
+          
+          const mapping = [
+            { field: "block_morning", label: "朝の会" },
+            { field: "block_p1", label: "1時限" },
+            { field: "block_p2", label: "2時限" },
+            { field: "block_p3", label: "3時限" },
+            { field: "block_p4", label: "4時限" },
+            { field: "block_lunch", label: "給食・昼" },
+            { field: "block_p5", label: "5時限" },
+            { field: "block_p6", label: "6時限" },
+            { field: "block_cleaning", label: "清掃" },
+            { field: "block_closing", label: "帰りの会" },
+            { field: "block_after", label: "放課後" },
+          ];
+          
+          let order = 0;
+          for (const m of mapping) {
+            if (formData[m.field]) {
+              newRecords.push(makeEmpty(order++, {
+                time_label: m.label,
+                body: formData[m.field].trim()
+              }));
+            }
+          }
+          
+          if (newRecords.length > 0) {
+            setRecords(newRecords);
+          }
+          
+          if (formData["reflection"]) {
+            setReflection(formData["reflection"].trim());
+          } else if (ocrRawText && newRecords.length === 0) {
+            setReflection(ocrRawText);
+          }
+          
+          const source = sessionStorage.getItem("ocr_source");
+          const conf = sessionStorage.getItem("ocr_confidence");
+          if (source) {
+            setOcrMeta({ source, confidence: conf ? parseFloat(conf) : undefined });
+          }
+          sessionStorage.removeItem("ocr_form_data");
+          sessionStorage.removeItem("ocr_raw_text");
+          sessionStorage.removeItem("ocr_source");
+          sessionStorage.removeItem("ocr_confidence");
+        }
+      } catch (e) {
+        console.error("Failed to load OCR data", e);
+      }
+    }
+  }, [isEditMode, location.search]);
   const saveMutation = useMutation<JournalEntry, Error, JournalCreateRequest>({
     mutationFn: async (payload) => {
       if (isEditMode) return mockApi.updateJournal(journalId!, payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
@@ -317,6 +383,7 @@ const JournalEditorPage: React.FC = () => {
   };
 
   const buildPayload = (status: "draft" | "submitted"): JournalCreateRequest => ({
+    ...(ocrMeta.source ? { ocr_source: ocrMeta.source, ocr_confidence: ocrMeta.confidence } : {}),
     title:           `${entryDate} の日誌（第${weekNumber}週）`,
     content:         recordsToContent(records, reflection),
     reflection_text: reflection,

@@ -293,6 +293,8 @@ const mockApi = {
       entry_date:      (data.entry_date as string) || new Date().toISOString().split("T")[0],
       status:          (data.status as JournalEntry["status"]) || "draft",
       week_number:     (data.week_number as number) || 1,
+      ocr_source:      data.ocr_source as string | undefined,
+      ocr_confidence:  data.ocr_confidence as number | undefined,
     };
     journals.unshift(newJ);
     saveJournals(journals);
