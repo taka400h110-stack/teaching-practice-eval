@@ -350,10 +350,10 @@ const mockApi = {
         overall_comment: data.evaluation.overall_comment || "",
         total_score: data.evaluation.total_score,
         factor_scores: {
-          factor1: data.evaluation.factor1_score,
-          factor2: data.evaluation.factor2_score,
-          factor3: data.evaluation.factor3_score,
-          factor4: data.evaluation.factor4_score,
+          factor1: data.evaluation.factor1,
+          factor2: data.evaluation.factor2,
+          factor3: data.evaluation.factor3,
+          factor4: data.evaluation.factor4,
         },
         evaluation_items: data.items.map((item: any) => ({
           item_number: item.item_number,
@@ -388,10 +388,10 @@ const mockApi = {
         overall_comment: e.overall_comment || "",
         total_score: e.total_score,
         factor_scores: {
-          factor1: e.factor1_score,
-          factor2: e.factor2_score,
-          factor3: e.factor3_score,
-          factor4: e.factor4_score,
+          factor1: e.factor1,
+          factor2: e.factor2,
+          factor3: e.factor3,
+          factor4: e.factor4,
         },
         evaluation_items: [], // 簡略化のため省略
         evaluated_item_count: 23,
@@ -525,30 +525,74 @@ const mockApi = {
 
   // ── 成長データ ──
   getGrowthData: async (): Promise<GrowthData> => {
-    await delay();
-    return MOCK_GROWTH_DATA;
+    try {
+      const res = await fetch('/api/data/growth/user-001');
+      if (!res.ok) throw new Error('Failed');
+      const data: any = await res.json();
+      return {
+        
+        student_id: data.student_id,
+        weekly_scores: data.weekly_scores.map((w: any) => ({
+          week: w.week_number,
+          factor1: w.factor1,
+          factor2: w.factor2,
+          factor3: w.factor3,
+          factor4: w.factor4,
+          total: w.total
+        }))
+      };
+    } catch {
+      return MOCK_GROWTH_DATA;
+    }
   },
 
   // ── 自己評価 ──
   getSelfEvaluations: async (): Promise<SelfEvaluation[]> => {
-    await delay();
-    return getSelfEvals();
+    try {
+      const res = await fetch('/api/data/self-evals/user-001');
+      if (!res.ok) throw new Error('Failed');
+      const data: any = await res.json();
+      return data.self_evaluations.map((e: any) => ({
+        id: e.id,
+        week: e.week_number,
+        date: e.created_at,
+        factor1: e.factor1,
+        factor2: e.factor2,
+        factor3: e.factor3,
+        factor4: e.factor4,
+        total_score: e.total_score,
+                comment: e.comment
+      }));
+    } catch {
+      return getSelfEvals();
+    }
   },
   saveSelfEvaluation: async (data: Omit<SelfEvaluation, "id">): Promise<SelfEvaluation> => {
-    await delay();
+    try {
+      const res = await fetch('/api/data/self-evals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: 'user-001',
+          week_number: data.week,
+          factor1: data.factor1,
+          factor2: data.factor2,
+          factor3: data.factor3,
+          factor4: data.factor4,
+                    comment: data.comment
+        })
+      });
+      if (res.ok) {
+        return { id: 'ok', ...data } as SelfEvaluation;
+      }
+    } catch {}
+    
+    // fallback
     const evals = getSelfEvals();
-    const newEval: SelfEvaluation = {
-      id: `self-eval-${Date.now()}`,
-      ...data,
-    };
-    // 同じ週のデータがあれば更新
+    const newEval: SelfEvaluation = { id: `self-eval-${Date.now()}`, ...data };
     const idx = evals.findIndex((e) => e.week === data.week);
-    if (idx !== -1) {
-      evals[idx] = newEval;
-    } else {
-      evals.push(newEval);
-      evals.sort((a, b) => a.week - b.week);
-    }
+    if (idx !== -1) evals[idx] = newEval;
+    else evals.push(newEval);
     saveSelfEvals(evals);
     return newEval;
   },
@@ -687,9 +731,15 @@ const mockApi = {
   },
 
   // ── コーホート ──
-  getCohortProfiles: async () => {
-    await delay();
-    return MOCK_COHORT_PROFILES;
+  getCohortProfiles: async (): Promise<typeof MOCK_COHORT_PROFILES> => {
+    try {
+      const res = await fetch('/api/data/cohorts');
+      if (!res.ok) throw new Error('Failed');
+      const data: any = await res.json();
+      return data.cohorts;
+    } catch {
+      return MOCK_COHORT_PROFILES;
+    }
   },
 
   // ── ユーザー管理（管理者用）──

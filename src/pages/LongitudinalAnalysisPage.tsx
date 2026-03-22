@@ -38,12 +38,7 @@ const FACTOR_LABELS = {
   factor4: "F4: 職務理解・行動力",
 };
 
-// LCGA クラス（3クラス分類、論文 3.5.3）
-const LCGA_CLASSES = [
-  { id: "high", label: "高成長群",   color: "#2e7d32", pct: 32, desc: "実習全体を通じて急速に成長", initScore: 2.0, finalScore: 4.2, slope: 0.28 },
-  { id: "mid",  label: "中成長群",   color: "#1565c0", pct: 48, desc: "緩やかに安定した成長",       initScore: 2.3, finalScore: 3.4, slope: 0.14 },
-  { id: "low",  label: "低成長・安定群", color: "#e65100", pct: 20, desc: "成長が限定的または停滞", initScore: 2.5, finalScore: 2.9, slope: 0.05 },
-];
+
 
 // ────────────────────────────────────────────────────────────────
 // モック縦断統計生成
@@ -64,7 +59,7 @@ function genWeeklyStats(weeks: number) {
 }
 
 function genLCGATrajectories(weeks: number) {
-  return LCGA_CLASSES.map((cls) => ({
+  return (lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || []).map((cls) => ({
     ...cls,
     trajectory: Array.from({ length: weeks }, (_, i) => ({
       week: i + 1,
@@ -74,14 +69,7 @@ function genLCGATrajectories(weeks: number) {
 }
 
 // LGCM 結果（論文記載値を使用）
-const LGCM_RESULT = {
-  intercept_mean: 2.31, intercept_variance: 0.18,
-  slope_mean: 0.127, slope_variance: 0.009,
-  intercept_slope_cov: -0.021,
-  cfi: 0.938, rmsea: 0.065, srmr: 0.0615,
-  chi2: 316.886, chi2_df: 203, chi2_p: 0.001,
-  growth_pattern: "線形成長（正）",
-};
+const LGCM_RESULT = { intercept_mean: 0, intercept_variance: 0, slope_mean: 0, slope_variance: 0, intercept_slope_cov: 0, cfi: 0, rmsea: 0, srmr: 0, chi2: 0, chi2_df: 0, chi2_p: 0, growth_pattern: "" };
 
 // ────────────────────────────────────────────────────────────────
 // CSVダウンロード
@@ -100,15 +88,15 @@ function downloadGrowthCSV(weeklyStats: ReturnType<typeof genWeeklyStats>) {
 function downloadLGCMCSV() {
   const rows = [
     ["パラメータ", "推定値", "備考"],
-    ["Intercept mean", LGCM_RESULT.intercept_mean, "初期値の平均"],
-    ["Intercept variance", LGCM_RESULT.intercept_variance, "初期値の個人差"],
-    ["Slope mean", LGCM_RESULT.slope_mean, "成長率の平均（週単位）"],
-    ["Slope variance", LGCM_RESULT.slope_variance, "成長率の個人差"],
-    ["Intercept-Slope Cov", LGCM_RESULT.intercept_slope_cov, "初期値と成長率の共分散"],
-    ["CFI", LGCM_RESULT.cfi, "≥0.90 で良好な適合"],
-    ["RMSEA", LGCM_RESULT.rmsea, "≤0.08 で許容可能"],
-    ["SRMR", LGCM_RESULT.srmr, "≤0.08 で良好"],
-    ["χ²(df)", `${LGCM_RESULT.chi2}(${LGCM_RESULT.chi2_df})`, `p<${LGCM_RESULT.chi2_p}`],
+    ["Intercept mean", lgcmResult?.intercept_mean, "初期値の平均"],
+    ["Intercept variance", lgcmResult?.intercept_variance, "初期値の個人差"],
+    ["Slope mean", lgcmResult?.slope_mean, "成長率の平均（週単位）"],
+    ["Slope variance", lgcmResult?.slope_variance, "成長率の個人差"],
+    ["Intercept-Slope Cov", lgcmResult?.intercept_slope_cov, "初期値と成長率の共分散"],
+    ["CFI", lgcmResult?.cfi, "≥0.90 で良好な適合"],
+    ["RMSEA", lgcmResult?.rmsea, "≤0.08 で許容可能"],
+    ["SRMR", lgcmResult?.srmr, "≤0.08 で良好"],
+    ["χ²(df)", `${lgcmResult?.chi2}(${lgcmResult?.chi2_df})`, `p<${lgcmResult?.chi2_p}`],
   ];
   const csv = rows.map((r) => r.join(",")).join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -144,12 +132,43 @@ export default function LongitudinalAnalysisPage() {
     queryFn: () => mockApi.getGrowthData(),
   });
 
-  const weeks = 10;
-  const weeklyStats = genWeeklyStats(weeks);
-  const lcgaTrajectories = genLCGATrajectories(weeks);
-  const lgcmPlotData = Array.from({ length: weeks }, (_, i) => ({ week: i + 1, predicted: +(LGCM_RESULT.intercept_mean + LGCM_RESULT.slope_mean * i).toFixed(2), observed: weeklyStats[i]?.total_mean }));
-  const lcgaPlotData = Array.from({ length: weeks }, (_, i) => { const row: any = { week: i + 1 }; lcgaTrajectories.forEach(cls => { row[cls.id] = cls.trajectory[i].score; }); return row; });
-  const overlayPlotData = Array.from({ length: weeks }, (_, i) => { const row: any = { week: i + 1 }; (cohorts ?? []).slice(0, 10).forEach((p, idx) => { const ws = p.weekly_scores.find((w: any) => w.week === i + 1); if(ws) row[`user_${idx}`] = ws.total; }); return row; });
+  const [lgcmResult, setLgcmResult] = useState<any>(LGCM_RESULT);
+  const [lcgaResult, setLcgaResult] = useState<any>(null);
+  const [weeklyStats, setWeeklyStats] = useState<any[]>([]);
+  const [lgcmPlotData, setLgcmPlotData] = useState<any[]>([]);
+  const [lcgaPlotData, setLcgaPlotData] = useState<any[]>([]);
+  const [overlayPlotData, setOverlayPlotData] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!cohorts || cohorts.length === 0) return;
+    const maxWeek = Math.max(...cohorts.flatMap((c: any) => c.weekly_scores.map((ws: any) => ws.week)), 10);
+    
+    const overlay = Array.from({ length: maxWeek }, (_, i) => { 
+      const row: any = { week: i + 1 }; 
+      cohorts.slice(0, 10).forEach((p: any, idx: number) => { 
+        const ws = p.weekly_scores.find((w: any) => w.week === i + 1); 
+        if(ws) row[`user_${idx}`] = ws.total; 
+      }); 
+      return row; 
+    });
+    setOverlayPlotData(overlay);
+
+    const stats = Array.from({ length: maxWeek }, (_, i) => {
+      const week = i + 1;
+      const weekScores = cohorts.map((c: any) => c.weekly_scores.find((ws: any) => ws.week === week)).filter(Boolean);
+      const mean = (k: string) => weekScores.length ? weekScores.reduce((a: number, b: any) => a + (b[k]||0), 0) / weekScores.length : 0;
+      const sd = (k: string, m: number) => weekScores.length ? Math.sqrt(weekScores.reduce((a: number, b: any) => a + Math.pow((b[k]||0) - m, 2), 0) / weekScores.length) : 0;
+      return {
+        week,
+        f1_mean: +(mean('factor1').toFixed(2)), f1_sd: +(sd('factor1', mean('factor1')).toFixed(2)),
+        f2_mean: +(mean('factor2').toFixed(2)), f2_sd: +(sd('factor2', mean('factor2')).toFixed(2)),
+        f3_mean: +(mean('factor3').toFixed(2)), f3_sd: +(sd('factor3', mean('factor3')).toFixed(2)),
+        f4_mean: +(mean('factor4').toFixed(2)), f4_sd: +(sd('factor4', mean('factor4')).toFixed(2)),
+        total_mean: +(mean('total').toFixed(2)), total_sd: +(sd('total', mean('total')).toFixed(2)),
+      };
+    });
+    setWeeklyStats(stats);
+  }, [cohorts]);
 
   const myScores = (growthData?.weekly_scores ?? []).map((ws) => ({
     week: ws.week, ...ws,
@@ -400,11 +419,11 @@ export default function LongitudinalAnalysisPage() {
                     </TableHead>
                     <TableBody>
                       {[
-                        { name: "切片 平均 (μ_i)",       value: LGCM_RESULT.intercept_mean,   note: "実習開始時の平均スコア" },
-                        { name: "切片 分散 (σ²_i)",      value: LGCM_RESULT.intercept_variance, note: "初期値の個人差" },
-                        { name: "傾き 平均 (μ_s)",        value: LGCM_RESULT.slope_mean,       note: "週あたり平均成長率" },
-                        { name: "傾き 分散 (σ²_s)",       value: LGCM_RESULT.slope_variance,   note: "成長率の個人差" },
-                        { name: "切片-傾き共分散 (σ_is)", value: LGCM_RESULT.intercept_slope_cov, note: "初期値と成長率の関係" },
+                        { name: "切片 平均 (μ_i)",       value: lgcmResult?.intercept_mean,   note: "実習開始時の平均スコア" },
+                        { name: "切片 分散 (σ²_i)",      value: lgcmResult?.intercept_variance, note: "初期値の個人差" },
+                        { name: "傾き 平均 (μ_s)",        value: lgcmResult?.slope_mean,       note: "週あたり平均成長率" },
+                        { name: "傾き 分散 (σ²_s)",       value: lgcmResult?.slope_variance,   note: "成長率の個人差" },
+                        { name: "切片-傾き共分散 (σ_is)", value: lgcmResult?.intercept_slope_cov, note: "初期値と成長率の関係" },
                       ].map((r) => (
                         <TableRow key={r.name} hover>
                           <TableCell sx={{ fontFamily: "monospace" }}>{r.name}</TableCell>
@@ -437,10 +456,10 @@ export default function LongitudinalAnalysisPage() {
                     </TableHead>
                     <TableBody>
                       {[
-                        { name: "χ²(df)", value: `${LGCM_RESULT.chi2}(${LGCM_RESULT.chi2_df})`, ref: "p<.05", ok: true, note: "p<.01" },
-                        { name: "CFI", value: LGCM_RESULT.cfi.toFixed(3), ref: "≥0.90", ok: LGCM_RESULT.cfi >= 0.90 },
-                        { name: "RMSEA", value: LGCM_RESULT.rmsea.toFixed(3), ref: "≤0.08", ok: LGCM_RESULT.rmsea <= 0.08 },
-                        { name: "SRMR", value: LGCM_RESULT.srmr.toFixed(4), ref: "≤0.08", ok: LGCM_RESULT.srmr <= 0.08 },
+                        { name: "χ²(df)", value: `${lgcmResult?.chi2}(${lgcmResult?.chi2_df})`, ref: "p<.05", ok: true, note: "p<.01" },
+                        { name: "CFI", value: lgcmResult?.cfi.toFixed(3), ref: "≥0.90", ok: lgcmResult?.cfi >= 0.90 },
+                        { name: "RMSEA", value: lgcmResult?.rmsea.toFixed(3), ref: "≤0.08", ok: lgcmResult?.rmsea <= 0.08 },
+                        { name: "SRMR", value: lgcmResult?.srmr.toFixed(4), ref: "≤0.08", ok: lgcmResult?.srmr <= 0.08 },
                       ].map((r) => (
                         <TableRow key={r.name} hover>
                           <TableCell><strong>{r.name}</strong></TableCell>
@@ -455,7 +474,7 @@ export default function LongitudinalAnalysisPage() {
                   </Table>
                 </TableContainer>
                 <Alert severity="success" sx={{ mt: 2 }}>
-                  CFI={LGCM_RESULT.cfi}、RMSEA={LGCM_RESULT.rmsea}、SRMR={LGCM_RESULT.srmr}。
+                  CFI={lgcmResult?.cfi}、RMSEA={lgcmResult?.rmsea}、SRMR={lgcmResult?.srmr}。
                   すべての適合度指標が基準を満たし、線形成長モデルが適切に当てはまっています。
                 </Alert>
               </CardContent>
@@ -496,7 +515,7 @@ export default function LongitudinalAnalysisPage() {
           {/* クラスサマリー */}
           <Grid size={{ xs: 12 }}>
             <Grid container spacing={2}>
-              {LCGA_CLASSES.map((cls) => (
+              {(lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || []).map((cls) => (
                 <Grid key={cls.id} size={{ xs: 12, sm: 4 }}>
                   <Card sx={{ borderLeft: `6px solid ${cls.color}` }}>
                     <CardContent>
@@ -552,7 +571,7 @@ export default function LongitudinalAnalysisPage() {
                   </LineChart>
                 </ResponsiveContainer>
                 <Alert severity="info" sx={{ mt: 1 }}>
-                  LCGA 3クラスモデル（BIC基準で最適）。高成長群({LCGA_CLASSES[0].pct}%)・中成長群({LCGA_CLASSES[1].pct}%)・低成長群({LCGA_CLASSES[2].pct}%)。
+                  LCGA 3クラスモデル（BIC基準で最適）。高成長群({(lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || [])[0].pct}%)・中成長群({(lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || [])[1].pct}%)・低成長群({(lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || [])[2].pct}%)。
                   実装: mplus/lavaan形式CSVエクスポート対応。
                 </Alert>
               </CardContent>
