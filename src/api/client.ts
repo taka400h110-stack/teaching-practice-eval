@@ -771,10 +771,16 @@ export default mockApi;
 
 export const bfiApi = {
   saveResponses: async (userId: string, responses: Record<number, number>) => {
+    
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
     try {
       const res = await fetch('/api/data/bfi/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authHeader}`
+        },
         body: JSON.stringify({ userId, responses })
       });
       return await res.json();
@@ -784,8 +790,15 @@ export const bfiApi = {
     }
   },
   getResponses: async (userId: string) => {
+    
+    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
     try {
-      const res = await fetch(`/api/data/bfi/responses/${userId}`, { headers: { 'x-user-id': userId } });
+      const res = await fetch(`/api/data/bfi/responses/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${authHeader}`
+        }
+      });
       const data = await res.json();
       return data.responses || {};
     } catch (e) {
