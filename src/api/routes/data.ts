@@ -1328,47 +1328,48 @@ dataRouter.post('/rq3b/save', async (c) => {
     return c.json({ error: 'Forbidden: Cannot update other users data' }, 403);
   }
   
-  const { week_number, goal_id, rd_chat_raw_level, rd_chat_category, focus_item_id, previous_score, current_score, delta_score, ga_self_rating, ga_self_binary, ga_evidence_binary, ga_evidence_reason } = body;
-  
-  if (!week_number) {
-    return c.json({ error: 'Missing week_number' }, 400);
-  }
-  
-  const id = `${userId}_wk${week_number}`;
-  
   const db = c.env.DB as D1Database;
+  const updates = Array.isArray(body.updates) ? body.updates : [body];
   
   try {
-    await db.prepare(`
-      INSERT INTO rq3b_outcomes (
-        id, user_id, week_number, goal_id, 
-        rd_chat_raw_level, rd_chat_category,
-        focus_item_id, previous_score, current_score, delta_score,
-        ga_self_rating, ga_self_binary,
-        ga_evidence_binary, ga_evidence_reason
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id, week_number) DO UPDATE SET
-        goal_id = COALESCE(excluded.goal_id, rq3b_outcomes.goal_id),
-        rd_chat_raw_level = COALESCE(excluded.rd_chat_raw_level, rq3b_outcomes.rd_chat_raw_level),
-        rd_chat_category = COALESCE(excluded.rd_chat_category, rq3b_outcomes.rd_chat_category),
-        focus_item_id = COALESCE(excluded.focus_item_id, rq3b_outcomes.focus_item_id),
-        previous_score = COALESCE(excluded.previous_score, rq3b_outcomes.previous_score),
-        current_score = COALESCE(excluded.current_score, rq3b_outcomes.current_score),
-        delta_score = COALESCE(excluded.delta_score, rq3b_outcomes.delta_score),
-        ga_self_rating = COALESCE(excluded.ga_self_rating, rq3b_outcomes.ga_self_rating),
-        ga_self_binary = COALESCE(excluded.ga_self_binary, rq3b_outcomes.ga_self_binary),
-        ga_evidence_binary = COALESCE(excluded.ga_evidence_binary, rq3b_outcomes.ga_evidence_binary),
-        ga_evidence_reason = COALESCE(excluded.ga_evidence_reason, rq3b_outcomes.ga_evidence_reason),
-        updated_at = CURRENT_TIMESTAMP
-    `).bind(
-      id, userId, week_number, goal_id || null,
-      rd_chat_raw_level || null, rd_chat_category || null,
-      focus_item_id || null, previous_score || null, current_score || null, delta_score || null,
-      ga_self_rating || null, ga_self_binary !== undefined ? ga_self_binary : null,
-      ga_evidence_binary !== undefined ? ga_evidence_binary : null, ga_evidence_reason || null
-    ).run();
+    const stmts = updates.map((upd: any) => {
+      const { week_number, goal_id, focus_item_id, rd_chat_raw_level, rd_chat_category, previous_score, current_score, delta_score, ga_self_rating, ga_self_binary, ga_evidence_binary, ga_evidence_reason } = upd;
+      
+      // Default dummy values for composite keys if missing
+      const g_id = goal_id || 'no_goal';
+      const f_id = focus_item_id || 0;
+      const id = `${userId}_wk${week_number}_g${g_id}_f${f_id}`;
+      
+      return db.prepare(`
+        INSERT INTO rq3b_outcomes (
+          id, user_id, week_number, goal_id, focus_item_id,
+          rd_chat_raw_level, rd_chat_category,
+          previous_score, current_score, delta_score,
+          ga_self_rating, ga_self_binary,
+          ga_evidence_binary, ga_evidence_reason
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, week_number, goal_id, focus_item_id) DO UPDATE SET
+          rd_chat_raw_level = COALESCE(excluded.rd_chat_raw_level, rq3b_outcomes.rd_chat_raw_level),
+          rd_chat_category = COALESCE(excluded.rd_chat_category, rq3b_outcomes.rd_chat_category),
+          previous_score = COALESCE(excluded.previous_score, rq3b_outcomes.previous_score),
+          current_score = COALESCE(excluded.current_score, rq3b_outcomes.current_score),
+          delta_score = COALESCE(excluded.delta_score, rq3b_outcomes.delta_score),
+          ga_self_rating = COALESCE(excluded.ga_self_rating, rq3b_outcomes.ga_self_rating),
+          ga_self_binary = COALESCE(excluded.ga_self_binary, rq3b_outcomes.ga_self_binary),
+          ga_evidence_binary = COALESCE(excluded.ga_evidence_binary, rq3b_outcomes.ga_evidence_binary),
+          ga_evidence_reason = COALESCE(excluded.ga_evidence_reason, rq3b_outcomes.ga_evidence_reason),
+          updated_at = CURRENT_TIMESTAMP
+      `).bind(
+        id, userId, week_number, g_id, f_id,
+        rd_chat_raw_level || null, rd_chat_category || null,
+        previous_score || null, current_score || null, delta_score || null,
+        ga_self_rating || null, ga_self_binary !== undefined ? ga_self_binary : null,
+        ga_evidence_binary !== undefined ? ga_evidence_binary : null, ga_evidence_reason || null
+      );
+    });
     
-    return c.json({ success: true, id });
+    await db.batch(stmts);
+    return c.json({ success: true });
   } catch (error) {
     console.error('RQ3b save error:', error);
     return c.json({ error: 'Internal server error' }, 500);

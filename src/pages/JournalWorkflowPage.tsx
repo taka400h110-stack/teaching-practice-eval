@@ -542,12 +542,26 @@ export default function JournalWorkflowPage() {
             }
           }
           
-          // 3. GA-Evidence logic (mock AI judgement)
-          if (prevGoal && prevOutcome.ga_evidence_binary === null) {
-            // Mock AI judgement for GA-Evidence based on evaluation comment or score
-            const isAchieved = evalData.total_score >= 2.5 ? 1 : 0;
-            updateData.ga_evidence_binary = isAchieved;
-            updateData.ga_evidence_reason = isAchieved ? "日誌の評価スコアが基準を満たしています。" : "具体的な達成エビデンスが不足しています。";
+          // 3. GA-Evidence logic (Real AI judgement based on Journal and previous Goal)
+          if (prevGoal && prevOutcome.ga_evidence_binary == null) {
+            try {
+              const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
+              const res = await fetch("/api/ai/check-evidence", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authHeader}` },
+                body: JSON.stringify({
+                  previous_goal: prevGoal.goal_text,
+                  journal_content: evalData.journal_content || records.map((r: any) => r.body).join("\n")
+                })
+              });
+              const evData = await res.json();
+              if (evData.success) {
+                updateData.ga_evidence_binary = evData.result.evidence_binary;
+                updateData.ga_evidence_reason = evData.result.reason;
+              }
+            } catch (e) {
+              console.error("GA-Evidence check failed", e);
+            }
           }
           
           // Save only if there's new data
@@ -1164,17 +1178,27 @@ export default function JournalWorkflowPage() {
                     startIcon={<TrackChangesIcon />}
                     onClick={async () => {
                       if (messages.length > 0) {
-                        const rdLevels = rdHistory.length > 0 ? rdHistory : [1];
-                        const maxRd = Math.max(...rdLevels, 1);
-                        const category = maxRd >= 3 ? 'deep' : (maxRd === 2 ? 'somewhat_deep' : 'shallow');
                         const user = JSON.parse(localStorage.getItem("user_info") || "{}");
                         if (user.id) {
-                          await mockApi.saveRq3bOutcomes({
-                            userId: user.id,
-                            week_number: weekNumber,
-                            rd_chat_raw_level: maxRd,
-                            rd_chat_category: category
-                          });
+                          try {
+                            const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
+                            const res = await fetch("/api/ai/evaluate-session-rd", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authHeader}` },
+                              body: JSON.stringify({ conversation: messages })
+                            });
+                            const rdData = await res.json();
+                            if (rdData.success) {
+                              await mockApi.saveRq3bOutcomes({
+                                userId: user.id,
+                                week_number: weekNumber,
+                                rd_chat_raw_level: rdData.result.rd_level,
+                                rd_chat_category: rdData.result.category
+                              });
+                            }
+                          } catch (e) {
+                            console.error("Failed to evaluate RD", e);
+                          }
                         }
                       }
                       navigate("/goals");

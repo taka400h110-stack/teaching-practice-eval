@@ -577,19 +577,29 @@ export default function ChatBotPage() {
           <Button variant="outlined" color="success" startIcon={<TrackChangesIcon />}
             onClick={async () => {
               if (messages.length > 0) {
-                const rdLevels = rdHistory.length > 0 ? rdHistory : [1];
-                const maxRd = Math.max(...rdLevels, 1);
-                const category = maxRd >= 3 ? 'deep' : (maxRd === 2 ? 'somewhat_deep' : 'shallow');
                 const user = JSON.parse(localStorage.getItem("user_info") || "{}");
                 const j = allJournals.find((j) => j.id === journalId);
                 const weekNum = j?.week_number || 1;
                 if (user.id) {
-                  await mockApi.saveRq3bOutcomes({
-                    userId: user.id,
-                    week_number: weekNum,
-                    rd_chat_raw_level: maxRd,
-                    rd_chat_category: category
-                  });
+                  try {
+                    const authHeader = btoa(JSON.stringify({ id: user.id, role: user.role }));
+                    const res = await fetch("/api/ai/evaluate-session-rd", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authHeader}` },
+                      body: JSON.stringify({ conversation: messages })
+                    });
+                    const rdData = await res.json();
+                    if (rdData.success) {
+                      await mockApi.saveRq3bOutcomes({
+                        userId: user.id,
+                        week_number: weekNum,
+                        rd_chat_raw_level: rdData.result.rd_level,
+                        rd_chat_category: rdData.result.category
+                      });
+                    }
+                  } catch (e) {
+                    console.error("Failed to evaluate RD", e);
+                  }
                 }
               }
               navigate("/goals");

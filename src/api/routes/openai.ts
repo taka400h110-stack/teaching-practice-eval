@@ -772,4 +772,114 @@ openaiRouter.post("/ocr", async (c) => {
   }
 });
 
+
+// POST /api/ai/check-evidence (RQ3b GA-Evidence)
+openaiRouter.post("/check-evidence", async (c) => {
+  const apiKey = OPENAI_API_KEY || c.env.OPENAI_API_KEY;
+  if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
+
+  const authContext = getAuthContext(c);
+  if (!authContext) return c.json({ error: "Unauthorized" }, 401);
+
+  const { previous_goal, journal_content } = await c.req.json();
+  if (!previous_goal || !journal_content) return c.json({ error: "Missing required fields" }, 400);
+
+  const prompt = `あなたは教育実習の評価アシスタントです。
+以下の「前週の目標」が、「今週の日誌」の中で具体的に取り組まれた形跡（行動・結果・振り返り）があるか判定してください。
+
+前週の目標:
+${previous_goal}
+
+今週の日誌:
+${journal_content}
+
+判定基準:
+日誌の中に、前週目標に対応する具体的な行動の記述、その結果、あるいはそれに対する振り返りが明確に含まれていれば「証拠あり(1)」、含まれていなければ「証拠なし(0)」とします。
+
+JSON形式で出力してください:
+{
+  "evidence_binary": 1または0,
+  "reason": "判定理由（100文字程度で簡潔に）"
+}`;
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0].message.content);
+    return c.json({ success: true, result });
+  } catch (error: any) {
+    console.error("check-evidence error:", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// POST /api/ai/evaluate-session-rd (RQ3b RD-Chat Session-level holistic judgement)
+openaiRouter.post("/evaluate-session-rd", async (c) => {
+  const apiKey = OPENAI_API_KEY || c.env.OPENAI_API_KEY;
+  if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
+
+  const authContext = getAuthContext(c);
+  if (!authContext) return c.json({ error: "Unauthorized" }, 401);
+
+  const { conversation } = await c.req.json();
+  if (!conversation || !Array.isArray(conversation)) return c.json({ error: "Missing conversation array" }, 400);
+
+  const formattedConv = conversation.map(m => `${m.role === 'user' ? '学生' : 'AI'}: ${m.content}`).join('\n\n');
+
+  const prompt = `あなたは教育実習生の省察プロセスを評価する専門家です。
+以下の省察チャットセッション全体を評価し、学生が到達した「省察の深さ（Reflection Depth）」を総合的に判定してください。
+
+セッション履歴:
+${formattedConv}
+
+判定基準 (1〜4のレベル):
+レベル1 (浅い): 事実の羅列のみ。感情や解釈を含まない。
+レベル2 (やや深い): 個人的な感情や単純な解釈が含まれるが、客観的な分析や他者の視点に欠ける。
+レベル3 (深い): 客観的な分析、他者の視点（児童や指導教員など）の導入、または自身の指導の背景要因への言及がある。
+レベル4 (非常に深い): 批判的省察。自身の信念・価値観の再構築、教育的・社会的文脈からの考察、または将来の実践への明確な応用方針がある。
+
+JSON形式で出力してください:
+{
+  "rd_level": 1, 2, 3, または 4,
+  "category": "shallow" (1), "somewhat_deep" (2), "deep" (3または4),
+  "reason": "判定理由（100文字程度で簡潔に）"
+}`;
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0].message.content);
+    return c.json({ success: true, result });
+  } catch (error: any) {
+    console.error("evaluate-session-rd error:", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 export default openaiRouter;

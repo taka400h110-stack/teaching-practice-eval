@@ -67,7 +67,7 @@ function GoalCard({ goal, onToggle }: { goal: GoalEntry; onToggle?: () => void }
 
 export default function GoalHistoryPage() {
     const [newGoal, setNewGoal]   = useState("");
-  const [focusItemId, setFocusItemId] = useState<number | "">("");
+  const [focusItemIds, setFocusItemIds] = useState<number[]>([]);
   const [isSmart, setIsSmart]   = useState(false);
   const [weekNum, setWeekNum]   = useState(1);
   const [snack, setSnack]       = useState(false);
@@ -88,13 +88,14 @@ export default function GoalHistoryPage() {
     mutationFn: async () => {
       const g = await mockApi.createGoal({ week: weekNum, goal_text: newGoal.trim(), is_smart: isSmart });
       const user = JSON.parse(localStorage.getItem("user_info") || "{}");
-      if (focusItemId && user.id) {
-        await mockApi.saveRq3bOutcomes({
+      if (focusItemIds.length > 0 && user.id) {
+        const updates = focusItemIds.map(fid => ({
           userId: user.id,
           week_number: weekNum,
           goal_id: g.id,
-          focus_item_id: focusItemId
-        });
+          focus_item_id: fid
+        }));
+        await mockApi.saveRq3bOutcomes({ userId: user.id, updates });
       }
       return g;
     },
@@ -102,7 +103,7 @@ export default function GoalHistoryPage() {
       void queryClient.invalidateQueries({ queryKey: ["goals"] });
       setSnack(true);
       setNewGoal("");
-      setFocusItemId("");
+      setFocusItemIds([]);
     },
   });
 
