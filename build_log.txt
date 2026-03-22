@@ -1,0 +1,10 @@
+
+> build
+> vite build
+
+vite v6.4.1 building SSR bundle for production...
+transforming...
+✓ 34 modules transformed.
+rendering chunks...
+dist/_worker.js  136.28 kB
+✓ built in 750ms
