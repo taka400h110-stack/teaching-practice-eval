@@ -6,7 +6,7 @@
  * /api/stats/lgcm エンドポイント経由でリアル計算
  * CSV エクスポート・APA形式テーブル付き
  */
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { MenuItem, Select, FormControl, InputLabel, RadioGroup, Radio,
   Box, Typography, Card, CardContent, Chip, Grid, Paper,
   Tabs, Tab, Alert, LinearProgress, Divider, Button,

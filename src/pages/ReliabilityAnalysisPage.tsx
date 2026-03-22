@@ -5,7 +5,7 @@
  * /api/stats/* エンドポイント経由でリアル計算
  * CSVエクスポート機能付き
  */
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Select, MenuItem, InputLabel, FormControl, TextField,
   Box, Card, CardContent, Chip, Typography, Tabs, Tab,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
