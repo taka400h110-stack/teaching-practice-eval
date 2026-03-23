@@ -6,13 +6,13 @@ export default defineConfig(({ mode }) => {
   if (mode === 'client') {
     return {
       plugins: [react()],
-      build: { outDir: 'dist', emptyOutDir: false, rollupOptions: {} },
+      build: { outDir: 'dist', emptyOutDir: false, minify: false, rollupOptions: {} },
       resolve: { dedupe: ['react', 'react-dom', 'react-is'] }
     }
   }
 
   return {
     plugins: [pages()],
-    build: { emptyOutDir: false }
+    build: { emptyOutDir: false, minify: false }
   }
 })

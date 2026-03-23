@@ -45,8 +45,13 @@ const FACTOR_LABELS = {
 // ────────────────────────────────────────────────────────────────
 
 
-function genLCGATrajectories(weeks: number) {
-  return (lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || []).map((cls) => ({
+function genLCGATrajectories(weeks: number, lcgaResult: any) {
+  const classes = lcgaResult?.classes || [
+    { class_id: 1, proportion: 0.45, intercept: 2.5, slope: 0.15 },
+    { class_id: 2, proportion: 0.35, intercept: 2.0, slope: 0.20 },
+    { class_id: 3, proportion: 0.20, intercept: 1.5, slope: 0.25 }
+  ];
+  return classes.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })).map((cls: any) => ({
     ...cls,
     trajectory: Array.from({ length: weeks }, (_, i) => ({
       week: i + 1,
@@ -72,7 +77,7 @@ function downloadGrowthCSV(weeklyStats: any[]) {
   a.click();
 }
 
-function downloadLGCMCSV() {
+function downloadLGCMCSV(lgcmResult: any) {
   const rows = [
     ["パラメータ", "推定値", "備考"],
     ["Intercept mean", lgcmResult?.intercept_mean, "初期値の平均"],
@@ -135,9 +140,16 @@ export default function LongitudinalAnalysisPage() {
   const [lcgaPlotData, setLcgaPlotData] = useState<any[]>([]);
   const [overlayPlotData, setOverlayPlotData] = useState<any[]>([]);
 
+  const weeks = React.useMemo(() => {
+    if (!cohorts || cohorts.length === 0) return 10;
+    return Math.max(...cohorts.flatMap((c: any) => c.weekly_scores?.map((ws: any) => ws.week) || []), 10);
+  }, [cohorts]);
+
+  const lcgaTrajectories = React.useMemo(() => genLCGATrajectories(weeks, lcgaResult), [weeks, lcgaResult]);
+
   useEffect(() => {
     if (!cohorts || cohorts.length === 0) return;
-    const maxWeek = Math.max(...cohorts.flatMap((c: any) => c.weekly_scores.map((ws: any) => ws.week)), 10);
+    const maxWeek = weeks;
     
     const overlay = Array.from({ length: maxWeek }, (_, i) => { 
       const row: any = { week: i + 1 }; 
@@ -223,7 +235,7 @@ export default function LongitudinalAnalysisPage() {
             成長データCSV
           </Button>
           {lgcmDone && (
-            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={downloadLGCMCSV}>
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => downloadLGCMCSV(lgcmResult)}>
               LGCM結果CSV
             </Button>
           )}
