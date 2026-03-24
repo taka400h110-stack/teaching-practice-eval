@@ -66,19 +66,19 @@ export default function DashboardPage() {
     queryFn:  () => apiClient.getSelfEvaluations(),
   });
 
-  const submitted  = journals.filter((j) => j.status === "submitted").length;
-  const evaluated  = journals.filter((j) => j.status === "evaluated").length;
-  const drafts     = journals.filter((j) => j.status === "draft").length;
-  const latest: WeeklyScore | undefined = growth?.weekly_scores.slice(-1)[0];
-  const prev: WeeklyScore | undefined   = growth?.weekly_scores.slice(-2)[0];
-  const achievedGoals = goals.filter((g) => g.achieved).length;
+  const submitted  = (journals ?? []).filter((j) => j.status === "submitted").length;
+  const evaluated  = (journals ?? []).filter((j) => j.status === "evaluated").length;
+  const drafts     = (journals ?? []).filter((j) => j.status === "draft").length;
+  const latest: WeeklyScore | undefined = (growth?.weekly_scores ?? []).slice(-1)[0];
+  const prev: WeeklyScore | undefined   = (growth?.weekly_scores ?? []).slice(-2)[0];
+  const achievedGoals = (goals ?? []).filter((g) => g.achieved).length;
 
   const trendDiff = latest && prev ? +(latest.total - prev.total).toFixed(2) : 0;
 
   const kpiCards = [
     {
       label: "日誌記録数",
-      value: journals.length,
+      value: (journals ?? []).length,
       sub: `評価済み ${evaluated} / 提出済み ${submitted}`,
       color: "#1976d2",
       bg: "#e3f2fd",
@@ -96,8 +96,8 @@ export default function DashboardPage() {
     },
     {
       label: "SMART目標達成率",
-      value: goals.length > 0 ? `${Math.round((achievedGoals / goals.length) * 100)}%` : "—",
-      sub: `${achievedGoals} / ${goals.length} 件達成`,
+      value: (goals ?? []).length > 0 ? `${Math.round((achievedGoals / (goals ?? []).length) * 100)}%` : "—",
+      sub: `${achievedGoals} / ${(goals ?? []).length} 件達成`,
       color: "#f57c00",
       bg: "#fff3e0",
       icon: <TrackChangesIcon sx={{ fontSize: 28 }} />,
@@ -105,8 +105,8 @@ export default function DashboardPage() {
     },
     {
       label: "自己評価記録数",
-      value: selfEvals.length,
-      sub: `最終週スコア ${selfEvals.slice(-1)[0]?.total.toFixed(2) ?? "—"}`,
+      value: (selfEvals ?? []).length,
+      sub: `最終週スコア ${(selfEvals ?? []).slice(-1)[0]?.total.toFixed(2) ?? "—"}`,
       color: "#7b1fa2",
       bg: "#f3e5f5",
       icon: <EmojiEventsIcon sx={{ fontSize: 28 }} />,
@@ -225,7 +225,12 @@ export default function DashboardPage() {
                 <Button size="small" onClick={() => navigate("/journals")}>すべて見る</Button>
               </Box>
               <List dense disablePadding>
-                {journals.slice(0, 5).map((j: JournalEntry, idx) => {
+                {(journals ?? []).length === 0 && (
+                  <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                    まだ日誌がありません
+                  </Typography>
+                )}
+                {(journals ?? []).slice(0, 5).map((j: JournalEntry, idx) => {
                   const cfg = statusConfig[j.status];
                   return (
                     <React.Fragment key={j.id}>
@@ -271,7 +276,12 @@ export default function DashboardPage() {
                 </Typography>
                 <Button size="small" onClick={() => navigate("/goals")}>すべて見る</Button>
               </Box>
-              {goals.slice(0, 4).map((g) => (
+              {(goals ?? []).length === 0 && (
+                  <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                    まだ目標がありません
+                  </Typography>
+                )}
+                {(goals ?? []).slice(0, 4).map((g) => (
                 <Paper key={g.id} variant="outlined" sx={{ p: 1.2, mb: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
                   {g.achieved
                     ? <CheckCircleIcon sx={{ color: "success.main", flexShrink: 0 }} />

@@ -113,7 +113,7 @@ export default function SelfEvaluationPage() {
     queryFn:  () => apiClient.getGrowthData(),
   });
 
-  const aiLatest = aiGrowth?.weekly_scores.slice(-1)[0];
+  const aiLatest = (aiGrowth?.weekly_scores ?? []).slice(-1)[0];
   const total = computeFactorWeightedTotal(scores.factor1, scores.factor2, scores.factor3, scores.factor4);
   const historyLatest: SelfEvaluation | undefined = history[history.length - 1];
 
