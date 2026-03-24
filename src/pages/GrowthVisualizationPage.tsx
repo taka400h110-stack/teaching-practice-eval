@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 /**
  * GrowthVisualizationPage.tsx
  * 成長グラフ - recharts による折れ線グラフ、因子別スコア推移
@@ -29,7 +30,7 @@ interface TabPanelProps { children: React.ReactNode; value: number; index: numbe
 const TabPanel = ({ children, value, index }: TabPanelProps) =>
   value === index ? <Box pt={2}>{children}</Box> : null;
 
-function TrendIcon({ delta }: { delta: number }) {
+function TrendIcon({ fDelta }: { fDelta: number }) {
   return <TrendingFlatIcon sx={{ color: "text.secondary", fontSize: 18 }} />;
 }
 
@@ -89,8 +90,8 @@ export default function GrowthVisualizationPage() {
     };
   }).filter((d) => d.AI評価 !== null);
 
-  // 週別成長量 (delta)
-  const deltaData = scores.slice(1).map((s, i) => ({
+  // 週別成長量 (fDelta)
+  const fDeltaData = scores.slice(1).map((s, i) => ({
     week: `W${s.week}`,
     成長量: +(s.total - scores[i].total).toFixed(3),
     因子I: +(s.factor1 - scores[i].factor1).toFixed(3),
@@ -119,16 +120,16 @@ export default function GrowthVisualizationPage() {
       {/* サマリカード */}
       <Grid container spacing={2} mb={3}>
         {[
-          { label: "現在の総合スコア",  value: latest.total.toFixed(2),     color: "#1565C0", bg: "#e3f2fd", delta: weekDelta,   sub: `前週比 ${weekDelta >= 0 ? "+" : ""}${weekDelta.toFixed(2)}` },
-          { label: "実習開始からの成長", value: `+${totalDelta.toFixed(2)}`, color: "#388e3c", bg: "#e8f5e9", delta: totalDelta,  sub: `${first.total.toFixed(2)} → ${latest.total.toFixed(2)}` },
-          { label: "記録週数",          value: `${scores.length}週`,         color: "#f57c00", bg: "#fff3e0", delta: 0,           sub: `Week ${first.week} ～ Week ${latest.week}` },
-          { label: "最高スコア週",      value: `W${scores.reduce((a, b) => a.total >= b.total ? a : b).week}`, color: "#7b1fa2", bg: "#f3e5f5", delta: 0, sub: `${Math.max(...scores.map((s) => s.total)).toFixed(2)} / 5.0` },
+          { label: "現在の総合スコア",  value: latest.total.toFixed(2),     color: "#1565C0", bg: "#e3f2fd", fDelta: weekDelta,   sub: `前週比 ${weekDelta >= 0 ? "+" : ""}${weekDelta.toFixed(2)}` },
+          { label: "実習開始からの成長", value: `+${totalDelta.toFixed(2)}`, color: "#388e3c", bg: "#e8f5e9", fDelta: totalDelta,  sub: `${first.total.toFixed(2)} → ${latest.total.toFixed(2)}` },
+          { label: "記録週数",          value: `${scores.length}週`,         color: "#f57c00", bg: "#fff3e0", fDelta: 0,           sub: `Week ${first.week} ～ Week ${latest.week}` },
+          { label: "最高スコア週",      value: `W${scores.reduce((a, b) => a.total >= b.total ? a : b).week}`, color: "#7b1fa2", bg: "#f3e5f5", fDelta: 0, sub: `${Math.max(...scores.map((s) => s.total)).toFixed(2)} / 5.0` },
         ].map((c) => (
           <Grid key={c.label} size={{ xs: 6, sm: 3 }}>
             <Card sx={{ bgcolor: c.bg }}>
               <CardContent sx={{ p: "14px !important" }}>
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  <TrendIcon delta={c.delta} />
+                  <TrendIcon fDelta={c.fDelta} />
                   <Typography variant="caption" color="text.secondary">{c.label}</Typography>
                 </Box>
                 <Typography variant="h4" fontWeight="bold" color={c.color}>{c.value}</Typography>
@@ -324,7 +325,7 @@ export default function GrowthVisualizationPage() {
           <CardContent>
             <Typography variant="subtitle1" fontWeight="bold" mb={2}>週別成長量（前週比）</Typography>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={deltaData}>
+              <BarChart data={fDeltaData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="week" />
                 <YAxis />
@@ -337,7 +338,7 @@ export default function GrowthVisualizationPage() {
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" fontWeight="bold" mb={2}>因子別成長量</Typography>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={deltaData}>
+              <BarChart data={fDeltaData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="week" />
                 <YAxis />
@@ -384,7 +385,7 @@ export default function GrowthVisualizationPage() {
                   const selfScore  = selfLatest ? selfLatest[fk] : null;
                   const gap = selfScore !== null ? +(latest[fk] - selfScore).toFixed(2) : null;
                   if (fDelta > 0.05) return <TrendingUpIcon sx={{ color: "success.main", fontSize: 18 }} />;
-  if (delta < -0.05) return <TrendingDownIcon sx={{ color: "error.main", fontSize: 18 }} />;
+  if (fDelta < -0.05) return <TrendingDownIcon sx={{ color: "error.main", fontSize: 18 }} />;
   if (isLoading) return <LinearProgress />;
   if (!growth) return null;
 

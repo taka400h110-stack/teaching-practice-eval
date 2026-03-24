@@ -91,7 +91,7 @@ export default function TeacherDashboardPage() {
                       </TableCell>
                       <TableCell>{p.grade}年</TableCell>
                       <TableCell>
-                        <Chip label={{ elementary:"小", middle:"中", high:"高", special:"特支" }[p.school_type]} size="small" variant="outlined" />
+                        <Chip label={{ elementary:"小", middle:"中", high:"高", special:"特支" }[p.school_type as "elementary" | "middle" | "high" | "special"]} size="small" variant="outlined" />
                       </TableCell>
                       <TableCell>
                         <Chip label={p.internship_type === "intensive" ? "集中" : "分散"} size="small" color={p.internship_type === "intensive" ? "primary" : "default"} variant="outlined" />

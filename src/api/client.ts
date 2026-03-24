@@ -141,7 +141,7 @@ const apiClient = {
     });
     
     if (!res.ok) throw new Error("User not found or invalid credentials");
-    const data = await res.json();
+    const data = await res.json() as any;
     const user = data.user;
     if (data.token) localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(user));
@@ -200,7 +200,7 @@ const apiClient = {
     }
     const res = await apiFetch(url);
     if (!res.ok) throw new Error("Failed to fetch journals");
-    const data = await res.json();
+    const data = await res.json() as any;
     return data.journals || [];
   },
   getJournal: async (id: string): Promise<JournalEntry> => {
@@ -241,27 +241,29 @@ const apiClient = {
     try {
       const res = await apiFetch(`/api/data/evaluations/${journalId}`, { headers: {  } });
       if (!res.ok) throw new Error("Failed to fetch evaluation");
-      const data = await res.json();
+      const data = await res.json() as any;
       return {
         id: data.id,
         journal_id: data.journal_id,
         status: "completed",
-        overall_score: data.total_score,
+        // overall_score: data.total_score,
         factor_scores: {
           factor1: data.factor1_score,
           factor2: data.factor2_score,
           factor3: data.factor3_score,
           factor4: data.factor4_score
         },
-        items: JSON.parse(data.items_json || "[]").map((i: any) => ({
+        evaluation_items: JSON.parse((data as any).items_json || "[]").map((i: any) => ({
           item_number: i.item_number || i.item,
           score: i.score,
           evidence: i.evidence,
           feedback: i.feedback
         })),
-        positive_feedback: data.positive_feedback || "",
-        constructive_feedback: data.constructive_feedback || "",
-        created_at: data.created_at
+        overall_comment: data.overall_comment || "",
+        total_score: data.total_score || 0,
+        evaluated_item_count: data.evaluated_item_count || 0,
+        tokens_used: data.tokens_used || 0,
+        halo_check: data.halo_check || false
       };
     } catch { throw new Error("Evaluation not found"); }
   },
@@ -271,27 +273,29 @@ const apiClient = {
     try {
       const res = await apiFetch("/api/data/evaluations", { headers: {  } });
       if (!res.ok) throw new Error("Failed to fetch all evaluations");
-      const data = await res.json();
+      const data = await res.json() as any;
       return data.evaluations.map((e: any) => ({
         id: e.id,
         journal_id: e.journal_id,
         status: "completed",
-        overall_score: e.total_score,
+         
         factor_scores: {
           factor1: e.factor1_score,
           factor2: e.factor2_score,
           factor3: e.factor3_score,
           factor4: e.factor4_score
         },
-        items: JSON.parse(e.items_json || "[]").map((i: any) => ({
+        evaluation_items: JSON.parse(e.items_json || "[]").map((i: any) => ({
           item_number: i.item_number || i.item,
           score: i.score,
           evidence: i.evidence,
           feedback: i.feedback
         })),
-        positive_feedback: e.positive_feedback || "",
-        constructive_feedback: e.constructive_feedback || "",
-        created_at: e.created_at
+        overall_comment: e.overall_comment || "",
+        total_score: e.total_score || 0,
+        evaluated_item_count: e.evaluated_item_count || 0,
+        tokens_used: e.tokens_used || 0,
+        halo_check: e.halo_check || false
       }));
     } catch {
       return [];
@@ -304,7 +308,7 @@ const apiClient = {
       try {
         const response = await apiFetch(`/api/data/human-evals/${journalId}`, { headers: {  } });
         if (!response.ok) throw new Error("Failed to fetch human evaluations");
-        const data = await response.json();
+        const data = (await response.json()) as any;
         return data.evaluations || [];
       } catch (err) {
         console.error("API error fetching human evals:", err);
@@ -316,7 +320,7 @@ const apiClient = {
     try {
       const response = await apiFetch("/api/data/human-evals", { headers: {  } });
       if (!response.ok) throw new Error("Failed to fetch all human evaluations");
-      const data = await response.json();
+      const data = (await response.json()) as any;
       return data.evaluations || [];
     } catch (err) {
       console.error("API error fetching all human evals:", err);
@@ -406,7 +410,7 @@ const apiClient = {
     try {
       const res = await apiFetch(`/api/data/growth/${userId}`, { headers: {  } });
       if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
+      const data = await res.json() as any;
       return {
         student_id: data.student_id,
         weekly_scores: data.weekly_scores.map((w: any) => ({
@@ -421,7 +425,7 @@ const apiClient = {
         }))
       };
     } catch {
-      return {  weekly_scores: [] as any[] };
+      return { student_id: "", weekly_scores: [] };
     }
   },
 
@@ -432,7 +436,7 @@ const apiClient = {
     try {
       const res = await apiFetch(`/api/data/self-evals/${userId}`, { headers: {  } });
       if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
+      const data = await res.json() as any;
       return data.self_evaluations.map((e: any) => ({
         id: e.id,
         week: e.week_number,
@@ -479,7 +483,7 @@ throw new Error("Failed to save self evaluation");
     const userId = user.id || "user-001";
     const res = await apiFetch(`/api/data/goals/${userId}`, { headers: {  } });
     if (!res.ok) throw new Error("Failed to fetch goals");
-    const data = await res.json();
+    const data = await res.json() as any;
     return data.goals || [];
   },
   createGoal: async (data: { week: number; goal_text: string; is_smart: boolean }): Promise<GoalEntry> => {
@@ -511,7 +515,7 @@ throw new Error("Failed to save self evaluation");
       const userId = user.id || "user-001";
       const res = await apiFetch(`/api/data/chat-sessions?student_id=${userId}`, { headers: {  } });
       if (!res.ok) return [];
-      const data = await res.json();
+      const data = await res.json() as any;
       return data.sessions || [];
     } catch {
       return [];
@@ -521,7 +525,7 @@ throw new Error("Failed to save self evaluation");
     const res = await apiFetch(`/api/data/chat-sessions/${journalId}`, { headers: {  } });
     if (!res.ok) {
       if (res.status === 404) {
-        return { id: "new", journal_id: journalId, student_id: "user-001", phase: "phase1", messages: [] };
+        return { id: "new", journal_id: journalId, phase: "phase1", messages: [], created_at: new Date().toISOString() };
       }
       throw new Error("Failed to fetch chat session");
     }
@@ -529,7 +533,7 @@ throw new Error("Failed to save self evaluation");
   },
   sendChatMessage: async (journalId: string, content: string): Promise<{ session: ChatSession; reply: ChatMessage }> => {
     // Note: ChatBotPage directly fetches from OpenAI in standard flow, this mock fallback won't be heavily used
-    return { session: { id: "new", journal_id: journalId, student_id: "user-001", phase: "phase1", messages: [] }, reply: { id: "r", role: "assistant", content: "dummy", timestamp: new Date().toISOString() } };
+    return { session: { id: "new", journal_id: journalId, phase: "phase1", messages: [], created_at: new Date().toISOString() }, reply: { id: "r", role: "assistant", content: "dummy", timestamp: new Date().toISOString() } };
   },
 
   // ── コーホート ──
@@ -539,7 +543,7 @@ throw new Error("Failed to save self evaluation");
     try {
       const res = await apiFetch('/api/data/cohorts', { headers: {  } });
       if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
+      const data = await res.json() as any;
       return data.cohorts || [];
     } catch { return []; }
   },
@@ -549,7 +553,7 @@ throw new Error("Failed to save self evaluation");
     try {
       const res = await apiFetch('/api/data/users', { headers: {  } });
       if (!res.ok) return [];
-      const data = await res.json();
+      const data = await res.json() as any;
       return data.users || [];
     } catch {
       return [];
@@ -560,7 +564,7 @@ throw new Error("Failed to save self evaluation");
       body: JSON.stringify(user)
     });
     if (!res.ok) throw new Error("Failed to create user");
-    const data = await res.json();
+    const data = await res.json() as any;
     return data.user;
   },
   updateUser: async (id: string, data: Partial<User>): Promise<User> => {
@@ -568,7 +572,7 @@ throw new Error("Failed to save self evaluation");
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error("Failed to update user");
-    const resData = await res.json();
+    const resData = (await res.json()) as any;
     return resData.user;
   },
   deleteUser: async (id: string): Promise<void> => {

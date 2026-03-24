@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 /**
  * EvaluationResultPage.tsx
  * AI評価結果ページ - 23項目詳細、因子別スコア、recharts レーダーチャート

@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 /**
  * ChatBotPage.tsx
  * 省察支援AIチャットBot（CoT-B: 省察深さ判定 / CoT-C: SMART目標提案）

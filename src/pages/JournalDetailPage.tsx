@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 /**
  * src/pages/JournalDetailPage.tsx
  * 実習日誌詳細 — 日誌本文 / AI評価レーダー / 23項目スコア / 成長曲線 / AIフィードバック

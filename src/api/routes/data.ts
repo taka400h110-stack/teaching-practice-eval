@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 /**
  * src/api/routes/data.ts
  * Hono APIルート: Cloudflare D1 データ CRUD
@@ -1813,13 +1814,13 @@ dataRouter.get("/chat-sessions/:journalId", async (c) => {
     const session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
     if (!session) return c.json({ error: "Not found" }, 404);
     
-    const messages = await db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY message_order ASC").bind(session.id).all();
+    const messages = await db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY message_order ASC").bind((session as any)?.id).all();
     
     return c.json({
-      id: session.id,
-      journal_id: session.journal_id,
-      student_id: session.student_id,
-      phase: session.phase,
+      id: (session as any)?.id,
+      journal_id: (session as any)?.journal_id,
+      student_id: (session as any)?.student_id,
+      phase: (session as any)?.phase,
       messages: messages.results || []
     });
   } catch (err) {
@@ -1847,18 +1848,18 @@ dataRouter.post("/chat-sessions/:journalId/messages", async (c) => {
     
     // メッセージ挿入
     const msgId = "msg-" + Date.now();
-    const order = await db.prepare("SELECT COUNT(*) as c FROM chat_messages WHERE session_id = ?").bind(session.id).first();
+    const order = await db.prepare("SELECT COUNT(*) as c FROM chat_messages WHERE session_id = ?").bind((session as any)?.id).first();
     
     await db.prepare(`
       INSERT INTO chat_messages (id, session_id, role, content, message_order, phase, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      msgId, session.id, body.role, body.content, (order.c || 0) + 1, session.phase, new Date().toISOString()
+      msgId, (session as any)?.id, body.role, body.content, (order?.c || 0) + 1, (session as any)?.phase, new Date().toISOString()
     ).run();
     
     // セッション更新（必要なら）
-    if (body.phase && body.phase !== session.phase) {
-      await db.prepare("UPDATE chat_sessions SET phase = ? WHERE id = ?").bind(body.phase, session.id).run();
+    if (body.phase && body.phase !== (session as any)?.phase) {
+      await db.prepare("UPDATE chat_sessions SET phase = ? WHERE id = ?").bind(body.phase, (session as any)?.id).run();
     }
     
     return c.json({ success: true, message_id: msgId });
@@ -2076,7 +2077,7 @@ dataRouter.post("/auth/login", async (c) => {
     const payload = {
       id: user.id,
       email: user.email,
-      role: user.role,
+      role: (user as any).role,
       name: user.name,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours expiration
     };
@@ -2089,7 +2090,7 @@ dataRouter.post("/auth/login", async (c) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: (user as any).role,
         student_number: user.student_number,
         grade: user.grade
       }, 

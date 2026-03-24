@@ -20,11 +20,12 @@ export const ExternalAnalysisJobPanel = ({ jobType, title, description, datasetT
           parameters: {}
         })
       });
-      if (res.success) {
-        setJobId(res.job_id);
-        setMessage(`Job Created Successfully. ID: ${res.job_id}`);
+      const data = (await res.json()) as any;
+      if (data.success) {
+        setJobId(data.job_id);
+        setMessage(`Job Created Successfully. ID: ${data.job_id}`);
       } else {
-        setMessage(`Failed: ${res.error}`);
+        setMessage(`Failed: ${data.error}`);
       }
     } catch (e: any) {
       setMessage(`Error: ${e.message}`);
@@ -50,7 +51,7 @@ export const ExternalAnalysisJobPanel = ({ jobType, title, description, datasetT
           result_summary: { note: 'This is a mocked result summary uploaded from external analysis.' }
         })
       });
-      if (res.success) {
+      if ((res as any).success) {
         setMessage('Mock result imported successfully.');
       }
     } catch (e: any) {

@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 /**
  * JournalWorkflowPage.tsx
  * 実習日誌ワークフロー — ① 日誌記入 → ② AI評価確認 → ③ チャット・目標設定

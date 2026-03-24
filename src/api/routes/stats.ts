@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 /**
  * src/api/routes/stats.ts
  * Hono APIルート: 統計計算エンジン
@@ -56,7 +57,7 @@ function covariance(x: number[], y: number[]): number {
   if (n < 2) return 0;
   const mx = mean(x.slice(0, n));
   const my = mean(y.slice(0, n));
-  return x.slice(0, n).reduce((s, xi, i) => s + (xi - mx) * (y[i] - my), 0) / (n - 1);
+  return x.slice(0, n).reduce((s: any, xi: any, i: number) => s + (xi - mx) * (y[i] - my), 0) / (n - 1);
 }
 
 /** Pearson相関係数 */
@@ -149,7 +150,7 @@ function computeICC21(
   }
 
   // 行列転置: subjects × raters
-  const matrix: number[][] = Array.from({ length: n }, (_, i) =>
+  const matrix: number[][] = Array.from({ length: n }, (_: any, i: number) =>
     ratings.map((r) => r[i])
   );
 
@@ -386,7 +387,7 @@ function computeBlandAltman(
 // ────────────────────────────────────────────────────────────────
 
 // k-means clustering for LCGA
-function kMeans(points, k, maxIter = 50) {
+function kMeans(points: any[], k: number, maxIter = 50) {
   if (points.length === 0) return { centroids: [], assignments: [] };
   // initialize centroids randomly
   let centroids = points.slice(0, k).map(p => [...p]);
@@ -437,7 +438,7 @@ function kMeans(points, k, maxIter = 50) {
 }
 
 // compute multivariate gaussian log pdf
-function logGaussianPdf(x, mu, cov) {
+function logGaussianPdf(x: any, mu: any, cov: any) {
   const d = x.length;
   let dist = 0;
   for (let i=0; i<d; i++) dist += Math.pow(x[i] - mu[i], 2) / (cov[i] || 1e-6);
@@ -454,11 +455,11 @@ function computeLCGA(weeklyScores, maxClasses = 5) {
   const points = []; // [intercept, slope]
   let residualVarSum = 0;
   for (const scores of weeklyScores) {
-    const x = scores.map((_, i) => i);
+    const x = scores.map((_: any, i: number) => i);
     const y = scores;
     const mx = x.reduce((a,b)=>a+b,0) / x.length;
     const my = y.reduce((a,b)=>a+b,0) / y.length;
-    const slope = x.reduce((s, xi, i) => s + (xi - mx) * (y[i] - my), 0) /
+    const slope = x.reduce((s: any, xi: any, i: number) => s + (xi - mx) * (y[i] - my), 0) /
                   (x.reduce((s, xi) => s + (xi - mx) ** 2, 0) || 1);
     const intercept = my - slope * mx;
     points.push([intercept, slope]);
@@ -546,7 +547,7 @@ function computeLCGA(weeklyScores, maxClasses = 5) {
         bic: Math.round(bic * 100) / 100,
         sabic: Math.round((aic + bic) / 2 * 100) / 100,
         blrt_p: Math.round(Math.random() * 0.05 * 1000) / 1000, // Approximate
-        classes: centroids.map((cent, idx) => ({
+        classes: centroids.map((cent: any, idx: number) => ({
           class_id: idx + 1,
           proportion: Math.round(proportions[idx] * 1000) / 1000,
           intercept: Math.round(cent[0] * 1000) / 1000,
@@ -591,10 +592,10 @@ function computeEM_FIML_LGCM(weeklyScores: (number | null)[][]): ReturnType<type
     slopes = [];
     // M-step: estimate parameters via OLS on current imputed data
     for (const scores of imputed) {
-      const x = scores.map((_, i) => i);
+      const x = scores.map((_: any, i: number) => i);
       const mx = mean(x);
       const my = mean(scores);
-      const slope = x.reduce((s, xi, i) => s + (xi - mx) * (scores[i] - my), 0) /
+      const slope = x.reduce((s: any, xi: any, i: number) => s + (xi - mx) * (scores[i] - my), 0) /
                     (x.reduce((s, xi) => s + (xi - mx) ** 2, 0) || 1);
       const intercept = my - slope * mx;
       intercepts.push(intercept);
@@ -647,7 +648,7 @@ function computeEM_FIML_LGCM(weeklyScores: (number | null)[][]): ReturnType<type
   };
 }
 
-function computeLGCMSummary(weeklyScores) {
+function computeLGCMSummary(weeklyScores: any[]) {
   const n = weeklyScores.length;
   const t = weeklyScores[0]?.length ?? 0;
   if (n < 5 || t < 3) {
@@ -665,11 +666,11 @@ function computeLGCMSummary(weeklyScores) {
   let ssErr = 0;
 
   for (const scores of weeklyScores) {
-    const x = scores.map((_, i) => i);
+    const x = scores.map((_: any, i: number) => i);
     const y = scores;
     const mx = mean(x);
     const my = mean(y);
-    const slope = x.reduce((s, xi, i) => s + (xi - mx) * (y[i] - my), 0) /
+    const slope = x.reduce((s: any, xi: any, i: number) => s + (xi - mx) * (y[i] - my), 0) /
                   (x.reduce((s, xi) => s + (xi - mx) ** 2, 0) || 1);
     const intercept = my - slope * mx;
     intercepts.push(intercept);
@@ -908,7 +909,7 @@ statsRouter.post("/full-reliability", async (c) => {
 
   try {
     const humanTotalArr = Array.isArray(body.human_total[0]) ? (body.human_total as number[][]) : [body.human_total as number[]];
-    const humanTotalAvg = Array.isArray(body.human_total[0]) ? body.ai_total.map((_, i) => mean((body.human_total as number[][]).map(r => r[i]))) : body.human_total as number[];
+    const humanTotalAvg = Array.isArray(body.human_total[0]) ? body.ai_total.map((_: any, i: number) => mean((body.human_total as number[][]).map(r => r[i]))) : body.human_total as number[];
     
     const [totalICCRes, totalBARes] = await Promise.all([
       statsProvider.computeICC([body.ai_total, ...humanTotalArr], "total", () => computeICC21([body.ai_total, ...humanTotalArr])),
@@ -928,7 +929,7 @@ statsRouter.post("/full-reliability", async (c) => {
       if (!ai || !human) continue;
       
       const humanMatrix = Array.isArray(human[0]) ? (human as unknown as number[][]) : [human as number[]];
-      const humanAvgF = Array.isArray(human[0]) ? ai.map((_, i) => mean((human as unknown as number[][]).map(r => r[i]))) : human as number[];
+      const humanAvgF = Array.isArray(human[0]) ? ai.map((_: any, i: number) => mean((human as unknown as number[][]).map(r => r[i]))) : human as number[];
 
       const r = pearsonR(ai, humanAvgF);
       const n = Math.min(ai.length, humanAvgF.length);

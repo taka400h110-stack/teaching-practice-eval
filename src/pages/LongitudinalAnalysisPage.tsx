@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * src/pages/LongitudinalAnalysisPage.tsx
  * 縦断分析・成長軌跡（RQ3a）
@@ -24,6 +23,18 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
+import {
+  CohortProfile,
+  WeeklyScore,
+  LGCMResult,
+  LCGAResult,
+  WeeklyStat,
+  OverlayPlotData,
+  AnalysisStatus,
+  LCGATrajectoryClass,
+  LCGAClass
+} from "../types/longitudinal";
+
 
 // ────────────────────────────────────────────────────────────────
 // 定数
@@ -45,30 +56,47 @@ const FACTOR_LABELS = {
 // ────────────────────────────────────────────────────────────────
 
 
-function genLCGATrajectories(weeks: number, lcgaResult: any) {
-  const classes = lcgaResult?.classes || [
-    { class_id: 1, proportion: 0.45, intercept: 2.5, slope: 0.15 },
-    { class_id: 2, proportion: 0.35, intercept: 2.0, slope: 0.20 },
-    { class_id: 3, proportion: 0.20, intercept: 1.5, slope: 0.25 }
-  ];
-  return classes.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })).map((cls: any) => ({
+function genLCGATrajectories(weeks: number, lcgaResult: LCGAResult | null, isSample: boolean): LCGATrajectoryClass[] {
+  let classes: LCGAClass[] = [];
+  if (lcgaResult?.classes && lcgaResult.classes.length > 0) {
+    classes = lcgaResult.classes;
+  } else if (isSample) {
+    classes = [
+      { class_id: 1, proportion: 0.45, intercept: 2.5, slope: 0.15 },
+      { class_id: 2, proportion: 0.35, intercept: 2.0, slope: 0.20 },
+      { class_id: 3, proportion: 0.20, intercept: 1.5, slope: 0.25 }
+    ];
+  } else {
+    return [];
+  }
+
+  return classes.map((c: LCGAClass) => ({ 
+    id: String(c.class_id), 
+    label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, 
+    color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', 
+    pct: Math.round(c.proportion*100), 
+    desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, 
+    initScore: c.intercept, 
+    finalScore: +(c.intercept + c.slope * weeks).toFixed(2), 
+    slope: c.slope 
+  })).map((cls) => ({
     ...cls,
     trajectory: Array.from({ length: weeks }, (_, i) => ({
       week: i + 1,
-      score: Math.min(5, +(cls.initScore + cls.slope * i).toFixed(2)),
+      score: Math.min(5, Math.max(1, +(cls.initScore + cls.slope * i).toFixed(2))),
     })),
   }));
 }
 
 // LGCM 結果（論文記載値を使用）
-const LGCM_RESULT = { intercept_mean: 0, intercept_variance: 0, slope_mean: 0, slope_variance: 0, intercept_slope_cov: 0, cfi: 0, rmsea: 0, srmr: 0, chi2: 0, chi2_df: 0, chi2_p: 0, growth_pattern: "" };
+const LGCM_RESULT: LGCMResult = { intercept_mean: 0, intercept_variance: 0, slope_mean: 0, slope_variance: 0, intercept_slope_cov: 0, cfi: 0, rmsea: 0, srmr: 0, chi2: 0, chi2_df: 0, chi2_p: 0, growth_pattern: "" };
 
 // ────────────────────────────────────────────────────────────────
 // CSVダウンロード
 // ────────────────────────────────────────────────────────────────
-function downloadGrowthCSV(weeklyStats: any[]) {
+function downloadGrowthCSV(weeklyStats: WeeklyStat[]) {
   const headers = ["week", "f1_mean", "f1_sd", "f2_mean", "f2_sd", "f3_mean", "f3_sd", "f4_mean", "f4_sd", "total_mean", "total_sd"];
-  const rows = weeklyStats.map((w) => headers.map((h) => (w as Record<string, number>)[h] ?? "").join(","));
+  const rows = weeklyStats.map((w) => headers.map((h) => (w as unknown as Record<string, number>)[h] ?? "").join(","));
   const csv = [headers.join(","), ...rows].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a");
@@ -77,18 +105,18 @@ function downloadGrowthCSV(weeklyStats: any[]) {
   a.click();
 }
 
-function downloadLGCMCSV(lgcmResult: any) {
+function downloadLGCMCSV(lgcmResult: LGCMResult | null) {
   const rows = [
     ["パラメータ", "推定値", "備考"],
-    ["Intercept mean", lgcmResult?.intercept_mean, "初期値の平均"],
-    ["Intercept variance", lgcmResult?.intercept_variance, "初期値の個人差"],
-    ["Slope mean", lgcmResult?.slope_mean, "成長率の平均（週単位）"],
-    ["Slope variance", lgcmResult?.slope_variance, "成長率の個人差"],
+    ["Intercept mean", lgcmResult?.intercept_mean ?? "", "初期値の平均"],
+    ["Intercept variance", lgcmResult?.intercept_variance ?? "", "初期値の個人差"],
+    ["Slope mean", lgcmResult?.slope_mean ?? "", "成長率の平均（週単位）"],
+    ["Slope variance", lgcmResult?.slope_variance ?? "", "成長率の個人差"],
     ["Intercept-Slope Cov", lgcmResult?.intercept_slope_cov, "初期値と成長率の共分散"],
-    ["CFI", lgcmResult?.cfi, "≥0.90 で良好な適合"],
-    ["RMSEA", lgcmResult?.rmsea, "≤0.08 で許容可能"],
-    ["SRMR", lgcmResult?.srmr, "≤0.08 で良好"],
-    ["χ²(df)", `${lgcmResult?.chi2}(${lgcmResult?.chi2_df})`, `p<${lgcmResult?.chi2_p}`],
+    ["CFI", lgcmResult?.cfi ?? "", "≥0.90 で良好な適合"],
+    ["RMSEA", lgcmResult?.rmsea ?? "", "≤0.08 で許容可能"],
+    ["SRMR", lgcmResult?.srmr ?? "", "≤0.08 で良好"],
+    ["χ²(df)", lgcmResult ? `${lgcmResult.chi2}(${lgcmResult.chi2_df})` : "", lgcmResult ? `p<${lgcmResult.chi2_p}` : ""],
   ];
   const csv = rows.map((r) => r.join(",")).join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -111,19 +139,18 @@ const TabPanel = ({ children, value, index }: TabPanelProps) =>
 export default function LongitudinalAnalysisPage() {
   const [tab, setTab] = useState(0);
   const [isCalcLGCM, setIsCalcLGCM] = useState(false);
-  const [lgcmDone, setLgcmDone] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, msg: "" });
+    const [snackbar, setSnackbar] = useState({ open: false, msg: "" });
 
-  const { data: cohorts, isLoading } = useQuery({
+  const { data: cohorts, isLoading } = useQuery<CohortProfile[]>({
     queryKey: ["cohorts"],
     queryFn: async () => {
       const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
       const data = await res.json() as any;
-      return data.cohorts || [];
+      return (data.cohorts || []) as CohortProfile[];
     },
   });
 
-  const { data: growthData } = useQuery({
+  const { data: growthData } = useQuery<WeeklyScore[][]>({
     queryKey: ["growth"],
     queryFn: async () => {
       const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
@@ -132,27 +159,30 @@ export default function LongitudinalAnalysisPage() {
     },
   });
 
-  const [lgcmResult, setLgcmResult] = useState<any>(LGCM_RESULT);
-  const [lcgaResult, setLcgaResult] = useState<any>(null);
+  const [lgcmResult, setLgcmResult] = useState<LGCMResult | null>(null);
+  const [lcgaResult, setLcgaResult] = useState<LCGAResult | null>(null);
   const [lgcmMode, setLgcmMode] = useState<"legacy" | "rigorous">("rigorous");
-  const [weeklyStats, setWeeklyStats] = useState<any[]>([]);
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyStat[]>([]);
   const [lgcmPlotData, setLgcmPlotData] = useState<any[]>([]);
-  const [lcgaPlotData, setLcgaPlotData] = useState<any[]>([]);
-  const [overlayPlotData, setOverlayPlotData] = useState<any[]>([]);
+  const [overlayPlotData, setOverlayPlotData] = useState<OverlayPlotData[]>([]);
+
+  const [lgcmStatus, setLgcmStatus] = useState<AnalysisStatus>('not_run');
+  const [lcgaStatus, setLcgaStatus] = useState<AnalysisStatus>('external_required');
+  const [isSampleMode, setIsSampleMode] = useState<boolean>(false);
 
   const weeks = React.useMemo(() => {
     if (!cohorts || cohorts.length === 0) return 10;
-    return Math.max(...cohorts.flatMap((c: any) => c.weekly_scores?.map((ws: any) => ws.week) || []), 10);
+    return Math.max(...cohorts.flatMap((c: CohortProfile) => c.weekly_scores?.map((ws: WeeklyScore) => ws.week) || []), 10);
   }, [cohorts]);
 
-  const lcgaTrajectories = React.useMemo(() => genLCGATrajectories(weeks, lcgaResult), [weeks, lcgaResult]);
+  const lcgaTrajectories = React.useMemo(() => genLCGATrajectories(weeks, lcgaResult, isSampleMode), [weeks, lcgaResult, isSampleMode]);
 
   useEffect(() => {
     if (!cohorts || cohorts.length === 0) return;
     const maxWeek = weeks;
     
     const overlay = Array.from({ length: maxWeek }, (_, i) => { 
-      const row: any = { week: i + 1 }; 
+      const row: OverlayPlotData = { week: i + 1 }; 
       cohorts.slice(0, 10).forEach((p: any, idx: number) => { 
         const ws = p.weekly_scores.find((w: any) => w.week === i + 1); 
         if(ws) row[`user_${idx}`] = ws.total; 
@@ -161,11 +191,11 @@ export default function LongitudinalAnalysisPage() {
     });
     setOverlayPlotData(overlay);
 
-    const stats = Array.from({ length: maxWeek }, (_, i) => {
+    const stats: WeeklyStat[] = Array.from({ length: maxWeek }, (_, i) => {
       const week = i + 1;
-      const weekScores = cohorts.map((c: any) => c.weekly_scores.find((ws: any) => ws.week === week)).filter(Boolean);
-      const mean = (k: string) => weekScores.length ? weekScores.reduce((a: number, b: any) => a + (b[k]||0), 0) / weekScores.length : 0;
-      const sd = (k: string, m: number) => weekScores.length ? Math.sqrt(weekScores.reduce((a: number, b: any) => a + Math.pow((b[k]||0) - m, 2), 0) / weekScores.length) : 0;
+      const weekScores = cohorts.map((c: CohortProfile) => c.weekly_scores.find((ws: WeeklyScore) => ws.week === week)).filter((ws): ws is WeeklyScore => Boolean(ws));
+      const mean = (k: keyof WeeklyScore) => weekScores.length ? weekScores.reduce((a: number, b: WeeklyScore) => a + (Number(b[k])||0), 0) / weekScores.length : 0;
+      const sd = (k: keyof WeeklyScore, m: number) => weekScores.length ? Math.sqrt(weekScores.reduce((a: number, b: WeeklyScore) => a + Math.pow((Number(b[k])||0) - m, 2), 0) / weekScores.length) : 0;
       return {
         week,
         f1_mean: +(mean('factor1').toFixed(2)), f1_sd: +(sd('factor1', mean('factor1')).toFixed(2)),
@@ -178,16 +208,18 @@ export default function LongitudinalAnalysisPage() {
     setWeeklyStats(stats);
   }, [cohorts]);
 
-  const myScores = (growthData?.weekly_scores ?? []).map((ws) => ({
-    week: ws.week, ...ws,
-  }));
+  const myScores = growthData?.[0] ?? [];
 
   const handleLGCM = useCallback(async () => {
-    if (!cohorts) return;
+    if (!cohorts || cohorts.length === 0) {
+      setLgcmStatus('no_data');
+      setSnackbar({ open: true, msg: "データが不足しています" });
+      return;
+    }
     setIsCalcLGCM(true);
 
     try {
-      const weeklyMatrix = (cohorts ?? []).slice(0, 30).map((p) =>
+      const weeklyMatrix = cohorts.slice(0, 30).map((p) =>
         p.weekly_scores.map((ws) => ws.total)
       );
       const resp = await apiFetch("/api/stats/lgcm", {
@@ -196,15 +228,21 @@ export default function LongitudinalAnalysisPage() {
         body: JSON.stringify({ weekly_scores: weeklyMatrix, factor: "total" }),
       });
       if (resp.ok) {
-        await resp.json();
+        const data = await resp.json() as LGCMResult;
+        setLgcmResult(data);
+        setLgcmStatus('completed');
+        setSnackbar({ open: true, msg: "LGCM分析が完了しました" });
+      } else {
+        throw new Error('API Error');
       }
     } catch {
-      // APIが使えない場合は論文値を表示
+      // APIが使えない場合は論文値をサンプルとして表示
+      setLgcmResult(LGCM_RESULT);
+      setLgcmStatus('sample');
+      setSnackbar({ open: true, msg: "LGCM分析に失敗しました（サンプルデータを表示します）" });
     }
 
-    setLgcmDone(true);
-    setIsCalcLGCM(false);
-    setSnackbar({ open: true, msg: "LGCM分析が完了しました（論文掲載値を表示）" });
+        setIsCalcLGCM(false);
   }, [cohorts]);
 
   if (isLoading) return <LinearProgress />;
@@ -234,7 +272,7 @@ export default function LongitudinalAnalysisPage() {
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => downloadGrowthCSV(weeklyStats)}>
             成長データCSV
           </Button>
-          {lgcmDone && (
+          {(lgcmStatus === "completed" || lgcmStatus === "sample") && (
             <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => downloadLGCMCSV(lgcmResult)}>
               LGCM結果CSV
             </Button>
@@ -374,9 +412,9 @@ export default function LongitudinalAnalysisPage() {
                   <ResponsiveContainer width="100%" height={180}>
                     <AreaChart data={weeklyStats.map((d) => ({
                       week: d.week,
-                      mean: (d as Record<string, number>)[`f${idx+1}_mean`],
-                      upper: +((d as Record<string, number>)[`f${idx+1}_mean`] + (d as Record<string, number>)[`f${idx+1}_sd`]).toFixed(2),
-                      lower: +((d as Record<string, number>)[`f${idx+1}_mean`] - (d as Record<string, number>)[`f${idx+1}_sd`]).toFixed(2),
+                      mean: (d as unknown as Record<string, number>)[`f${idx+1}_mean`],
+                      upper: +((d as unknown as Record<string, number>)[`f${idx+1}_mean`] + (d as unknown as Record<string, number>)[`f${idx+1}_sd`]).toFixed(2),
+                      lower: +((d as unknown as Record<string, number>)[`f${idx+1}_mean`] - (d as unknown as Record<string, number>)[`f${idx+1}_sd`]).toFixed(2),
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="week" />
@@ -397,15 +435,29 @@ export default function LongitudinalAnalysisPage() {
       {/* ━━ LGCM結果 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <TabPanel value={tab} index={3}>
         <Grid container spacing={3}>
-          {!lgcmDone && (
+          {lgcmStatus === 'no_data' && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning">データ不足のため LGCM を実行できません</Alert>
+            </Grid>
+          )}
+          {lgcmStatus === 'not_run' && (
             <Grid size={{ xs: 12 }}>
               <Alert severity="info">
                 「LGCM実行」ボタンを押すと、/api/stats/lgcm エンドポイント経由で計算します。
-                未接続の場合は論文掲載値を表示します。
+              </Alert>
+            </Grid>
+          )}
+          {lgcmStatus === 'sample' && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning">
+                <strong>サンプル表示（実分析結果ではありません）</strong>
+                <br />API実行に失敗したため、論文掲載値をサンプルとして表示しています。
               </Alert>
             </Grid>
           )}
 
+          {(lgcmStatus === 'completed' || lgcmStatus === 'sample') && lgcmResult && (
+            <>
           {/* LGCMパラメータ表（論文 Table 3-5相当） */}
           <Grid size={{ xs: 12, md: 6 }}>
             <Card variant="outlined">
@@ -464,10 +516,10 @@ export default function LongitudinalAnalysisPage() {
                     </TableHead>
                     <TableBody>
                       {[
-                        { name: "χ²(df)", value: `${lgcmResult?.chi2}(${lgcmResult?.chi2_df})`, ref: "p<.05", ok: true, note: "p<.01" },
-                        { name: "CFI", value: lgcmResult?.cfi.toFixed(3), ref: "≥0.90", ok: lgcmResult?.cfi >= 0.90 },
-                        { name: "RMSEA", value: lgcmResult?.rmsea.toFixed(3), ref: "≤0.08", ok: lgcmResult?.rmsea <= 0.08 },
-                        { name: "SRMR", value: lgcmResult?.srmr.toFixed(4), ref: "≤0.08", ok: lgcmResult?.srmr <= 0.08 },
+                        { name: "χ²(df)", value: lgcmResult ? `${lgcmResult.chi2}(${lgcmResult.chi2_df})` : "", ref: "p<.05", ok: true, note: "p<.01" },
+                        { name: "CFI", value: typeof lgcmResult?.cfi === "number" ? lgcmResult.cfi.toFixed(3) : "", ref: "≥0.90", ok: typeof lgcmResult?.cfi === "number" ? lgcmResult.cfi >= 0.90 : false },
+                        { name: "RMSEA", value: typeof lgcmResult?.rmsea === "number" ? lgcmResult.rmsea.toFixed(3) : "", ref: "≤0.08", ok: typeof lgcmResult?.rmsea === "number" ? lgcmResult.rmsea <= 0.08 : false },
+                        { name: "SRMR", value: typeof lgcmResult?.srmr === "number" ? lgcmResult.srmr.toFixed(4) : "", ref: "≤0.08", ok: typeof lgcmResult?.srmr === "number" ? lgcmResult.srmr <= 0.08 : false },
                       ].map((r) => (
                         <TableRow key={r.name} hover>
                           <TableCell><strong>{r.name}</strong></TableCell>
@@ -482,7 +534,7 @@ export default function LongitudinalAnalysisPage() {
                   </Table>
                 </TableContainer>
                 <Alert severity="success" sx={{ mt: 2 }}>
-                  CFI={lgcmResult?.cfi}、RMSEA={lgcmResult?.rmsea}、SRMR={lgcmResult?.srmr}。
+                  CFI={lgcmResult?.cfi ?? ""}、RMSEA={lgcmResult?.rmsea ?? ""}、SRMR={lgcmResult?.srmr ?? ""}。
                   すべての適合度指標が基準を満たし、線形成長モデルが適切に当てはまっています。
                 </Alert>
               </CardContent>
@@ -514,16 +566,34 @@ export default function LongitudinalAnalysisPage() {
               </CardContent>
             </Card>
           </Grid>
+          </>)}
         </Grid>
       </TabPanel>
 
       {/* ━━ LCGA（クラス分類） ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <TabPanel value={tab} index={4}>
         <Grid container spacing={3}>
+          <Grid size={{ xs: 12 }}>
+            {lcgaStatus === 'external_required' && !isSampleMode && (
+              <Alert severity="info" action={<Button color="inherit" size="small" onClick={() => setIsSampleMode(true)}>サンプル表示を確認</Button>}>
+                LCGA は外部分析前提です。<br />
+                外部ソフトウェア（Mplus/R等）で算出された結果を取り込むと、ここにクラス軌跡と要約が表示されます。
+              </Alert>
+            )}
+            {isSampleMode && (
+              <Alert severity="warning" action={<Button color="inherit" size="small" onClick={() => setIsSampleMode(false)}>サンプル表示を閉じる</Button>}>
+                <strong>サンプル表示（実分析結果ではありません）</strong><br />
+                外部分析結果を取り込むと実データへ置き換わります。
+              </Alert>
+            )}
+          </Grid>
+          
+          {(lcgaStatus === 'completed' || isSampleMode) && (
+            <>
           {/* クラスサマリー */}
           <Grid size={{ xs: 12 }}>
             <Grid container spacing={2}>
-              {(lcgaResult?.classes?.map((c: any) => ({ id: String(c.class_id), label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', pct: Math.round(c.proportion*100), desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, initScore: c.intercept, finalScore: +(c.intercept + c.slope * 10).toFixed(2), slope: c.slope })) || []).map((cls) => (
+              {lcgaTrajectories.map((cls) => (
                 <Grid key={cls.id} size={{ xs: 12, sm: 4 }}>
                   <Card sx={{ borderLeft: `6px solid ${cls.color}` }}>
                     <CardContent>
@@ -555,7 +625,7 @@ export default function LongitudinalAnalysisPage() {
             <Card variant="outlined">
               <CardContent>
                                 <Alert severity="info" sx={{ mb: 2 }}>
-                  注記: 以下のLCGA（潜在クラス成長分析）の結果は、外部ソフトウェア（Mplus/R等）で算出された結果の表示用モックです。本システム内での自動計算は行われていません。
+                  このグラフはLCGAの各クラスごとの平均的な成長軌跡を示しています。
                 </Alert>
 <Typography variant="subtitle1" fontWeight={700} gutterBottom>
                   LCGA 潜在クラス別 成長軌跡（3クラスモデル）
@@ -582,12 +652,13 @@ export default function LongitudinalAnalysisPage() {
                   </LineChart>
                 </ResponsiveContainer>
                 <Alert severity="info" sx={{ mt: 1 }}>
-                  LCGA 3クラスモデル（BIC基準で最適）。高成長群(((({(lcgaResult?.classes?.map((c: any) => ({ pct: Math.round(c.proportion*100) })) || [{pct: 45}, {pct: 35}, {pct: 20}])[2].pct}%)。
+                  LCGA 3クラスモデル（BIC基準で最適）。高成長群({lcgaTrajectories[2]?.pct}%)。
                   実装: mplus/lavaan形式CSVエクスポート対応。
                 </Alert>
               </CardContent>
             </Card>
           </Grid>
+          </>)}
         </Grid>
       </TabPanel>
 
