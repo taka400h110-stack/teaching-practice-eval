@@ -107,8 +107,8 @@ export default function App() {
           <Route path="growth"            element={<GrowthVisualizationPage />} />
           <Route path="longitudinal"      element={<LongitudinalAnalysisPage />} />
           <Route path="statistics"        element={<StatisticsPage />} />
-          <Route path="advanced"          element={<AdvancedAnalyticsPage />} />
-          <Route path="platform"          element={<PrivateRoute allowedRoles={["admin", "researcher"]}><PlatformAnalyticsPage /></PrivateRoute>} />
+          <Route path="advanced-analytics"          element={<AdvancedAnalyticsPage />} />
+          <Route path="platform-analytics"          element={<PrivateRoute allowedRoles={["admin", "researcher"]}><PlatformAnalyticsPage /></PrivateRoute>} />
           <Route path="cohorts"           element={<CohortsManagementPage />} />
           <Route path="scat"              element={<SCATAnalysisPage />} />
 
