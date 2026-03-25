@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { CircularProgress, Box } from "@mui/material";
+import { CircularProgress, Box, Typography } from "@mui/material";
 import AppLayout from "./components/AppLayout";
 import apiClient from "./api/client";
 
@@ -57,8 +57,11 @@ function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, a
   
   if (allowedRoles && allowedRoles.length > 0) {
     const user = apiClient.getCurrentUser();
-    if (!user || !allowedRoles.includes(user.role)) {
-      return <Navigate to="/dashboard" replace />;
+    // 下位互換対応
+    const userRoles = (user as any)?.roles || [(user as any)?.role || "student"];
+    const hasRole = userRoles.some((r: string) => allowedRoles.includes(r));
+    if (!user || !hasRole) {
+      return <Navigate to="/unauthorized" replace />;
     }
   }
   
@@ -82,53 +85,54 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
 
           {/* ダッシュボード */}
-          <Route path="dashboard"         element={<DashboardPage />} />
-          <Route path="teacher-dashboard" element={<TeacherDashboardPage />} />
+          <Route path="dashboard"         element={<PrivateRoute allowedRoles={["student"]}><DashboardPage /></PrivateRoute>} />
+          <Route path="teacher-dashboard" element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor"]}><TeacherDashboardPage /></PrivateRoute>} />
           <Route path="admin"             element={<PrivateRoute allowedRoles={["admin", "researcher"]}><AdminDashboardPage /></PrivateRoute>} />
 
           {/* 日誌 */}
-          <Route path="journals"                    element={<JournalListPage />} />
-          <Route path="journals/new"                element={<JournalEditorPage />} />
-          <Route path="journals/:journalId"         element={<JournalDetailPage />} />
-          <Route path="journals/:journalId/edit"    element={<JournalEditorPage />} />
+          <Route path="journals"                    element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor"]}><JournalListPage /></PrivateRoute>} />
+          <Route path="journals/new"                element={<PrivateRoute allowedRoles={["student"]}><JournalEditorPage /></PrivateRoute>} />
+          <Route path="journals/:journalId"         element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor"]}><JournalDetailPage /></PrivateRoute>} />
+          <Route path="journals/:journalId/edit"    element={<PrivateRoute allowedRoles={["student"]}><JournalEditorPage /></PrivateRoute>} />
 
           {/* 実習ワークフロー（日誌+AI評価+チャット統合） */}
-          <Route path="journal-workflow"              element={<JournalWorkflowPage />} />
-          <Route path="journal-workflow/:journalId"   element={<JournalWorkflowPage />} />
+          <Route path="journal-workflow"              element={<PrivateRoute allowedRoles={["student"]}><JournalWorkflowPage /></PrivateRoute>} />
+          <Route path="journal-workflow/:journalId"   element={<PrivateRoute allowedRoles={["student"]}><JournalWorkflowPage /></PrivateRoute>} />
 
           {/* 評価 (RQ2) */}
           <Route path="evaluations"                         element={<PrivateRoute allowedRoles={["admin", "researcher", "evaluator", "teacher", "univ_teacher", "school_mentor"]}><EvaluationsPage /></PrivateRoute>} />
-          <Route path="evaluations/:journalId"              element={<EvaluationResultPage />} />
-          <Route path="evaluations/:journalId/human"        element={<HumanEvaluationPage />} />
-          <Route path="comparison"                          element={<ComparisonPage />} />
-          <Route path="reliability"                         element={<ReliabilityAnalysisPage />} />
+          <Route path="evaluations/:journalId"              element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer", "student", "teacher", "univ_teacher", "school_mentor"]}><EvaluationResultPage /></PrivateRoute>} />
+          <Route path="evaluations/:journalId/human"        element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><HumanEvaluationPage /></PrivateRoute>} />
+          <Route path="comparison"                          element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><ComparisonPage /></PrivateRoute>} />
+          <Route path="reliability"                         element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><ReliabilityAnalysisPage /></PrivateRoute>} />
 
           {/* 成長・分析 (RQ3) */}
-          <Route path="growth"            element={<GrowthVisualizationPage />} />
-          <Route path="longitudinal"      element={<LongitudinalAnalysisPage />} />
-          <Route path="statistics"        element={<StatisticsPage />} />
-          <Route path="advanced-analytics"          element={<AdvancedAnalyticsPage />} />
+          <Route path="growth"            element={<PrivateRoute allowedRoles={["student"]}><GrowthVisualizationPage /></PrivateRoute>} />
+          <Route path="longitudinal"      element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><LongitudinalAnalysisPage /></PrivateRoute>} />
+          <Route path="statistics"        element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><StatisticsPage /></PrivateRoute>} />
+          <Route path="advanced-analytics"          element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><AdvancedAnalyticsPage /></PrivateRoute>} />
           <Route path="platform-analytics"          element={<PrivateRoute allowedRoles={["admin", "researcher"]}><PlatformAnalyticsPage /></PrivateRoute>} />
-          <Route path="cohorts"           element={<CohortsManagementPage />} />
-          <Route path="scat"              element={<SCATAnalysisPage />} />
+          <Route path="cohorts"           element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><CohortsManagementPage /></PrivateRoute>} />
+          <Route path="scat"              element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATAnalysisPage /></PrivateRoute>} />
 
           {/* 個人 */}
-          <Route path="self-evaluation"   element={<SelfEvaluationPage />} />
-          <Route path="goals"             element={<GoalHistoryPage />} />
-          <Route path="chat"              element={<ChatBotPage />} />
+          <Route path="self-evaluation"   element={<PrivateRoute allowedRoles={["student"]}><SelfEvaluationPage /></PrivateRoute>} />
+          <Route path="goals"             element={<PrivateRoute allowedRoles={["student"]}><GoalHistoryPage /></PrivateRoute>} />
+          <Route path="chat"              element={<PrivateRoute allowedRoles={["student"]}><ChatBotPage /></PrivateRoute>} />
 
           {/* ユーザー登録 */}
           <Route path="register"          element={<PrivateRoute allowedRoles={["admin"]}><UserRegistrationPage /></PrivateRoute>} />
 
           {/* OCR読み込み */}
-          <Route path="ocr"               element={<JournalOCRPage />} />
+          <Route path="ocr"               element={<PrivateRoute allowedRoles={["student"]}><JournalOCRPage /></PrivateRoute>} />
 
           {/* 教員統計 */}
-          <Route path="teacher-statistics" element={<TeacherStatisticsPage />} />
+          <Route path="teacher-statistics" element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><TeacherStatisticsPage /></PrivateRoute>} />
 
           {/* 国際比較（RQ1） */}
-          <Route path="international"     element={<InternationalComparisonPage />} />
+          <Route path="international"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><InternationalComparisonPage /></PrivateRoute>} />
         </Route>
+        <Route path="unauthorized" element={<Box p={4}><Typography variant="h5" color="error">403 Forbidden</Typography><Typography>このページへのアクセス権限がありません。</Typography></Box>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>
