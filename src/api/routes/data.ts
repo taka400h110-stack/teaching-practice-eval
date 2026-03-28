@@ -18,6 +18,7 @@
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { requireRoles } from "../middleware/auth";
 
 type Bindings = {
   DB: D1Database;
@@ -356,7 +357,7 @@ function nowISO(): string {
 // ────────────────────────────────────────────────────────────────
 // 日誌 CRUD
 // ────────────────────────────────────────────────────────────────
-dataRouter.get("/journals", async (c) => {
+dataRouter.get("/journals", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer", "evaluator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -376,7 +377,7 @@ dataRouter.get("/journals", async (c) => {
   }
 });
 
-dataRouter.post("/journals", async (c) => {
+dataRouter.post("/journals", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -413,7 +414,7 @@ dataRouter.post("/journals", async (c) => {
   }
 });
 
-dataRouter.get("/journals/:id", async (c) => {
+dataRouter.get("/journals/:id", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer", "evaluator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -425,7 +426,7 @@ dataRouter.get("/journals/:id", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // AI評価結果の保存・取得
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/evaluations", async (c) => {
+dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -512,7 +513,7 @@ dataRouter.post("/evaluations", async (c) => {
   }
 });
 
-dataRouter.get("/evaluations", async (c) => {
+dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -523,7 +524,7 @@ dataRouter.get("/evaluations", async (c) => {
   }
 });
 
-dataRouter.get("/evaluations/:journalId", async (c) => {
+dataRouter.get("/evaluations/:journalId", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -547,7 +548,7 @@ dataRouter.get("/evaluations/:journalId", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // 人間評価
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/human-evals", async (c) => {
+dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -605,7 +606,7 @@ dataRouter.post("/human-evals", async (c) => {
   }
 });
 
-dataRouter.get("/human-evals", async (c) => {
+dataRouter.get("/human-evals", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -616,7 +617,7 @@ dataRouter.get("/human-evals", async (c) => {
   }
 });
 
-dataRouter.get("/human-evals/:journalId", async (c) => {
+dataRouter.get("/human-evals/:journalId", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -646,7 +647,7 @@ dataRouter.get("/human-evals/:journalId", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // 自己評価（週次）
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/self-evals", async (c) => {
+dataRouter.post("/self-evals", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -685,7 +686,7 @@ dataRouter.post("/self-evals", async (c) => {
   }
 });
 
-dataRouter.get("/self-evals/:studentId", async (c) => {
+dataRouter.get("/self-evals/:studentId", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -699,7 +700,7 @@ dataRouter.get("/self-evals/:studentId", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // SMART目標
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/goals", async (c) => {
+dataRouter.post("/goals", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -743,7 +744,7 @@ dataRouter.post("/goals", async (c) => {
   }
 });
 
-dataRouter.get("/goals/:studentId", async (c) => {
+dataRouter.get("/goals/:studentId", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -757,7 +758,7 @@ dataRouter.get("/goals/:studentId", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // ICC結果保存
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/icc-results", async (c) => {
+dataRouter.post("/icc-results", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -805,7 +806,7 @@ dataRouter.post("/icc-results", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // 学生一覧・成長データ取得（研究者用）
 // ────────────────────────────────────────────────────────────────
-dataRouter.get("/students", async (c) => {
+dataRouter.get("/students", requireRoles(["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -818,7 +819,7 @@ dataRouter.get("/students", async (c) => {
 });
 
 
-dataRouter.get("/cohorts", async (c) => {
+dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -847,7 +848,7 @@ dataRouter.get("/cohorts", async (c) => {
   return c.json({ success: true, cohorts: finalCohorts });
 });
 
-dataRouter.get("/growth/:studentId", async (c) => {
+dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -876,7 +877,7 @@ dataRouter.get("/growth/:studentId", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // Bland-Altman結果保存
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/bland-altman-results", async (c) => {
+dataRouter.post("/bland-altman-results", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -915,7 +916,7 @@ dataRouter.post("/bland-altman-results", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // 保存済み信頼性分析結果の一覧取得
 // ────────────────────────────────────────────────────────────────
-dataRouter.get("/reliability-results", async (c) => {
+dataRouter.get("/reliability-results", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -945,7 +946,7 @@ dataRouter.get("/reliability-results", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // 保存済み信頼性分析結果の詳細取得 (run_id)
 // ────────────────────────────────────────────────────────────────
-dataRouter.get("/reliability-results/:runId", async (c) => {
+dataRouter.get("/reliability-results/:runId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const runId = c.req.param("runId");
@@ -985,10 +986,9 @@ dataRouter.get("/reliability-results/:runId", async (c) => {
 });
 
 
-dataRouter.get("/export/evaluations-csv", async (c) => {
+dataRouter.get("/export/evaluations-csv", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
 
-  const role = c.get("user")?.role;
-  if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
+  
 
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -1032,10 +1032,9 @@ dataRouter.get("/export/evaluations-csv", async (c) => {
   }
 });
 
-dataRouter.get("/export/reliability-csv", async (c) => {
+dataRouter.get("/export/reliability-csv", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
 
-  const role = c.get("user")?.role;
-  if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
+  
 
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -1083,7 +1082,7 @@ dataRouter.get("/export/reliability-csv", async (c) => {
 // 全23項目×5段階のRD水準行動指標を返す（または初期投入）
 // 2026-03-07: 全因子共通RD水準対応
 // ────────────────────────────────────────────────────────────────
-dataRouter.get("/rubric-behaviors", async (c) => {
+dataRouter.get("/rubric-behaviors", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 500);
 
@@ -1101,7 +1100,7 @@ dataRouter.get("/rubric-behaviors", async (c) => {
 // POST /api/data/rubric-behaviors/seed
 // 全23項目×5段階のRD水準行動指標をDBに投入（初期化）
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/rubric-behaviors/seed", async (c) => {
+dataRouter.post("/rubric-behaviors/seed", requireRoles(["admin", "researcher"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 500);
 
@@ -1396,7 +1395,7 @@ dataRouter.post("/rubric-behaviors/seed", async (c) => {
 // GET /api/data/rubric-behaviors/:itemNumber
 // 特定項目のRD水準行動指標を返す
 // ────────────────────────────────────────────────────────────────
-dataRouter.get("/rubric-behaviors/:itemNumber", async (c) => {
+dataRouter.get("/rubric-behaviors/:itemNumber", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 500);
 
@@ -1417,7 +1416,7 @@ dataRouter.get("/rubric-behaviors/:itemNumber", async (c) => {
 
 
 // POST /api/data/rq3b/save
-dataRouter.post('/rq3b/save', async (c) => {
+dataRouter.post("/rq3b/save", requireRoles(["student"]), async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -1490,7 +1489,7 @@ dataRouter.post('/rq3b/save', async (c) => {
 });
 
 // GET /api/data/rq3b/responses/:userId
-dataRouter.get('/rq3b/responses/:userId', async (c) => {
+dataRouter.get("/rq3b/responses/:userId", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const reqUserId = c.req.param('userId');
   
   const authHeader = c.req.header('Authorization');
@@ -1521,9 +1520,8 @@ dataRouter.get('/rq3b/responses/:userId', async (c) => {
 });
 
 
-dataRouter.get("/export/joint-display-csv", async (c) => {
-  const role = c.get("user")?.role;
-  if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
+dataRouter.get("/export/joint-display-csv", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  
 
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -1566,9 +1564,8 @@ dataRouter.get("/export/joint-display-csv", async (c) => {
   }
 });
 
-dataRouter.get("/export/chat-goals-csv", async (c) => {
-  const role = c.get("user")?.role;
-  if (role !== "researcher" && role !== "admin") return c.text("Forbidden", 403);
+dataRouter.get("/export/chat-goals-csv", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  
 
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -1608,7 +1605,7 @@ dataRouter.get("/export/chat-goals-csv", async (c) => {
 
 
 // --- Evaluator Profiles ---
-dataRouter.get('/evaluator-profiles', async (c) => {
+dataRouter.get("/evaluator-profiles", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   await ensureSchema(db);
@@ -1620,7 +1617,7 @@ dataRouter.get('/evaluator-profiles', async (c) => {
   }
 });
 
-dataRouter.post('/evaluator-profiles', async (c) => {
+dataRouter.post("/evaluator-profiles", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   await ensureSchema(db);
@@ -1640,15 +1637,12 @@ dataRouter.post('/evaluator-profiles', async (c) => {
 });
 
 // --- Joint Display View ---
-dataRouter.get('/joint-display', async (c) => {
+dataRouter.get("/joint-display", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
   // Basic Auth Check
-  const role = c.get("user")?.role;
-  if (role !== "researcher" && role !== "admin") {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+  
 
   await ensureSchema(db);
   try {
@@ -1677,7 +1671,7 @@ dataRouter.get('/joint-display', async (c) => {
 
 
 // --- SCAT CRUD APIs ---
-dataRouter.get("/scat/projects", async (c) => {
+dataRouter.get("/scat/projects", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -1688,7 +1682,7 @@ dataRouter.get("/scat/projects", async (c) => {
   }
 });
 
-dataRouter.post("/scat/projects", async (c) => {
+dataRouter.post("/scat/projects", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -1701,7 +1695,7 @@ dataRouter.post("/scat/projects", async (c) => {
   }
 });
 
-dataRouter.get("/scat/segments/:projectId", async (c) => {
+dataRouter.get("/scat/segments/:projectId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -1712,7 +1706,7 @@ dataRouter.get("/scat/segments/:projectId", async (c) => {
   }
 });
 
-dataRouter.post("/scat/segments/:projectId", async (c) => {
+dataRouter.post("/scat/segments/:projectId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -1729,7 +1723,7 @@ dataRouter.post("/scat/segments/:projectId", async (c) => {
   }
 });
 
-dataRouter.get("/scat/codes/:projectId", async (c) => {
+dataRouter.get("/scat/codes/:projectId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -1740,7 +1734,7 @@ dataRouter.get("/scat/codes/:projectId", async (c) => {
   }
 });
 
-dataRouter.post("/scat/codes", async (c) => {
+dataRouter.post("/scat/codes", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -1764,7 +1758,7 @@ dataRouter.post("/scat/codes", async (c) => {
 });
 
 
-dataRouter.put("/journals/:id", async (c) => {
+dataRouter.put("/journals/:id", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -1789,7 +1783,7 @@ dataRouter.put("/journals/:id", async (c) => {
   }
 });
 
-dataRouter.delete("/journals/:id", async (c) => {
+dataRouter.delete("/journals/:id", requireRoles(["student", "admin"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -1804,7 +1798,7 @@ dataRouter.delete("/journals/:id", async (c) => {
 });
 
 
-dataRouter.get("/chat-sessions/:journalId", async (c) => {
+dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -1828,7 +1822,7 @@ dataRouter.get("/chat-sessions/:journalId", async (c) => {
   }
 });
 
-dataRouter.post("/chat-sessions/:journalId/messages", async (c) => {
+dataRouter.post("/chat-sessions/:journalId/messages", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -1869,7 +1863,7 @@ dataRouter.post("/chat-sessions/:journalId/messages", async (c) => {
 });
 
 
-dataRouter.put("/goals/:id", async (c) => {
+dataRouter.put("/goals/:id", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -1895,7 +1889,7 @@ dataRouter.put("/goals/:id", async (c) => {
 });
 
 
-dataRouter.get("/chat-sessions", async (c) => {
+dataRouter.get("/chat-sessions", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -1916,7 +1910,7 @@ dataRouter.get("/chat-sessions", async (c) => {
 export default dataRouter;
 
 // --- BFI Endpoints ---
-dataRouter.post('/bfi/save', async (c) => {
+dataRouter.post("/bfi/save", requireRoles(["student"]), async (c) => {
   const authUserId = c.req.header('x-user-id');
   const { env } = c;
   const body = await c.req.json();
@@ -1970,7 +1964,7 @@ dataRouter.post('/bfi/save', async (c) => {
   return c.json({ success: true, isCompleted: false });
 });
 
-dataRouter.get('/bfi/responses/:userId', async (c) => {
+dataRouter.get("/bfi/responses/:userId", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const authUserId = c.req.header('x-user-id');
   const { env } = c;
   const userId = c.req.param('userId');
@@ -1985,14 +1979,14 @@ dataRouter.get('/bfi/responses/:userId', async (c) => {
 
 
 // ユーザー管理
-dataRouter.get("/users", async (c) => {
+dataRouter.get("/users", requireRoles(["admin", "researcher"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const { results } = await db.prepare("SELECT * FROM users ORDER BY created_at DESC").all();
   return c.json({ success: true, users: results });
 });
 
-dataRouter.post("/users", async (c) => {
+dataRouter.post("/users", requireRoles(["admin"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const body = await c.req.json();
@@ -2008,7 +2002,7 @@ dataRouter.post("/users", async (c) => {
   }
 });
 
-dataRouter.put("/users/:id", async (c) => {
+dataRouter.put("/users/:id", requireRoles(["admin"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const id = c.req.param("id");
@@ -2024,7 +2018,7 @@ dataRouter.put("/users/:id", async (c) => {
   }
 });
 
-dataRouter.delete("/users/:id", async (c) => {
+dataRouter.delete("/users/:id", requireRoles(["admin"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const id = c.req.param("id");

@@ -1,13 +1,11 @@
 import { Hono } from "hono";
+import { requireRoles } from "../middleware/auth";
 
 const externalJobsRouter = new Hono<{ Bindings: { DB: any }, Variables: { user: any } }>();
 
 // GET list of jobs
-externalJobsRouter.get("/", async (c) => {
-  const user = c.get("user");
-  if (!user || (user.role !== "admin" && user.role !== "researcher")) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+externalJobsRouter.get("/", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -16,11 +14,8 @@ externalJobsRouter.get("/", async (c) => {
 });
 
 // POST create a job
-externalJobsRouter.post("/", async (c) => {
-  const user = c.get("user");
-  if (!user || (user.role !== "admin" && user.role !== "researcher")) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -34,8 +29,8 @@ externalJobsRouter.post("/", async (c) => {
     `).bind(
       id,
       body.job_type || "UNKNOWN",
-      user.id || "unknown_user",
-      user.role || "unknown_role",
+      c.get("user")?.id || "unknown_user",
+      c.get("user")?.role || "unknown_role",
       body.dataset_type || "default",
       JSON.stringify(body.parameters || {})
     );
@@ -49,11 +44,8 @@ externalJobsRouter.post("/", async (c) => {
 });
 
 // POST import results
-externalJobsRouter.post("/:id/complete", async (c) => {
-  const user = c.get("user");
-  if (!user || (user.role !== "admin" && user.role !== "researcher")) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+externalJobsRouter.post("/:id/complete", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -79,11 +71,8 @@ externalJobsRouter.post("/:id/complete", async (c) => {
 });
 
 // GET download dataset
-externalJobsRouter.get("/:id/download", async (c) => {
-  const user = c.get("user");
-  if (!user || (user.role !== "admin" && user.role !== "researcher")) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+externalJobsRouter.get("/:id/download", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   

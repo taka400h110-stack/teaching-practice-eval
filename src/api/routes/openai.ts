@@ -16,6 +16,7 @@
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { requireRoles } from "../middleware/auth";
 
 function getAuthContext(c: any) {
   const auth = c.req.header('Authorization');
@@ -426,7 +427,7 @@ async function callOpenAI(
 // ────────────────────────────────────────────────────────────────
 // POST /api/ai/evaluate  (CoT-A)
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/evaluate", async (c) => {
+openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
@@ -492,7 +493,7 @@ openaiRouter.post("/evaluate", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // POST /api/ai/reflection-depth  (CoT-B)
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/reflection-depth", async (c) => {
+openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
@@ -529,7 +530,7 @@ openaiRouter.post("/reflection-depth", async (c) => {
 // ────────────────────────────────────────────────────────────────
 // POST /api/ai/generate-goal  (CoT-C)
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/generate-goal", async (c) => {
+openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
@@ -605,7 +606,7 @@ openaiRouter.post("/generate-goal", async (c) => {
 // POST /api/ai/chat  (省察チャット対話生成)
 // CoT-B判定後に適切な問いかけを生成
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/chat", async (c) => {
+openaiRouter.post("/chat", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
@@ -680,7 +681,7 @@ ${body.journal_content.slice(0, 600)}...
 // POST /api/ocr/analyze  (OCR画像解析)
 // Google Cloud Vision API → Tesseract.js フォールバック
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/analyze", async (c) => {
+openaiRouter.post("/analyze", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   // Cloudflare Workers では FormData パースが可能
   try {
     const formData = await c.req.formData();
@@ -776,7 +777,7 @@ openaiRouter.post("/analyze", async (c) => {
 
 
 // POST /api/ai/check-evidence (RQ3b GA-Evidence)
-openaiRouter.post("/check-evidence", async (c) => {
+openaiRouter.post("/check-evidence", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const apiKey = process.env.OPENAI_API_KEY || c.env.process.env.OPENAI_API_KEY;
   if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
 
@@ -829,7 +830,7 @@ JSON形式で出力してください:
 });
 
 // POST /api/ai/evaluate-session-rd (RQ3b RD-Chat Session-level holistic judgement)
-openaiRouter.post("/evaluate-session-rd", async (c) => {
+openaiRouter.post("/evaluate-session-rd", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const apiKey = process.env.OPENAI_API_KEY || c.env.process.env.OPENAI_API_KEY;
   if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
 
