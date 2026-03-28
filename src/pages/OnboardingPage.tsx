@@ -40,7 +40,8 @@ import type { UserRole } from "../types";
 // ── 役割ラベル ──
 const ROLE_LABELS: Record<UserRole, string> = {
   student:        "実習生",
-  univ_teacher:   "大学教員",
+  teacher: "実習校教員 (Legacy)",
+    univ_teacher:   "大学教員",
   school_mentor:  "校内指導教員",
   evaluator:      "評価者",
   researcher:     "研究者",
@@ -175,6 +176,7 @@ export default function OnboardingPage() {
 
   return (
     <Box
+      data-testid="onboarding-page-root"
       display="flex"
       justifyContent="center"
       alignItems="center"

@@ -248,7 +248,7 @@ export default function LongitudinalAnalysisPage() {
   if (isLoading) return <LinearProgress />;
 
   return (
-    <Box>
+    <Box data-testid="statistics-page-root">
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
         <Box display="flex" alignItems="center" gap={1}>

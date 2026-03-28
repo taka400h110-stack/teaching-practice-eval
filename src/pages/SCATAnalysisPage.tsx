@@ -177,12 +177,20 @@ const FACTOR_LABELS: Record<string, string> = {
 // CSV ダウンロード
 // ────────────────────────────────────────────────────────────────
 function downloadScatCSV(rows: ScatRow[]) {
-  const headers = ["id", "week", "factor", "text", "keywords", "thesaurus", "concept", "theme", "memo", "coder_id"];
-  const data = rows.map((r) => headers.map((h) => {
-    const v = (r as unknown as unknown as Record<string, unknown>)[h] ?? "";
+  const headers = ["segment_id", "week", "factor", "raw_text", "step1_focus_words", "step2_outside_words", "step3_explanatory_words", "step4_theme_construct", "step5_questions_issues", "coder_id"];
+  const data = rows.map((r) => {
+    const rowObj: Record<string, any> = {
+      segment_id: r.id, week: r.week, factor: r.factor,
+      raw_text: r.text, step1_focus_words: r.keywords, step2_outside_words: r.thesaurus,
+      step3_explanatory_words: r.concept, step4_theme_construct: r.theme, step5_questions_issues: r.memo,
+      coder_id: r.coder_id
+    };
+    return headers.map((h) => {
+      const v = rowObj[h] ?? "";
     const s = String(v);
     return s.includes(",") || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
-  }).join(","));
+    }).join(",");
+  });
   const csv = [headers.join(","), ...data].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a");
@@ -209,6 +217,7 @@ export default function SCATAnalysisPage() {
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const [newSegmentText, setNewSegmentText] = useState("");
   const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" as any });
+  const [aiText, setAiText] = useState("");
   const [kappaResult, setKappaResult] = useState<{ kappa: number; agreement: number; interpretation: string; n: number } | null>(null);
 
   const queryClient = useQueryClient();
@@ -241,6 +250,85 @@ export default function SCATAnalysisPage() {
     },
     enabled: !!selectedProjectId
   });
+
+  
+  const aiAnalyzeMut = useMutation<any, Error, string>({
+    mutationFn: async (text: string) => {
+      const res = await apiFetch("/api/openai/scat-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "AI Analysis failed");
+      
+      // Save theorization
+      if (selectedProjectId) {
+        await apiFetch(`/api/data/scat/projects/${selectedProjectId}/theorization`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storyline: data.result.storyline,
+            theoretical_description: data.result.theoretical_description
+          })
+        });
+        
+        // Save segments and codes
+        for (const seg of data.result.segments) {
+          // Add segment
+          const segRes = await apiFetch(`/api/data/scat/segments/${selectedProjectId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ segments: [{ text_content: seg.raw_text }] })
+          });
+          const segData = await segRes.json();
+          // Wait briefly
+          await new Promise(r => setTimeout(r, 200));
+          
+          // Re-fetch segments to get the new segment id
+          const segListRes = await apiFetch(`/api/data/scat/segments/${selectedProjectId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
+          const segListData = await segListRes.json();
+          const newSeg = segListData.segments[segListData.segments.length - 1];
+          
+          if (newSeg) {
+            await apiFetch("/api/data/scat/codes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                segment_id: newSeg.id,
+                researcher_id: researcherId,
+                step1_words: seg.step1_focus_words || "",
+                step2_words: seg.step2_outside_words || "",
+                step3_concepts: seg.step3_explanatory_words || "",
+                step4_themes: seg.step4_theme_construct || "",
+                memo: seg.step5_questions_issues || ""
+              })
+            });
+          }
+        }
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scat-segments', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['scat-codes', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['scat-projects'] });
+      setAiText("");
+      setSnackbar({ open: true, msg: "AI分析が完了し、セグメントと理論記述を保存しました", severity: "success" });
+    },
+    onError: (err) => {
+      setSnackbar({ open: true, msg: `AI分析エラー: ${err.message}`, severity: "error" });
+    }
+  });
+
+  const handleAiAnalyze = () => {
+    if (aiText.trim() && selectedProjectId) {
+      aiAnalyzeMut.mutate(aiText.trim());
+    } else {
+      setSnackbar({ open: true, msg: "テキストとプロジェクトを選択してください", severity: "warning" });
+    }
+  };
 
   const createProjectMut = useMutation<any, Error, any>({
     mutationFn: async (title: string) => {
@@ -365,7 +453,7 @@ export default function SCATAnalysisPage() {
   }));
 
   return (
-    <Box>
+    <Box data-testid="statistics-page-root">
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
         <Box display="flex" alignItems="center" gap={1}>
           <PsychologyIcon color="primary" sx={{ fontSize: 32 }} />
@@ -421,13 +509,45 @@ export default function SCATAnalysisPage() {
         <Tab label="テーマ・概念集計" disabled={!selectedProjectId} />
         <Tab label="因子別分析" disabled={!selectedProjectId} />
         <Tab label="量×質 統合" disabled={!selectedProjectId} />
+        <Tab label="理論・ストーリーライン" disabled={!selectedProjectId} />
       </Tabs>
 
       <TabPanel value={tab} index={0}>
         <Alert severity="info" sx={{ mb: 2 }}>
-          SCAT（大谷, 2007/2011）：①元テキスト → ②注目語句 → ③テキスト外語句 → ④構成概念 → ⑤テーマ の順に分析します。
+          SCAT（大谷, 2007/2011）：セグメントごとに、①注目語句 → ②言い換え語句 → ③説明語句 → ④テーマ・構成概念 → ⑤疑問・課題メモ の順に分析します。
         </Alert>
         
+        
+        <Card variant="outlined" sx={{ mb: 3, bgcolor: '#f3e5f5' }}>
+          <CardContent>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <PsychologyIcon /> AI一括分析（自動セグメント化＆コーディング）
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              対象の自由記述テキストを入力すると、意味のまとまりごとにセグメント化し、Step1〜4のコーディングとストーリーライン・理論記述を自動生成します。
+            </Typography>
+            <TextField 
+              fullWidth 
+              multiline 
+              rows={3} 
+              size="small" 
+              placeholder="インタビュー記録や日誌テキストをここに貼り付けてください" 
+              value={aiText}
+              onChange={(e) => setAiText(e.target.value)}
+              sx={{ bgcolor: 'white', mb: 1 }}
+            />
+            <Button 
+              variant="contained" 
+              color="secondary" 
+              onClick={handleAiAnalyze} 
+              disabled={!aiText.trim() || aiAnalyzeMut.isPending || !selectedProjectId}
+              startIcon={aiAnalyzeMut.isPending ? <CircularProgress size={20} /> : <PsychologyIcon />}
+            >
+              {aiAnalyzeMut.isPending ? "分析中..." : "AIで分析する"}
+            </Button>
+          </CardContent>
+        </Card>
+
         <Box mb={3} display="flex" gap={1}>
           <TextField 
             fullWidth 
@@ -457,7 +577,7 @@ export default function SCATAnalysisPage() {
               <AccordionDetails>
                 <Grid container spacing={2}>
                   <Grid size={{xs: 12, sm: 6}}>
-                    <TextField label="② 注目する語句" value={code.step1_keywords || ""} fullWidth
+                    <TextField label="① 注目語句 (Step 1)" value={code.step1_keywords || ""} fullWidth
                       onBlur={(e) => handleSaveCode(seg.id, "step1_keywords", e.target.value, code)}
                       onChange={(e) => {
                         // Optimistic update omitted for simplicity, use onBlur to save
@@ -467,17 +587,17 @@ export default function SCATAnalysisPage() {
                       helperText="テキスト中の重要語句を抜き出す" />
                   </Grid>
                   <Grid size={{xs: 12, sm: 6}}>
-                    <TextField label="③ テキスト外の語句（類語・上位概念）" defaultValue={code.step2_thesaurus || ""} fullWidth
+                    <TextField label="② 言い換え語句・データ外 (Step 2)" defaultValue={code.step2_thesaurus || ""} fullWidth
                       onBlur={(e) => handleSaveCode(seg.id, "step2_thesaurus", e.target.value, code)}
                       helperText="類語・上位概念・専門用語に置き換える" />
                   </Grid>
                   <Grid size={{xs: 12, sm: 6}}>
-                    <TextField label="④ 構成概念" defaultValue={code.step3_concept || ""} fullWidth
+                    <TextField label="③ 説明語句・文脈 (Step 3)" defaultValue={code.step3_concept || ""} fullWidth
                       onBlur={(e) => handleSaveCode(seg.id, "step3_concept", e.target.value, code)}
                       helperText="概念化・抽象化" />
                   </Grid>
                   <Grid size={{xs: 12, sm: 6}}>
-                    <TextField label="⑤ テーマ・カテゴリ" defaultValue={code.step4_theme || ""} fullWidth
+                    <TextField label="④ テーマ・構成概念 (Step 4)" defaultValue={code.step4_theme || ""} fullWidth
                       onBlur={(e) => handleSaveCode(seg.id, "step4_theme", e.target.value, code)}
                       helperText="上位テーマに統合" />
                   </Grid>
@@ -487,7 +607,7 @@ export default function SCATAnalysisPage() {
                       helperText="例: factor1" />
                   </Grid>
                   <Grid size={{xs: 12, sm: 6}}>
-                    <TextField label="⑥ メモ・注記" defaultValue={code.memo || ""} fullWidth
+                    <TextField label="⑤ 疑問・課題メモ (Step 5)" defaultValue={code.memo || ""} fullWidth
                       onBlur={(e) => handleSaveCode(seg.id, "memo", e.target.value, code)} />
                   </Grid>
                 </Grid>
@@ -654,6 +774,27 @@ export default function SCATAnalysisPage() {
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
         message={snackbar.msg}
       />
+    
+      <TabPanel value={tab} index={4}>
+        <Grid container spacing={3}>
+          <Grid size={{xs: 12}}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" color="primary" mb={1}>ストーリーライン</Typography>
+                <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-wrap', bgcolor: '#f5f5f5', p: 2, borderRadius: 1 }}>
+                  {projectsData?.projects?.find((p:any) => p.id === selectedProjectId)?.storyline || "まだストーリーラインがありません。AI分析を実行するか手動で追加してください。"}
+                </Typography>
+                <Divider sx={{ my: 3 }} />
+                <Typography variant="h6" fontWeight="bold" color="secondary" mb={1}>理論記述</Typography>
+                <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-wrap', bgcolor: '#f5f5f5', p: 2, borderRadius: 1 }}>
+                  {projectsData?.projects?.find((p:any) => p.id === selectedProjectId)?.theoretical_description || "まだ理論記述がありません。"}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </TabPanel>
+
     </Box>
   );
 }

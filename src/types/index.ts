@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────
 export type UserRole =
   | "student"
+  | "teacher"
   | "univ_teacher"
   | "school_mentor"
   | "board_observer"

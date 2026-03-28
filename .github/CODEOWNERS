@@ -1,0 +1,3 @@
+tests/e2e/**/__screenshots__/** @UI-Owners
+docs/testing/snapshot-governance.md @UI-Owners
+tests/e2e/visual-*.spec.ts @UI-Owners

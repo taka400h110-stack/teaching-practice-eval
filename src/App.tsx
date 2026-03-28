@@ -5,6 +5,9 @@ import AppLayout from "./components/AppLayout";
 import apiClient from "./api/client";
 
 // ── ページ (lazy load) ──
+const ExportsPage             = lazy(() => import("./pages/ExportsPage"));
+const AdminExportsPage        = lazy(() => import("./pages/AdminExportsPage"));
+
 const LoginPage               = lazy(() => import("./pages/LoginPage"));
 const OnboardingPage          = lazy(() => import("./pages/OnboardingPage"));
 // 実習生
@@ -31,6 +34,9 @@ const PlatformAnalyticsPage   = lazy(() => import("./pages/PlatformAnalyticsPage
 const StatisticsPage          = lazy(() => import("./pages/StatisticsPage"));
 const CohortsManagementPage   = lazy(() => import("./pages/CohortsManagementPage"));
 const SCATAnalysisPage        = lazy(() => import("./pages/SCATAnalysisPage"));
+const SCATBatchAnalysisPage   = lazy(() => import("./pages/SCATBatchAnalysisPage"));
+const SCATNetworkAnalysisPage = lazy(() => import("./pages/SCATNetworkAnalysisPage"));
+const SCATTimelinePage        = lazy(() => import("./pages/SCATTimelinePage"));
 const AdvancedAnalyticsPage   = lazy(() => import("./pages/AdvancedAnalyticsPage"));
 // 個人
 const SelfEvaluationPage      = lazy(() => import("./pages/SelfEvaluationPage"));
@@ -114,6 +120,14 @@ export default function App() {
           <Route path="platform-analytics"          element={<PrivateRoute allowedRoles={["admin", "researcher"]}><PlatformAnalyticsPage /></PrivateRoute>} />
           <Route path="cohorts"           element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><CohortsManagementPage /></PrivateRoute>} />
           <Route path="scat"              element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATAnalysisPage /></PrivateRoute>} />
+          <Route path="scat-batch"        element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATBatchAnalysisPage /></PrivateRoute>} />
+          <Route path="scat-network"      element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATNetworkAnalysisPage /></PrivateRoute>} />
+          <Route path="scat-timeline"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATTimelinePage /></PrivateRoute>} />
+                              
+          
+          {/* エクスポート */}
+          <Route path="exports"           element={<PrivateRoute allowedRoles={["researcher", "collaborator", "board_observer", "admin"]}><ExportsPage /></PrivateRoute>} />
+          <Route path="admin/exports"     element={<PrivateRoute allowedRoles={["admin"]}><AdminExportsPage /></PrivateRoute>} />
 
           {/* 個人 */}
           <Route path="self-evaluation"   element={<PrivateRoute allowedRoles={["student"]}><SelfEvaluationPage /></PrivateRoute>} />

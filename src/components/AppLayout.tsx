@@ -45,7 +45,8 @@ type NavGroup = { group: string; items: NavItem[] };
 // ────────────────────────────────────────────
 const ROLE_LABEL: Record<UserRole, string> = {
   student:        "実習生",
-  univ_teacher:   "大学教員",
+  teacher: "実習校教員 (Legacy)",
+    univ_teacher:   "大学教員",
   school_mentor:  "校内指導教員",
   evaluator:      "評価者（RQ2）",
   researcher:     "研究者",
@@ -56,7 +57,8 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 const ROLE_COLOR: Record<UserRole, string> = {
   student:        "#1976d2",
-  univ_teacher:   "#388e3c",
+  teacher: "実習校教員 (Legacy)",
+    univ_teacher:   "#388e3c",
   school_mentor:  "#f57c00",
   evaluator:      "#e64a19",
   researcher:     "#0288d1",
@@ -151,10 +153,20 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "コホート管理", path: "/cohorts", icon: <SchoolIcon /> },
           { label: "縦断分析（LGCM）", path: "/longitudinal", icon: <AutoGraphIcon /> },
           { label: "SCAT質的分析", path: "/scat", icon: <DescriptionIcon /> },
+          { label: "SCATバッチ分析", path: "/scat-batch", icon: <DescriptionIcon /> },
+          { label: "SCATネットワーク分析", path: "/scat-network", icon: <DescriptionIcon /> },
+          { label: "SCAT時系列分析", path: "/scat-timeline", icon: <DescriptionIcon /> },
           { label: "統計サマリー", path: "/statistics", icon: <AnalyticsIcon /> },
           { label: "高度分析 (Beta)", path: "/advanced-analytics", icon: <InsightsIcon /> },
         ],
+      },
+      {
+        group: "データ管理・出力",
+        items: [
+          { label: "データエクスポート", path: "/exports", icon: <DownloadIcon /> },
+        ],
       }
+
     ];
   }
 
@@ -166,6 +178,10 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "管理ダッシュボード", path: "/admin", icon: <AdminPanelSettingsIcon /> },
           { label: "プラットフォーム分析", path: "/platform-analytics", icon: <StorageIcon /> },
           { label: "ユーザー登録", path: "/register", icon: <PersonAddIcon /> },
+
+          { label: "エクスポート承認管理", path: "/admin/exports", icon: <VerifiedUserIcon /> },
+          { label: "データエクスポート", path: "/exports", icon: <DownloadIcon /> },
+
         ],
       },
     ];

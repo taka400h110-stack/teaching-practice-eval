@@ -11,8 +11,17 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  // Use custom build for worker to support `scheduled` handler without being wrapped by pages()
   return {
-    plugins: [pages()],
-    build: { emptyOutDir: false, minify: false }
+    build: { 
+      ssr: 'src/worker.ts',
+      emptyOutDir: false, 
+      minify: false,
+      rollupOptions: {
+        output: {
+          entryFileNames: '_worker.js'
+        }
+      }
+    }
   }
 })

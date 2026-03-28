@@ -20,6 +20,8 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
  * モックAPIクライアント（将来的に実際のバックエンドに差し替え可能）
  */
 
+import type { CleanupMetricsResponse } from "../types/adminMetrics";
+import type { CleanupFailureAlertResponse, AlertHistoryRow } from "../types/adminAlerts";
 import type {
   JournalEntry, EvaluationResult, GrowthData, SelfEvaluation,
   LpsWeek, GoalEntry, ChatSession, UserRole, ChatMessage, User,
@@ -751,3 +753,48 @@ export const bfiApi = {
     }
   }
 };
+
+export async function getCleanupMetrics(range: "7d" | "30d"): Promise<CleanupMetricsResponse> {
+  const res = await apiFetch(`/api/admin/metrics/cleanup?range=${range}`);
+  if (!res.ok) throw new Error("Failed to fetch cleanup metrics");
+  return res.json();
+}
+
+export async function getCleanupFailureAlert(): Promise<CleanupFailureAlertResponse> {
+  const res = await apiFetch(`/api/admin/alerts/cleanup-failure`);
+  if (!res.ok) throw new Error("Failed to fetch cleanup failure alert");
+  return res.json();
+}
+
+export async function dismissCleanupFailureAlert(fingerprint: string): Promise<{ ok: boolean }> {
+  const res = await apiFetch(`/api/admin/alerts/cleanup-failure/dismiss`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fingerprint }),
+  });
+  if (!res.ok) throw new Error("Failed to dismiss alert");
+  return res.json();
+}
+
+export async function getCleanupAlertHistory(range: "7d" | "30d" | "90d" = "30d", limit: number = 50): Promise<AlertHistoryRow[]> {
+  const res = await apiFetch(`/api/admin/alerts/history?range=${range}&limit=${limit}`);
+  if (!res.ok) throw new Error("Failed to fetch alert history");
+  const data = await res.json() as any;
+  return data.history || [];
+}
+
+export async function acknowledgeCleanupFailureAlert(fingerprint: string, status: "acknowledged" | "investigating" | "resolved", note?: string): Promise<any> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE_URL}/api/admin/alerts/cleanup-failure/acknowledge`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ fingerprint, status, note }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to acknowledge cleanup alert: ${res.status}`);
+  }
+  return res.json();
+}

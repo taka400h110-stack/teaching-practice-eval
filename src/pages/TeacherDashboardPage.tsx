@@ -15,10 +15,11 @@ export default function TeacherDashboardPage() {
   const [tab, setTab]       = useState(0);
   const [search, setSearch] = useState("");
 
-  const { data: profiles = [] } = useQuery({
+  const { data: profilesData } = useQuery({
     queryKey: ["cohort"],
     queryFn:  () => apiClient.getCohortProfiles(),
   });
+  const profiles = Array.isArray(profilesData) ? profilesData : [];
 
   const filtered = profiles.filter((p) =>
     p.name.includes(search) || p.school_name.includes(search)
@@ -30,7 +31,7 @@ export default function TeacherDashboardPage() {
     : "—";
 
   return (
-    <Box>
+    <Box data-testid="teacher-dashboard-root">
       <Typography variant="h5" fontWeight="bold" mb={3}>教員ダッシュボード</Typography>
 
       {/* サマリ */}

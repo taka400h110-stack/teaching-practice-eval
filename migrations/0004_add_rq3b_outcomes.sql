@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS rq3b_outcomes;
 CREATE TABLE IF NOT EXISTS rq3b_outcomes (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
