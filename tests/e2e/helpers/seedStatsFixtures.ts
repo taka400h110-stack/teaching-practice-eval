@@ -130,3 +130,43 @@ export async function mockTeacherStatsMalformed(page: Page) {
     });
   });
 }
+
+export async function mockLongitudinalStats(page: Page, type: 'normal' | 'empty' | 'boundary' = 'normal') {
+  await page.route('**/api/data/cohorts', async route => {
+    if (type === 'empty') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ cohorts: [] })
+      });
+      return;
+    }
+
+    const weekly_scores = type === 'boundary' 
+      ? [{ week: 1, factor1: 1, factor2: 1, factor3: 1, factor4: 1, total: 4 }]
+      : [
+          { week: 1, factor1: 3, factor2: 3, factor3: 3, factor4: 3, total: 12 },
+          { week: 2, factor1: 4, factor2: 4, factor3: 4, factor4: 4, total: 16 }
+        ];
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        cohorts: [
+          {
+            id: 'longitudinal1',
+            school_type: '中学校',
+            duration_weeks: 4,
+            profiles: [
+              {
+                user_id: 'u1',
+                weekly_scores
+              }
+            ]
+          }
+        ]
+      })
+    });
+  });
+}
