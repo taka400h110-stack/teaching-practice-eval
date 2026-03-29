@@ -120,7 +120,7 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
 
   if (experienceGroup !== "ALL") {
     allHumanEvals = allHumanEvals.filter((he: any) => {
-      const prof = profiles.find((p: any) => p.evaluator_id === he.evaluator_id);
+      const prof = profiles?.find?.((p: any) => p.evaluator_id === he.evaluator_id);
       const yoe = prof?.years_of_experience || 0;
       if (experienceGroup === "NOVICE") return yoe <= 3;
       if (experienceGroup === "MID") return yoe >= 4 && yoe <= 9;
@@ -179,14 +179,14 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
   // マッチしたデータが少なすぎる場合はモックのコホートデータを使う（フォールバック）
   if (matchedPairs.length < 5) {
     console.warn("Not enough matched pairs (need at least 5). Using mock fallback.");
-    const ai_total = cohorts.map((p: any) => p.final_total);
-    const human_total = cohorts.map((p: any) => p.final_total); // Fallback dummy removed, use real DB data in production.
+    const ai_total = (cohorts || []).map((p: any) => p.final_total);
+    const human_total = (cohorts || []).map((p: any) => p.final_total); // Fallback dummy removed, use real DB data in production.
 
     const ai_by_factor: Record<string, number[]> = {
-      factor1: cohorts.map((p: any) => p.factor_scores?.factor1 ?? p.final_total * 0.9),
-      factor2: cohorts.map((p: any) => p.factor_scores?.factor2 ?? p.final_total * 1.0),
-      factor3: cohorts.map((p: any) => p.factor_scores?.factor3 ?? p.final_total * 0.95),
-      factor4: cohorts.map((p: any) => p.factor_scores?.factor4 ?? p.final_total * 1.05),
+      factor1: (cohorts || []).map((p: any) => p.factor_scores?.factor1 ?? p.final_total * 0.9),
+      factor2: (cohorts || []).map((p: any) => p.factor_scores?.factor2 ?? p.final_total * 1.0),
+      factor3: (cohorts || []).map((p: any) => p.factor_scores?.factor3 ?? p.final_total * 0.95),
+      factor4: (cohorts || []).map((p: any) => p.factor_scores?.factor4 ?? p.final_total * 1.05),
     };
     const human_by_factor: Record<string, number[]> = Object.fromEntries(
       Object.entries(ai_by_factor).map(([k, v]) => [k, v.map((s) => s)]) // Fallback dummy removed
@@ -245,7 +245,7 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
         ci_mean_upper: 0.07, ci_mean_lower: -0.03,
         ci_loa_upper_upper: 0.43, ci_loa_lower_lower: -0.39,
         outlier_ratio: 0.04, bias_p_value: 0.42,
-        points: cohorts.slice(0, 50).map((p: any) => ({
+        points: (cohorts || []).slice(0, 50).map((p: any) => ({
           mean: p.final_total,
           diff: 0 // Fallback dummy removed,
         })),
@@ -290,7 +290,7 @@ function downloadCSV(data: FullReliabilityResult) {
     ["Pearson r", "総合", data.total.pearson.r, data.total.pearson.ci95[0], data.total.pearson.ci95[1], data.total.pearson.p_value, data.total.pearson.interpretation],
     ["Krippendorff α", "総合", data.total.krippendorff_alpha.alpha, "", "", "", data.total.krippendorff_alpha.interpretation],
     ["Bland-Altman 平均差", "総合", data.total.bland_altman.mean_diff, data.total.bland_altman.loa_lower, data.total.bland_altman.loa_upper, data.total.bland_altman.bias_p_value, ""],
-    ...Object.entries(data.by_factor).map(([f, v]) => [
+    ...Object.entries(data?.by_factor || {}).map(([f, v]) => [
       "ICC(2,1)", FACTOR_LABELS[f as keyof typeof FACTOR_LABELS] ?? f,
       v.icc.icc, v.icc.ci95[0], v.icc.ci95[1], v.icc.p, v.icc.interpretation,
     ]),
@@ -356,7 +356,7 @@ function ReliabilityDetailModal({ runId, open, onClose }: { runId: string | null
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.map((row: any) => (
+                {(data || []).map((row: any) => (
                   <TableRow key={row.factor}>
                     <TableCell sx={{ fontWeight: row.factor === 'total' ? 'bold' : 'normal' }}>
                       {row.factor === 'total' ? 'Overall (Total)' : row.factor}
@@ -385,7 +385,7 @@ function ReliabilityDetailModal({ runId, open, onClose }: { runId: string | null
             const headers = ["factor", "icc_value", "icc_ci_lower", "icc_ci_upper", "mean_diff", "loa_lower", "loa_upper", "subject_count", "calculated_at", "data_source", "run_id"];
             const csvRows = [
               headers.join(","),
-              ...data.map((row: any) => headers.map(h => {
+              ...(data || []).map((row: any) => headers.map(h => {
                 const val = row[h];
                 if (val === null || val === undefined) return "";
                 return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
@@ -597,22 +597,22 @@ export default function ReliabilityAnalysisPage() {
           <Grid container spacing={2} mb={3}>
             {[
               {
-                label: "ICC(2,1) 絶対一致", value: data.total.icc21.icc.toFixed(3),
+                label: "ICC(2,1) 絶対一致", value: data.total.icc21.icc?.toFixed(3),
                 ci: `[${data.total.icc21.ci95[0]}, ${data.total.icc21.ci95[1]}]`,
                 good: data.total.icc21.icc >= 0.75, note: data.total.icc21.interpretation,
               },
               {
-                label: "Pearson r", value: data.total.pearson.r.toFixed(3),
+                label: "Pearson r", value: data.total.pearson.r?.toFixed(3),
                 ci: `[${data.total.pearson.ci95[0]}, ${data.total.pearson.ci95[1]}]`,
                 good: data.total.pearson.r >= 0.7, note: data.total.pearson.interpretation,
               },
               {
-                label: "Krippendorff's α", value: data.total.krippendorff_alpha.alpha.toFixed(3),
+                label: "Krippendorff's α", value: data.total.krippendorff_alpha.alpha?.toFixed(3),
                 ci: "—",
                 good: data.total.krippendorff_alpha.alpha >= 0.667, note: data.total.krippendorff_alpha.interpretation,
               },
               {
-                label: "Bland-Altman 平均差", value: data.total.bland_altman.mean_diff.toFixed(3),
+                label: "Bland-Altman 平均差", value: data.total.bland_altman.mean_diff?.toFixed(3),
                 ci: `LoA [${data.total.bland_altman.loa_lower}, ${data.total.bland_altman.loa_upper}]`,
                 good: Math.abs(data.total.bland_altman.mean_diff) < 0.1, note: `p=${data.total.bland_altman.bias_p_value}`,
               },
@@ -671,7 +671,7 @@ export default function ReliabilityAnalysisPage() {
                     { label: "SD", value: data.total.bland_altman.sd_diff, color: "default" as const },
                     { label: "+1.96SD（LoA上限）", value: data.total.bland_altman.loa_upper, color: "warning" as const },
                     { label: "−1.96SD（LoA下限）", value: data.total.bland_altman.loa_lower, color: "warning" as const },
-                    { label: "アウトライヤー率", value: `${(data.total.bland_altman.outlier_ratio * 100).toFixed(1)}%`, color: data.total.bland_altman.outlier_ratio <= 0.05 ? "success" as const : "error" as const },
+                    { label: "アウトライヤー率", value: `${(data.total.bland_altman.outlier_ratio * 100)?.toFixed(1)}%`, color: data.total.bland_altman.outlier_ratio <= 0.05 ? "success" as const : "error" as const },
                     { label: "バイアスp値", value: `p=${data.total.bland_altman.bias_p_value}`, color: data.total.bland_altman.bias_p_value > 0.05 ? "success" as const : "error" as const },
                   ].map((s) => (
                     <Grid key={s.label} size={{ xs: 6, sm: 4, md: 2 }}>
@@ -706,11 +706,11 @@ export default function ReliabilityAnalysisPage() {
                     <ReferenceLine y={data.total.bland_altman.ci_mean_upper} stroke="#bbdefb" strokeDasharray="2 2" />
                     <ReferenceLine y={data.total.bland_altman.ci_mean_lower} stroke="#bbdefb" strokeDasharray="2 2" />
                     <ReferenceLine y={0} stroke="#333" strokeWidth={1} />
-                    <Scatter data={data.total.bland_altman.points} fill="#1976D2" opacity={0.6} r={4} />
+                    <Scatter data={(data?.total?.bland_altman?.points || [])} fill="#1976D2" opacity={0.6} r={4} />
                   </ScatterChart>
                 </ResponsiveContainer>
                 <Alert severity="info" sx={{ mt: 1 }}>
-                  アウトライヤー率 {(data.total.bland_altman.outlier_ratio * 100).toFixed(1)}%（基準: ≤5%）。
+                  アウトライヤー率 {(data.total.bland_altman.outlier_ratio * 100)?.toFixed(1)}%（基準: ≤5%）。
                   バイアスp値 p={data.total.bland_altman.bias_p_value}（p＞0.05 → 系統的バイアスなし）。
                   95%CI of mean difference: [{data.total.bland_altman.ci_mean_lower}, {data.total.bland_altman.ci_mean_upper}]
                 </Alert>
@@ -739,7 +739,7 @@ export default function ReliabilityAnalysisPage() {
                     <RechartTooltip cursor={{ strokeDasharray: "3 3" }} />
                     <ReferenceLine stroke="#888" segment={[{x:1,y:1},{x:5,y:5}]} strokeDasharray="4 4" />
                     <Scatter
-                      data={data.total.bland_altman.points.map((p: any) => ({
+                      data={(data?.total?.bland_altman?.points || []).map((p: any) => ({
                         ai: p.mean + p.diff / 2,
                         human: p.mean - p.diff / 2,
                       }))}
@@ -766,7 +766,7 @@ export default function ReliabilityAnalysisPage() {
                   <BarChart
                     data={[
                       { name: "総合", icc: data.total.icc21.icc, ci_lower: data.total.icc21.ci95[0], ci_upper: data.total.icc21.ci95[1] },
-                      ...Object.entries(data.by_factor).map(([f, v]) => ({
+                      ...Object.entries(data?.by_factor || {}).map(([f, v]) => ({
                         name: FACTOR_LABELS[f as keyof typeof FACTOR_LABELS]?.split(": ")[0] ?? f,
                         icc: v.icc.icc,
                         ci_lower: v.icc.ci95[0],
@@ -797,17 +797,17 @@ export default function ReliabilityAnalysisPage() {
                     <TableBody>
                       <TableRow sx={{ bgcolor: "#e3f2fd" }} hover>
                         <TableCell><strong>総合</strong></TableCell>
-                        <TableCell><Chip label={data.total.icc21.icc.toFixed(3)} size="small" color={data.total.icc21.icc >= 0.75 ? "success" : "warning"} /></TableCell>
+                        <TableCell><Chip label={data.total.icc21.icc?.toFixed(3)} size="small" color={data.total.icc21.icc >= 0.75 ? "success" : "warning"} /></TableCell>
                         <TableCell>[{data.total.icc21.ci95[0]}, {data.total.icc21.ci95[1]}]</TableCell>
                         <TableCell>{data.total.icc21.f}</TableCell>
                         <TableCell>({data.total.icc21.df1}, {data.total.icc21.df2})</TableCell>
                         <TableCell><Chip label={`p=${data.total.icc21.p}`} size="small" color="success" /></TableCell>
                         <TableCell>{data.total.icc21.interpretation}</TableCell>
                       </TableRow>
-                      {Object.entries(data.by_factor).map(([f, v]) => (
+                      {Object.entries(data?.by_factor || {}).map(([f, v]) => (
                         <TableRow key={f} hover>
                           <TableCell>{FACTOR_LABELS[f as keyof typeof FACTOR_LABELS]}</TableCell>
-                          <TableCell><Chip label={v.icc.icc.toFixed(3)} size="small" color={v.icc.icc >= 0.75 ? "success" : "warning"} /></TableCell>
+                          <TableCell><Chip label={v.icc.icc?.toFixed(3)} size="small" color={v.icc.icc >= 0.75 ? "success" : "warning"} /></TableCell>
                           <TableCell>[{v.icc.ci95[0]}, {v.icc.ci95[1]}]</TableCell>
                           <TableCell>{v.icc.f}</TableCell>
                           <TableCell>({v.icc.df1}, {v.icc.df2})</TableCell>
@@ -839,15 +839,15 @@ export default function ReliabilityAnalysisPage() {
                     <TableBody>
                       <TableRow sx={{ bgcolor: "#e3f2fd" }} hover>
                         <TableCell><strong>総合</strong></TableCell>
-                        <TableCell><Chip label={data.total.pearson.r.toFixed(3)} size="small" color="primary" /></TableCell>
+                        <TableCell><Chip label={data.total.pearson.r?.toFixed(3)} size="small" color="primary" /></TableCell>
                         <TableCell>[{data.total.pearson.ci95[0]}, {data.total.pearson.ci95[1]}]</TableCell>
                         <TableCell>p &lt; .001</TableCell>
                         <TableCell>{data.total.pearson.interpretation}</TableCell>
                       </TableRow>
-                      {Object.entries(data.by_factor).map(([f, v]) => (
+                      {Object.entries(data?.by_factor || {}).map(([f, v]) => (
                         <TableRow key={f} hover>
                           <TableCell>{FACTOR_LABELS[f as keyof typeof FACTOR_LABELS]}</TableCell>
-                          <TableCell><Chip label={v.pearson.r.toFixed(3)} size="small" color="secondary" /></TableCell>
+                          <TableCell><Chip label={v.pearson.r?.toFixed(3)} size="small" color="secondary" /></TableCell>
                           <TableCell>[{v.pearson.ci95[0]}, {v.pearson.ci95[1]}]</TableCell>
                           <TableCell>p &lt; .001</TableCell>
                           <TableCell>{v.pearson.r >= 0.7 ? "強い相関" : "中程度の相関"}</TableCell>
@@ -878,13 +878,13 @@ export default function ReliabilityAnalysisPage() {
                     </TableHead>
                     <TableBody>
                       {[
-                        { name: "ICC(2,1) 絶対一致", value: data.total.icc21.icc.toFixed(3), ci: `[${data.total.icc21.ci95.join(", ")}]`, ref: "≥0.75 (良好)", ok: data.total.icc21.icc >= 0.75 },
+                        { name: "ICC(2,1) 絶対一致", value: data.total.icc21.icc?.toFixed(3), ci: `[${data.total.icc21.ci95.join(", ")}]`, ref: "≥0.75 (良好)", ok: data.total.icc21.icc >= 0.75 },
                         { name: "ICC(2,1) F検定", value: `F(${data.total.icc21.df1}, ${data.total.icc21.df2})=${data.total.icc21.f}`, ci: `p<${data.total.icc21.p}`, ref: "p<.05", ok: data.total.icc21.p < 0.05 },
-                        { name: "Pearson r", value: data.total.pearson.r.toFixed(3), ci: `[${data.total.pearson.ci95.join(", ")}]`, ref: "≥0.7 (強い)", ok: data.total.pearson.r >= 0.7 },
+                        { name: "Pearson r", value: data.total.pearson.r?.toFixed(3), ci: `[${data.total.pearson.ci95.join(", ")}]`, ref: "≥0.7 (強い)", ok: data.total.pearson.r >= 0.7 },
                         { name: "Pearson p値", value: `p=${data.total.pearson.p_value}`, ci: `n=${data.total.pearson.n}`, ref: "p<.05", ok: data.total.pearson.p_value < 0.05 },
-                        { name: "Krippendorff's α", value: data.total.krippendorff_alpha.alpha.toFixed(3), ci: "—", ref: "≥0.667", ok: data.total.krippendorff_alpha.alpha >= 0.667 },
-                        { name: "Bland-Altman 平均差", value: data.total.bland_altman.mean_diff.toFixed(3), ci: `LoA[${data.total.bland_altman.loa_lower}, ${data.total.bland_altman.loa_upper}]`, ref: "|差|<0.1", ok: Math.abs(data.total.bland_altman.mean_diff) < 0.1 },
-                        { name: "アウトライヤー率", value: `${(data.total.bland_altman.outlier_ratio * 100).toFixed(1)}%`, ci: "—", ref: "≤5%", ok: data.total.bland_altman.outlier_ratio <= 0.05 },
+                        { name: "Krippendorff's α", value: data.total.krippendorff_alpha.alpha?.toFixed(3), ci: "—", ref: "≥0.667", ok: data.total.krippendorff_alpha.alpha >= 0.667 },
+                        { name: "Bland-Altman 平均差", value: data.total.bland_altman.mean_diff?.toFixed(3), ci: `LoA[${data.total.bland_altman.loa_lower}, ${data.total.bland_altman.loa_upper}]`, ref: "|差|<0.1", ok: Math.abs(data.total.bland_altman.mean_diff) < 0.1 },
+                        { name: "アウトライヤー率", value: `${(data.total.bland_altman.outlier_ratio * 100)?.toFixed(1)}%`, ci: "—", ref: "≤5%", ok: data.total.bland_altman.outlier_ratio <= 0.05 },
                       ].map((r) => (
                         <TableRow key={r.name} hover>
                           <TableCell>{r.name}</TableCell>
@@ -941,7 +941,7 @@ export default function ReliabilityAnalysisPage() {
                 <TableRow><TableCell>ID</TableCell><TableCell>経験年数</TableCell><TableCell>バックグラウンド</TableCell></TableRow>
               </TableHead>
               <TableBody>
-                {evaluatorProfiles.map(p => (
+                {(evaluatorProfiles || []).map(p => (
                   <TableRow key={p.evaluator_id}>
                     <TableCell>{p.evaluator_id}</TableCell>
                     <TableCell>{p.years_of_experience}年</TableCell>

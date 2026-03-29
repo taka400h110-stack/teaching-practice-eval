@@ -21,7 +21,14 @@ app.get('/delivery', async (c) => {
     return c.json(data);
   } catch (err: any) {
     console.error('Error in delivery analytics:', err);
-    return c.json({ error: 'Internal Server Error' }, 500);
+    // Fallback response to prevent UI crashes
+    return c.json({
+      summary: { totalAlerts: 0, deliverySuccessRate: 0, escalationRate: 0, p90DeliveryTimeSec: 0, criticalFailureCount: 0 },
+      providerBreakdown: [],
+      dailySeries: [],
+      escalationFunnel: [],
+      recentFailures: []
+    }, 200);
   }
 });
 

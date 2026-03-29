@@ -12,7 +12,7 @@ export const CleanupAlertCommentsList = ({ fingerprint }: { fingerprint: string 
       
       {isLoading ? (
         <Typography variant="body2">Loading comments...</Typography>
-      ) : (!comments || comments.length === 0) ? (
+      ) : (!Array.isArray(comments) || comments.length === 0) ? (
         <Typography variant="body2" color="text.secondary">No comments yet.</Typography>
       ) : (
         <List dense>

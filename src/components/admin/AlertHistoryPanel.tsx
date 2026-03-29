@@ -140,12 +140,12 @@ export const AlertHistoryPanel: React.FC = () => {
                 <TableRow><TableCell colSpan={6} align="center">Loading...</TableCell></TableRow>
               ) : error ? (
                 <TableRow><TableCell colSpan={6} align="center" sx={{ color: 'error.main' }}>Error loading data</TableCell></TableRow>
-              ) : data?.items?.length === 0 ? (
+              ) : !data || !Array.isArray(data.items) || data.items.length === 0 ? (
                 <TableRow><TableCell colSpan={6} align="center">No records found</TableCell></TableRow>
               ) : (
-                data?.items?.map((row) => (
-                  <TableRow key={row.id} hover>
-                    <TableCell>{new Date(row.createdAt).toLocaleString()}</TableCell>
+                data.items.map((row) => (
+                  <TableRow key={row.id || Math.random()} hover>
+                    <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleString() : ''}</TableCell>
                     <TableCell>
                       <Chip size="small" label={row.eventType} color={
                         row.eventType === 'notify_sent' ? 'primary' :

@@ -10,13 +10,17 @@ export const ProviderHealthPanel: React.FC = () => {
   if (isLoading) return <Typography>Loading readiness status...</Typography>;
   if (error || !data) return <Alert severity="error">Failed to load readiness status.</Alert>;
 
+  const blockingIssues = Array.isArray(data.readiness?.blockingIssues) ? data.readiness.blockingIssues : [];
+  const missingSecrets = Array.isArray(data.secrets?.missing) ? data.secrets.missing : [];
+  const providers = Array.isArray(data.providers) ? data.providers : [];
+
   return (
     <Card sx={{ mb: 4 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">Operational Readiness & Provider Health</Typography>
           <Box>
-            {data.readiness.ok ? (
+            {data.readiness?.ok ? (
               <Chip icon={<CheckCircleIcon />} label="System Ready" color="success" />
             ) : (
               <Chip icon={<WarningIcon />} label="Issues Detected" color="error" />
@@ -24,25 +28,25 @@ export const ProviderHealthPanel: React.FC = () => {
           </Box>
         </Box>
 
-        {data.readiness.blockingIssues.length > 0 && (
+        {blockingIssues.length > 0 && (
           <Alert severity="error" sx={{ mb: 3 }}>
             <strong>Blocking Issues:</strong>
             <ul>
-              {data.readiness.blockingIssues.map((issue, i) => <li key={i}>{issue}</li>)}
+              {blockingIssues.map((issue, i) => <li key={i}>{issue}</li>)}
             </ul>
           </Alert>
         )}
 
-        {data.secrets.missing.length > 0 && (
+        {missingSecrets.length > 0 && (
           <Alert severity="warning" sx={{ mb: 3 }}>
-            <strong>Missing Required Secrets:</strong> {data.secrets.missing.join(', ')}
+            <strong>Missing Required Secrets:</strong> {missingSecrets.join(', ')}
           </Alert>
         )}
 
         <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>Provider Status</Typography>
         <Grid container spacing={2}>
-          {data.providers.map(provider => (
-            <Grid item xs={12} sm={6} md={4} key={provider.name}>
+          {providers.map(provider => (
+            <Grid item xs={12} sm={6} md={4} key={provider.name || Math.random()}>
               <Card variant="outlined" sx={{ 
                 borderColor: provider.status === 'failing' ? 'error.main' : 
                              provider.status === 'degraded' ? 'warning.main' : 
@@ -65,7 +69,7 @@ export const ProviderHealthPanel: React.FC = () => {
                     />
                   </Box>
                   <Typography variant="body2" color="textSecondary">
-                    24h Failures: <strong>{provider.failureCount24h}</strong> ({(provider.failureRate24h * 100).toFixed(1)}%)
+                    24h Failures: <strong>{provider.failureCount24h}</strong> ({provider.failureRate24h != null ? (provider.failureRate24h * 100).toFixed(1) : 0}%)
                   </Typography>
                   {provider.lastError && (
                     <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1, noWrap: true, textOverflow: 'ellipsis', overflow: 'hidden' }}>

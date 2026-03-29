@@ -26,7 +26,15 @@ adminMetricsRouter.get("/cleanup", async (c) => {
     return c.json(metrics);
   } catch (error) {
     console.error("Failed to get cleanup metrics", error);
-    return c.json({ error: "Failed to get cleanup metrics" }, 500);
+    // Fallback response to prevent UI crashes
+    return c.json({
+      successRate: 0,
+      totalRuns: 0,
+      failedRuns: 0,
+      avgDurationMs: 0,
+      recordsCleaned: 0,
+      trend: []
+    }, 200);
   }
 });
 

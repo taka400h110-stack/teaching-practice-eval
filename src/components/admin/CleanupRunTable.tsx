@@ -7,6 +7,8 @@ type Props = {
 };
 
 export const CleanupRunTable: React.FC<Props> = ({ runs }) => {
+  const safeRuns = Array.isArray(runs) ? runs : [];
+
   return (
     <Card sx={{ mt: 3 }}>
       <CardContent>
@@ -28,14 +30,14 @@ export const CleanupRunTable: React.FC<Props> = ({ runs }) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {runs.length === 0 && (
+              {safeRuns.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} align="center">No recent runs</TableCell>
                 </TableRow>
               )}
-              {runs.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{new Date(row.createdAt).toLocaleString()}</TableCell>
+              {safeRuns.map((row) => (
+                <TableRow key={row.id || Math.random()}>
+                  <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleString() : ''}</TableCell>
                   <TableCell>{row.cron || 'manual'}</TableCell>
                   <TableCell>
                     {row.outcome === 'success' && <Chip label="Success" color="success" size="small" />}

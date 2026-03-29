@@ -776,11 +776,40 @@ export async function dismissCleanupFailureAlert(fingerprint: string): Promise<{
   return res.json();
 }
 
-export async function getCleanupAlertHistory(range: "7d" | "30d" | "90d" = "30d", limit: number = 50): Promise<AlertHistoryRow[]> {
-  const res = await apiFetch(`/api/admin/alerts/history?range=${range}&limit=${limit}`);
+export async function getCleanupAlertHistory(query: any): Promise<any> {
+  const params = new URLSearchParams();
+  if (query) {
+    if (query.range) params.append('range', query.range);
+    if (query.limit) params.append('limit', query.limit.toString());
+    if (query.eventTypes) params.append('eventTypes', query.eventTypes);
+    if (query.severities) params.append('severities', query.severities);
+    if (query.channels) params.append('channels', query.channels);
+    if (query.outcomes) params.append('outcomes', query.outcomes);
+    if (query.reasonQuery) params.append('reasonQuery', query.reasonQuery);
+    if (query.fingerprintPrefix) params.append('fingerprintPrefix', query.fingerprintPrefix);
+    if (query.actorUserId) params.append('actorUserId', query.actorUserId);
+    if (query.sort) params.append('sort', query.sort);
+    if (query.cursor) params.append('cursor', query.cursor);
+    if (query.dateFrom) params.append('dateFrom', query.dateFrom);
+    if (query.dateTo) params.append('dateTo', query.dateTo);
+  } else {
+    params.append('range', '30d');
+    params.append('limit', '50');
+  }
+
+  const res = await apiFetch(`/api/admin/alerts/history?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to fetch alert history");
   const data = await res.json() as any;
-  return data.history || [];
+  
+  if (!data.items) {
+    return {
+      items: data.history || [],
+      pageInfo: { nextCursor: null, hasNextPage: false },
+      summary: { totalMatched: 0, notifySent: 0, notifySuppressed: 0, dismissed: 0, alertGenerated: 0, failedCount: 0 },
+      filtersApplied: {}
+    };
+  }
+  return data;
 }
 
 export async function acknowledgeCleanupFailureAlert(fingerprint: string, status: "acknowledged" | "investigating" | "resolved", note?: string): Promise<any> {

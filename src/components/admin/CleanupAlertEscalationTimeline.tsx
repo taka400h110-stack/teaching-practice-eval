@@ -6,7 +6,7 @@ export const CleanupAlertEscalationTimeline = ({ fingerprint }: { fingerprint: s
   const { data: escalations, isLoading } = useCleanupAlertEscalations(fingerprint);
 
   if (isLoading) return <Typography variant="body2">Loading escalations...</Typography>;
-  if (!escalations || escalations.length === 0) return <Typography variant="body2" color="text.secondary">No escalations triggered.</Typography>;
+  if (!Array.isArray(escalations) || escalations.length === 0) return <Typography variant="body2" color="text.secondary">No escalations triggered.</Typography>;
 
   return (
     <Box>

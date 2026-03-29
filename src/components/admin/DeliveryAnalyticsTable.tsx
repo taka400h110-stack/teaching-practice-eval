@@ -3,6 +3,8 @@ import { Card, CardContent, Typography, Table, TableBody, TableCell, TableContai
 import { EmailDeliveryStatusChip } from './EmailDeliveryStatusChip';
 
 export const DeliveryAnalyticsTable = ({ failures }: { failures: any[] }) => {
+  const safeFailures = Array.isArray(failures) ? failures : [];
+
   return (
     <Card variant="outlined" sx={{ mt: 3 }}>
       <CardContent>
@@ -19,13 +21,13 @@ export const DeliveryAnalyticsTable = ({ failures }: { failures: any[] }) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {failures.length === 0 ? (
+              {safeFailures.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center">No recent failures found</TableCell>
                 </TableRow>
               ) : (
-                failures.map((f) => (
-                  <TableRow key={f.id}>
+                safeFailures.map((f) => (
+                  <TableRow key={f.id || Math.random()}>
                     <TableCell>{f.lastEventAt ? new Date(f.lastEventAt).toLocaleString() : ''}</TableCell>
                     <TableCell>{f.provider}</TableCell>
                     <TableCell><EmailDeliveryStatusChip status={f.deliveryStatus} /></TableCell>

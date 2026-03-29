@@ -49,12 +49,12 @@ export default function TeacherStatisticsPage() {
   // 統計計算
   const n = cohorts.length;
   const avg = (arr: number[]) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
-  const totalScores = cohorts.map((p) => p.final_total || 0);
+  const totalScores = (cohorts || []).map((p) => p.final_total || 0);
   const avgTotal = avg(totalScores);
-  const f1Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor1 ?? (p.final_total || 0) * 0.9);
-  const f2Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor2 ?? (p.final_total || 0));
-  const f3Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor3 ?? (p.final_total || 0) * 0.95);
-  const f4Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor4 ?? (p.final_total || 0) * 1.05);
+  const f1Scores = (cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.factor1 ?? (p.final_total || 0) * 0.9);
+  const f2Scores = (cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.factor2 ?? (p.final_total || 0));
+  const f3Scores = (cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.factor3 ?? (p.final_total || 0) * 0.95);
+  const f4Scores = (cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.factor4 ?? (p.final_total || 0) * 1.05);
 
   const factorAvgs = {
     factor1: avg(f1Scores),
@@ -66,7 +66,7 @@ export default function TeacherStatisticsPage() {
   // 週別平均推移（growth_data）
   const weeklyData = Array.from({ length: 10 }, (_, i) => ({
     week: i + 1,
-    avg: +(avgTotal * (0.7 + i * 0.04)).toFixed(2),
+    avg: +(avgTotal * (0.7 + i * 0.04))?.toFixed(2),
   }));
 
   // スコア分布
@@ -77,19 +77,19 @@ export default function TeacherStatisticsPage() {
     { range: "4.0-5.0", count: cohorts.filter((p) => (p.final_total || 0) >= 4).length },
   ];
 
-  const radarData = Object.entries(factorAvgs).map(([k, v]) => ({
+  const radarData = Object.entries(factorAvgs || {}).map(([k, v]) => ({
     factor: FACTOR_LABELS[k as keyof typeof FACTOR_LABELS].split(": ")[0],
-    score: +v.toFixed(2),
+    score: +v?.toFixed(2),
   }));
 
   const downloadCSV = () => {
     const header = "ID,氏名,学校種別,総合スコア,成長度";
-    const rows = cohorts.map((p: any) => [
+    const rows = (cohorts || []).map((p: any) => [
       p.id,
       p.name,
       p.school_type,
-      (p.final_total || 0).toFixed(2),
-      (p.growth_delta || 0).toFixed(2)
+      (p.final_total || 0)?.toFixed(2),
+      (p.growth_delta || 0)?.toFixed(2)
     ].join(','));
     const csv = [header, ...rows].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -122,8 +122,8 @@ export default function TeacherStatisticsPage() {
       <Grid container spacing={2} mb={3}>
         {[
           { label: "実習生数", value: n, unit: "名", color: "#1976d2" },
-          { label: "平均スコア（最終）", value: avgTotal.toFixed(2), unit: "/5.0", color: "#43a047" },
-          { label: "平均成長量 (Δ)", value: +(avgTotal * 0.3).toFixed(2), unit: "pt", color: "#fb8c00" },
+          { label: "平均スコア（最終）", value: avgTotal?.toFixed(2), unit: "/5.0", color: "#43a047" },
+          { label: "平均成長量 (Δ)", value: +(avgTotal * 0.3)?.toFixed(2), unit: "pt", color: "#fb8c00" },
           { label: "目標達成率", value: `${Math.round(cohorts.filter((p) => p.growth_delta > 0.8).length / Math.max(n, 1) * 100)}%`, unit: "", color: "#7b1fa2" },
         ].map((s) => (
           <Grid key={s.label} size={{ xs: 6, sm: 3 }}>
@@ -185,7 +185,7 @@ export default function TeacherStatisticsPage() {
       {/* ━━ 因子別分析 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <TabPanel value={tab} index={1}>
         <Grid container spacing={2}>
-          {Object.entries(factorAvgs).map(([k, v]) => (
+          {Object.entries(factorAvgs || {}).map(([k, v]) => (
             <Grid key={k} size={{ xs: 12, sm: 6 }}>
               <Card sx={{ borderLeft: `4px solid ${FACTOR_COLORS[k as keyof typeof FACTOR_COLORS]}` }}>
                 <CardContent>
@@ -194,7 +194,7 @@ export default function TeacherStatisticsPage() {
                   </Typography>
                   <Typography variant="h4" fontWeight={700}
                     color={FACTOR_COLORS[k as keyof typeof FACTOR_COLORS]}>
-                    {v.toFixed(2)}
+                    {v?.toFixed(2)}
                   </Typography>
                   <LinearProgress
                     variant="determinate"
@@ -224,18 +224,18 @@ export default function TeacherStatisticsPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {[...cohorts].sort((a, b) => (b.final_total || 0) - (a.final_total || 0)).slice(0, 20).map((p, i) => (
+                  {[...(cohorts || [])].sort((a, b) => (b.final_total || 0) - (a.final_total || 0)).slice(0, 20).map((p, i) => (
                     <TableRow key={p.id} hover>
                       <TableCell>
                         <Chip label={i + 1} size="small" color={i < 3 ? "primary" : "default"} />
                       </TableCell>
                       <TableCell>{p.name}</TableCell>
                       <TableCell>
-                        <Chip label={(p.final_total || 0).toFixed(2)} size="small"
+                        <Chip label={(p.final_total || 0)?.toFixed(2)} size="small"
                           color={(p.final_total || 0) >= 3.5 ? "success" : (p.final_total || 0) >= 3.0 ? "primary" : "default"} />
                       </TableCell>
                       <TableCell>
-                        <Chip label={`+${(p.growth_delta || 0).toFixed(2)}`} size="small"
+                        <Chip label={`+${(p.growth_delta || 0)?.toFixed(2)}`} size="small"
                           color={(p.growth_delta || 0) >= 1.0 ? "success" : "default"} />
                       </TableCell>
                       <TableCell>
