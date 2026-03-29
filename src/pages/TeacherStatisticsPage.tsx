@@ -49,12 +49,12 @@ export default function TeacherStatisticsPage() {
   // 統計計算
   const n = cohorts.length;
   const avg = (arr: number[]) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
-  const totalScores = cohorts.map((p) => p.final_total);
+  const totalScores = cohorts.map((p) => p.final_total || 0);
   const avgTotal = avg(totalScores);
-  const f1Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor1 ?? p.final_total * 0.9);
-  const f2Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor2 ?? p.final_total);
-  const f3Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor3 ?? p.final_total * 0.95);
-  const f4Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor4 ?? p.final_total * 1.05);
+  const f1Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor1 ?? (p.final_total || 0) * 0.9);
+  const f2Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor2 ?? (p.final_total || 0));
+  const f3Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor3 ?? (p.final_total || 0) * 0.95);
+  const f4Scores = cohorts.map((p) => ((p as any).factor_scores as Record<string, number>)?.factor4 ?? (p.final_total || 0) * 1.05);
 
   const factorAvgs = {
     factor1: avg(f1Scores),
@@ -71,10 +71,10 @@ export default function TeacherStatisticsPage() {
 
   // スコア分布
   const distribution = [
-    { range: "1.0-1.9", count: cohorts.filter((p) => p.final_total < 2).length },
-    { range: "2.0-2.9", count: cohorts.filter((p) => p.final_total >= 2 && p.final_total < 3).length },
-    { range: "3.0-3.9", count: cohorts.filter((p) => p.final_total >= 3 && p.final_total < 4).length },
-    { range: "4.0-5.0", count: cohorts.filter((p) => p.final_total >= 4).length },
+    { range: "1.0-1.9", count: cohorts.filter((p) => (p.final_total || 0) < 2).length },
+    { range: "2.0-2.9", count: cohorts.filter((p) => (p.final_total || 0) >= 2 && (p.final_total || 0) < 3).length },
+    { range: "3.0-3.9", count: cohorts.filter((p) => (p.final_total || 0) >= 3 && (p.final_total || 0) < 4).length },
+    { range: "4.0-5.0", count: cohorts.filter((p) => (p.final_total || 0) >= 4).length },
   ];
 
   const radarData = Object.entries(factorAvgs).map(([k, v]) => ({
@@ -224,19 +224,19 @@ export default function TeacherStatisticsPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {[...cohorts].sort((a, b) => b.final_total - a.final_total).slice(0, 20).map((p, i) => (
+                  {[...cohorts].sort((a, b) => (b.final_total || 0) - (a.final_total || 0)).slice(0, 20).map((p, i) => (
                     <TableRow key={p.id} hover>
                       <TableCell>
                         <Chip label={i + 1} size="small" color={i < 3 ? "primary" : "default"} />
                       </TableCell>
                       <TableCell>{p.name}</TableCell>
                       <TableCell>
-                        <Chip label={p.final_total.toFixed(2)} size="small"
-                          color={p.final_total >= 3.5 ? "success" : p.final_total >= 3.0 ? "primary" : "default"} />
+                        <Chip label={(p.final_total || 0).toFixed(2)} size="small"
+                          color={(p.final_total || 0) >= 3.5 ? "success" : (p.final_total || 0) >= 3.0 ? "primary" : "default"} />
                       </TableCell>
                       <TableCell>
-                        <Chip label={`+${p.growth_delta.toFixed(2)}`} size="small"
-                          color={p.growth_delta >= 1.0 ? "success" : "default"} />
+                        <Chip label={`+${(p.growth_delta || 0).toFixed(2)}`} size="small"
+                          color={(p.growth_delta || 0) >= 1.0 ? "success" : "default"} />
                       </TableCell>
                       <TableCell>
                         <Chip label={p.growth_delta > 0.8 ? "✅" : "—"} size="small"

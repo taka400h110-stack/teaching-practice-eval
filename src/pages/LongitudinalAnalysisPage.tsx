@@ -172,7 +172,7 @@ export default function LongitudinalAnalysisPage() {
 
   const weeks = React.useMemo(() => {
     if (!cohorts || cohorts.length === 0) return 10;
-    return Math.max(...cohorts.flatMap((c: CohortProfile) => c.weekly_scores?.map((ws: WeeklyScore) => ws.week) || []), 10);
+    return Math.max(...cohorts.flatMap((c: CohortProfile) => (c.weekly_scores || []).map((ws: WeeklyScore) => ws.week)), 10);
   }, [cohorts]);
 
   const lcgaTrajectories = React.useMemo(() => genLCGATrajectories(weeks, lcgaResult, isSampleMode), [weeks, lcgaResult, isSampleMode]);
@@ -184,7 +184,7 @@ export default function LongitudinalAnalysisPage() {
     const overlay = Array.from({ length: maxWeek }, (_, i) => { 
       const row: OverlayPlotData = { week: i + 1 }; 
       cohorts.slice(0, 10).forEach((p: any, idx: number) => { 
-        const ws = p.weekly_scores.find((w: any) => w.week === i + 1); 
+        const ws = (p.weekly_scores || []).find((w: any) => w.week === i + 1); 
         if(ws) row[`user_${idx}`] = ws.total; 
       }); 
       return row; 
@@ -193,8 +193,8 @@ export default function LongitudinalAnalysisPage() {
 
     const stats: WeeklyStat[] = Array.from({ length: maxWeek }, (_, i) => {
       const week = i + 1;
-      const weekScores = cohorts.map((c: CohortProfile) => c.weekly_scores.find((ws: WeeklyScore) => ws.week === week)).filter((ws): ws is WeeklyScore => Boolean(ws));
-      const mean = (k: keyof WeeklyScore) => weekScores.length ? weekScores.reduce((a: number, b: WeeklyScore) => a + (Number(b[k])||0), 0) / weekScores.length : 0;
+      const weekScores = cohorts.map((c: CohortProfile) => (c.weekly_scores || []).find((ws: WeeklyScore) => ws.week === week)).filter((ws): ws is WeeklyScore => Boolean(ws));
+      const mean = (k: keyof WeeklyScore) => weekScores.length ? (weekScores.reduce((a: number, b: WeeklyScore) => a + (Number(b[k]) || 0), 0) / weekScores.length) || 0 : 0;
       const sd = (k: keyof WeeklyScore, m: number) => weekScores.length ? Math.sqrt(weekScores.reduce((a: number, b: WeeklyScore) => a + Math.pow((Number(b[k])||0) - m, 2), 0) / weekScores.length) : 0;
       return {
         week,
@@ -220,7 +220,7 @@ export default function LongitudinalAnalysisPage() {
 
     try {
       const weeklyMatrix = cohorts.slice(0, 30).map((p) =>
-        p.weekly_scores.map((ws) => ws.total)
+        (p.weekly_scores || []).map((ws) => ws.total)
       );
       const resp = await apiFetch("/api/stats/lgcm", {
         method: "POST",
