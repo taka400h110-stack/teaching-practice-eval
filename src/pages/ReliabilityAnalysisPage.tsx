@@ -337,7 +337,7 @@ function ReliabilityDetailModal({ runId, open, onClose }: { runId: string | null
       <DialogTitle>詳細分析結果 (Run ID: {runId})</DialogTitle>
       <DialogContent dividers>
         {isLoading && <LinearProgress />}
-        {isError && <Alert severity="error">詳細の取得に失敗しました</Alert>}
+        {isError && <Alert severity="error" data-testid="fallback-no-data-alert">詳細の取得に失敗しました</Alert>}
         {!isLoading && !isError && data && data.length === 0 && (
           <Typography color="text.secondary">データが見つかりません</Typography>
         )}
@@ -536,7 +536,7 @@ export default function ReliabilityAnalysisPage() {
   if (isLoading) return <LinearProgress />;
 
   return (
-    <Box>
+    <Box data-testid="statistics-page-root">
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
         <Box>

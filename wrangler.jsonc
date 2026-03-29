@@ -6,13 +6,13 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  // 環境変数（シークレットは wrangler secret put で設定）
-  // "vars": {
-  //   "APP_ENV": "production"
-  // },
-  
-  // Cloudflare D1 データベース
-  // 作成方法: npx wrangler d1 create teaching-practice-eval-db
+  "r2_buckets": [
+    {
+      "binding": "EXPORTS_BUCKET",
+      "bucket_name": "teaching-practice-exports",
+      "preview_bucket_name": "teaching-practice-exports-preview"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -20,17 +20,41 @@
       "database_id": "f9ec086a-d383-45de-86df-dd9d1a2c9faf"
     }
   ],
-  
-  // Cloudflare KV（セッション・キャッシュ用）
-  // 作成方法: npx wrangler kv:namespace create teaching_eval_KV
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "KV",
-  //     "id": "YOUR_KV_ID_HERE"
-  //   }
-  // ]
-  
-  // シークレット（本番環境）:
-  // npx wrangler pages secret put OPENAI_API_KEY
-  // npx wrangler pages secret put GOOGLE_CLOUD_VISION_API_KEY
+  "vars": {
+    "EXPORT_TOKEN_RETENTION_HOURS": "24",
+    "EXPORT_USED_TOKEN_RETENTION_HOURS": "72",
+    "EXPORT_OBJECT_RETENTION_DAYS": "30",
+    "RAW_EXPORT_RETENTION_HOURS": "24",
+    "EXPORT_CLEANUP_BATCH_SIZE": "100",
+    "EXPORT_CLEANUP_DELETE_BATCH_SIZE": "500",
+    "EXPORT_CLEANUP_DRY_RUN": "false",
+    "AUDIT_SYSTEM_ACTOR_ID": "system-cron",
+    "AUDIT_SYSTEM_ACTOR_ROLE": "system",
+    "EXPORT_R2_PREFIX": "exports/"
+  },
+  "triggers": {
+    "crons": [
+      "*/15 * * * *",
+      "10 0 * * *"
+    ]
+  },
+  "env": {
+    "staging": {
+      "triggers": {
+        "crons": [
+          "*/15 * * * *",
+          "*/10 * * * *"
+        ]
+      }
+    },
+    "production": {
+      "triggers": {
+        "crons": [
+          "*/15 * * * *",
+          "*/5 * * * *",
+          "10 0 * * *"
+        ]
+      }
+    }
+  }
 }

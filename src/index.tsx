@@ -1,15 +1,3 @@
-/**
- * src/index.tsx
- * Hono メインエントリポイント
- * Cloudflare Pages Functions（_worker.js）
- * 
- * APIルート:
- *   /api/ai/*        → OpenAI CoT-A/B/C
- *   /api/ocr/*       → OCR（Google Cloud Vision / Tesseract fallback）
- *   /api/stats/*     → 統計計算（ICC, Bland-Altman, Pearson）
- *   /api/export/*    → CSV/Excel エクスポート
- *   /api/data/*      → D1データベース CRUD
- */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "hono/cloudflare-pages";
@@ -18,6 +6,12 @@ import statsRouter from "./api/routes/stats";
 import dataRouter from "./api/routes/data";
 import externalJobsRouter from "./api/routes/externalJobs";
 import analyticsRouter from "./api/routes/analytics";
+import adminMetricsRouter from "./api/routes/adminMetrics";
+import { adminAlertsRouter } from "./api/routes/adminAlerts";
+import adminAnalyticsRouter from "./api/routes/adminAnalytics";
+import adminIncidentsRouter from "./api/routes/adminIncidents";
+import adminOperationalReadinessRouter from "./api/routes/adminOperationalReadiness";
+
 
 type Bindings = {
   OPENAI_API_KEY: string;
@@ -43,42 +37,23 @@ app.get("/version", (c) => c.json({ version: "1.0.0", environment: "production" 
 // API ルーティング
 // ────────────────────────────────────────────────────────────────
 
-import { Context, Next } from "hono";
+import { requireAuth } from "./api/middleware/auth";
+import { auditReadMiddleware, auditWriteMiddleware } from "./api/middleware/audit";
 
-import { verify } from 'hono/jwt';
-
-// 本格的なJWT認証ミドルウェア
-export const authMiddleware = async (c: Context, next: Next) => {
-  // /auth と healthcheck はスキップ
-  if (c.req.path.startsWith('/api/data/auth') || c.req.path === '/api/health') {
-    await next();
-    return;
-  }
-  
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return c.json({ error: "Unauthorized: Missing or invalid Authorization header" }, 401);
-  }
-  
-  try {
-    const token = authHeader.split(" ")[1];
-    const secret = (c.env as any)?.JWT_SECRET || "default_local_secret_key_for_dev_only";
-    const payload = await verify(token, secret, "HS256");
-    c.set("user", payload);
-    await next();
-  } catch (err) {
-    console.error("JWT Verification failed:", err);
-    return c.json({ error: "Unauthorized: Invalid token" }, 401);
-  }
-};
-
-app.use("/api/*", authMiddleware);
+app.use("/api/*", requireAuth);
+app.use("/api/*", auditReadMiddleware);
+app.use("/api/*", auditWriteMiddleware);
 app.route("/api/ai",     openaiRouter);
 app.route("/api/ocr",    openaiRouter);
 app.route("/api/analytics", analyticsRouter);
 app.route("/api/stats",  statsRouter);
 app.route("/api/data",   dataRouter);
 app.route("/api/external-jobs", externalJobsRouter);
+app.route("/api/admin/metrics", adminMetricsRouter);
+app.route("/api/admin/alerts", adminAlertsRouter);
+app.route("/api/admin/analytics", adminAnalyticsRouter);
+app.route("/api/admin/incidents", adminIncidentsRouter);
+app.route("/api/admin/operational-readiness", adminOperationalReadinessRouter);
 
 // ────────────────────────────────────────────────────────────────
 // ヘルスチェック
@@ -110,4 +85,12 @@ app.use("/static/*", serveStatic());
 app.get('*', serveStatic());
 
 
-export default app;
+import { runExportCleanupJob } from "./api/jobs/exportCleanup";
+
+export default {
+  fetch: app.fetch,
+  scheduled: async (event: any, env: any, ctx: any) => {
+    ctx.waitUntil(runExportCleanupJob(event, env, ctx));
+  }
+};
+

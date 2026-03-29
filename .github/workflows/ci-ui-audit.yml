@@ -1,0 +1,309 @@
+name: CI UI Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-ui-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  TZ: UTC
+  LANG: ja_JP.UTF-8
+  LC_ALL: ja_JP.UTF-8
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locale and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y locales fonts-noto-cjk
+          sudo locale-gen ja_JP.UTF-8 || true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+  role-ui-smoke:
+    name: role-ui-smoke
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locale and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y locales fonts-noto-cjk
+          sudo locale-gen ja_JP.UTF-8 || true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run role UI smoke
+        run: npm run test:e2e:smoke
+        env:
+          PLAYWRIGHT_JOBS_LAYER: mandatory
+
+      - name: Upload role-ui-smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: role-ui-smoke-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  export-filter-audit:
+    name: export-filter-audit
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locale and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y locales fonts-noto-cjk
+          sudo locale-gen ja_JP.UTF-8 || true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run export/filter audit
+        run: npm run test:e2e:export
+        env:
+          PLAYWRIGHT_JOBS_LAYER: mandatory
+
+      - name: Upload export-filter-audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: export-filter-audit-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  statistics-validity-required:
+    name: statistics-validity-required
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locale and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y locales fonts-noto-cjk
+          sudo locale-gen ja_JP.UTF-8 || true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run required statistics validity audit
+        run: |
+          npm run test:e2e:stats:normal
+          npm run test:e2e:stats:empty
+        env:
+          PLAYWRIGHT_JOBS_LAYER: mandatory
+
+      - name: Upload statistics-validity-required report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: statistics-validity-required-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  audit-optional-pr:
+    name: audit-optional-pr
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    continue-on-error: true
+    needs:
+      - build
+      - role-ui-smoke
+      - export-filter-audit
+      - statistics-validity-required
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - stats-malformed
+          - mobile
+          - provider-health
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locale and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y locales fonts-noto-cjk
+          sudo locale-gen ja_JP.UTF-8 || true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run optional PR audit
+        run: |
+          if [ "${{ matrix.target }}" = "stats-malformed" ]; then
+            npm run test:e2e:optional:stats-malformed
+          elif [ "${{ matrix.target }}" = "mobile" ]; then
+            npm run test:e2e:optional:mobile
+          elif [ "${{ matrix.target }}" = "provider-health" ]; then
+            npm run test:e2e:optional:provider-health
+          else
+            echo "Unknown matrix target: ${{ matrix.target }}"
+            exit 1
+          fi
+        env:
+          PLAYWRIGHT_JOBS_LAYER: optional-pr
+
+      - name: Upload optional PR audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optional-pr-${{ matrix.target }}-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  audit-optional-main:
+    name: audit-optional-main
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs:
+      - build
+      - role-ui-smoke
+      - export-filter-audit
+      - statistics-validity-required
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - stats-malformed
+          - mobile
+          - provider-health
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locale and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y locales fonts-noto-cjk
+          sudo locale-gen ja_JP.UTF-8 || true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run optional main audit
+        run: |
+          if [ "${{ matrix.target }}" = "stats-malformed" ]; then
+            npm run test:e2e:optional:stats-malformed
+          elif [ "${{ matrix.target }}" = "mobile" ]; then
+            npm run test:e2e:optional:mobile
+          elif [ "${{ matrix.target }}" = "provider-health" ]; then
+            npm run test:e2e:optional:provider-health
+          else
+            echo "Unknown matrix target: ${{ matrix.target }}"
+            exit 1
+          fi
+        env:
+          PLAYWRIGHT_JOBS_LAYER: optional-main
+
+      - name: Upload optional main audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optional-main-${{ matrix.target }}-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14

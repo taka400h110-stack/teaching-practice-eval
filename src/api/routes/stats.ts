@@ -11,6 +11,7 @@
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { requireRoles } from "../middleware/auth";
 import { statsProvider } from "../services/statsProvider";
 
 const statsRouter = new Hono<{ Bindings: CloudflareBindings }>();
@@ -21,10 +22,7 @@ statsRouter.use("*", async (c, next) => {
   if (c.req.method === 'OPTIONS') {
     return next();
   }
-  const role = c.get("user")?.role;
-  if (role !== "researcher" && role !== "admin") {
-    return c.json({ error: "Forbidden: researcher or admin role required" }, 403);
-  }
+  
   await next();
 });
 
@@ -772,7 +770,7 @@ function computeLGCMSummary(weeklyScores: any[]) {
 // ────────────────────────────────────────────────────────────────
 
 // POST /api/stats/icc
-statsRouter.post("/icc", async (c) => {
+statsRouter.post("/icc", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as { ratings: number[][]; factor?: string };
   try {
     const result = await statsProvider.computeICC(body.ratings, body.factor || "total", () => computeICC21(body.ratings));
@@ -783,7 +781,7 @@ statsRouter.post("/icc", async (c) => {
 });
 
 // POST /api/stats/icc-all-factors
-statsRouter.post("/icc-all-factors", async (c) => {
+statsRouter.post("/icc-all-factors", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as {
     ai_scores: Record<string, number[]>;    // { factor1: [...], factor2: [...], total: [...] }
     human_scores: Record<string, number[]>; // { factor1: [...], factor2: [...], total: [...] }
@@ -810,7 +808,7 @@ statsRouter.post("/icc-all-factors", async (c) => {
 });
 
 // POST /api/stats/krippendorff
-statsRouter.post("/krippendorff", async (c) => {
+statsRouter.post("/krippendorff", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as {
     ratings: (number | null)[][];
     metric?: "ordinal" | "interval";
@@ -825,7 +823,7 @@ statsRouter.post("/krippendorff", async (c) => {
 });
 
 // POST /api/stats/pearson
-statsRouter.post("/pearson", async (c) => {
+statsRouter.post("/pearson", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as {
     x: number[];
     y: number[];
@@ -852,7 +850,7 @@ statsRouter.post("/pearson", async (c) => {
 });
 
 // POST /api/stats/bland-altman
-statsRouter.post("/bland-altman", async (c) => {
+statsRouter.post("/bland-altman", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as { method1: number[]; method2: number[]; factor?: string };
   try {
     const result = await statsProvider.computeBlandAltman(body.method1, body.method2, body.factor || "total", () => computeBlandAltman(body.method1, body.method2));
@@ -863,7 +861,7 @@ statsRouter.post("/bland-altman", async (c) => {
 });
 
 // POST /api/stats/lgcm
-statsRouter.post("/missing-data-process", async (c) => {
+statsRouter.post("/missing-data-process", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as { data: (number | null)[][]; method?: string };
   try {
     const result = await statsProvider.computeMissingData(body.data, body.method || "listwise", () => handleMissingData(body.data, (body.method || "listwise") as any));
@@ -873,7 +871,7 @@ statsRouter.post("/missing-data-process", async (c) => {
   }
 });
 
-statsRouter.post("/lcga", async (c) => {
+statsRouter.post("/lcga", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as { weekly_scores: (number | null)[][]; max_classes?: number };
   try {
     const imputed = handleMissingData(body.weekly_scores, "mean_imputation");
@@ -884,7 +882,7 @@ statsRouter.post("/lcga", async (c) => {
   }
 });
 
-statsRouter.post("/lgcm", async (c) => {
+statsRouter.post("/lgcm", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as { weekly_scores: (number | null)[][]; factor?: string };
   try {
     const imputed = handleMissingData(body.weekly_scores, "mean_imputation");
@@ -897,7 +895,7 @@ statsRouter.post("/lgcm", async (c) => {
 
 // POST /api/stats/full-reliability
 // 全信頼性指標を一括計算（RQ2用）
-statsRouter.post("/full-reliability", async (c) => {
+statsRouter.post("/full-reliability", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const body = await c.req.json() as {
     ai_total: number[];
     human_total: number[] | number[][];
@@ -967,7 +965,7 @@ statsRouter.post("/full-reliability", async (c) => {
 
 
 // AI vs Human 比較 (ComparisonPage 用)
-statsRouter.get("/ai-vs-human", async (c) => {
+statsRouter.get("/ai-vs-human", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   

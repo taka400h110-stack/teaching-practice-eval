@@ -40,7 +40,7 @@ export default function JournalListPage() {
   if (isLoading) return <Box p={3}><Typography>読み込み中...</Typography></Box>;
 
   return (
-    <Box>
+    <Box data-testid="journal-list-root">
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
         <Typography variant="h5" fontWeight="bold">実習日誌一覧</Typography>
         {isStudent && (

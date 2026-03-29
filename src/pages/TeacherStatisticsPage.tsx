@@ -18,6 +18,10 @@ import {
   PolarGrid, PolarAngleAxis,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
+import Button from "@mui/material/Button";
+import DownloadIcon from "@mui/icons-material/Download";
+import Button from "@mui/material/Button";
+import DownloadIcon from "@mui/icons-material/Download";
 import apiClient from "../api/client";
 
 const FACTOR_COLORS = {
@@ -78,6 +82,26 @@ export default function TeacherStatisticsPage() {
     score: +v.toFixed(2),
   }));
 
+  const downloadCSV = () => {
+    const header = "ID,氏名,学校種別,総合スコア,成長度";
+    const rows = cohorts.map((p: any) => [
+      p.id,
+      p.name,
+      p.school_type,
+      (p.final_total || 0).toFixed(2),
+      (p.growth_delta || 0).toFixed(2)
+    ].join(','));
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "teacher_statistics.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
     <Box>
       {/* ヘッダー */}
@@ -85,6 +109,9 @@ export default function TeacherStatisticsPage() {
         <SchoolIcon color="primary" sx={{ fontSize: 32 }} />
         <Box>
           <Typography variant="h5" fontWeight={700}>教員向け統計ダッシュボード</Typography>
+        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={downloadCSV}>
+          CSV出力
+        </Button>
           <Typography variant="body2" color="text.secondary">
             コーホート全体の成長統計・因子別分析
           </Typography>

@@ -11,8 +11,16 @@ import StorageIcon     from "@mui/icons-material/Storage";
 import { useQuery }    from "@tanstack/react-query";
 import apiClient from "../api/client";
 import { apiFetch } from "../api/client";
+import { CleanupMetricsPanel } from "../components/admin/CleanupMetricsPanel";
+import { CleanupFailureAlertBanner } from "../components/admin/CleanupFailureAlertBanner";
+import { AlertHistoryPanel } from "../components/admin/AlertHistoryPanel";
+import { ProviderHealthPanel } from "../components/admin/ProviderHealthPanel";
+import { DeliveryAnalyticsPanel } from "../components/admin/DeliveryAnalyticsPanel";
+import { useCleanupFailureAlert } from "../hooks/useCleanupFailureAlert";
 
 export default function AdminDashboardPage() {
+  const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+  const { data: alertData } = useCleanupFailureAlert();
 
   const handleDownload = async (url: string, filename: string) => {
     try {
@@ -36,8 +44,11 @@ export default function AdminDashboardPage() {
   };
 
   const [tab, setTab] = useState(0);
-  const { data: profiles = [] } = useQuery({ queryKey: ["cohort"], queryFn: () => apiClient.getCohortProfiles() });
-  const { data: journals = [] } = useQuery({ queryKey: ["journals"], queryFn: () => apiClient.getJournals() });
+  const { data: profilesData } = useQuery({ queryKey: ["cohort"], queryFn: () => apiClient.getCohortProfiles() });
+  const { data: journalsData } = useQuery({ queryKey: ["journals"], queryFn: () => apiClient.getJournals() });
+
+  const profiles = Array.isArray(profilesData) ? profilesData : [];
+  const journals = Array.isArray(journalsData) ? journalsData : [];
   
   const { data: jointData = [] } = useQuery({
     queryKey: ["jointDisplay"],
@@ -79,8 +90,13 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <Box>
+    <Box data-testid="admin-dashboard-root">
       <Typography variant="h5" fontWeight="bold" mb={3}>管理者ダッシュボード</Typography>
+
+      {/* Cleanup Alert Banner */}
+      {alertData && (
+        <CleanupFailureAlertBanner alert={alertData} adminUserId={user?.id || "unknown"} />
+      )}
 
       {/* サマリカード */}
       <Grid container spacing={2} mb={3}>
@@ -103,7 +119,12 @@ export default function AdminDashboardPage() {
         システム稼働中 — 最終同期: {new Date().toLocaleString("ja-JP")}
       </Alert>
 
-            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+            <CleanupMetricsPanel />
+      <ProviderHealthPanel />
+        <DeliveryAnalyticsPanel />
+        <AlertHistoryPanel />
+      <Box sx={{ mt: 4 }} />
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label="学校種別統計" />
         <Tab label="ユーザー管理" />
         <Tab label="システム情報" />

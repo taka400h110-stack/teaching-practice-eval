@@ -108,7 +108,7 @@ export default function CohortsManagementPage() {
   if (isLoading) return <LinearProgress />;
 
   return (
-    <Box>
+    <Box data-testid="cohorts-page-root">
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" gap={1} mb={3}>
         <GroupsIcon color="primary" />

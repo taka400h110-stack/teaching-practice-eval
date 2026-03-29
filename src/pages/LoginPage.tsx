@@ -145,11 +145,21 @@ export default function LoginPage() {
     setLoggingIn(loginEmail);
     setError("");
     try {
-      const result = await apiClient.login(loginEmail, loginPw);
-      if ((result as { requiresOnboarding?: boolean }).requiresOnboarding) {
+      const result = await apiClient.login(loginEmail, loginPw) as any;
+      const user = apiClient.getCurrentUser();
+      console.log("LOGIN RESULT", result, "USER", user);
+      if (result.requiresOnboarding) {
         navigate("/onboarding");
       } else {
-        navigate("/dashboard");
+        const user = apiClient.getCurrentUser();
+        const role = user?.role || user?.roles?.[0] || 'student';
+        if (role === 'admin' || role === 'researcher') {
+          navigate("/admin");
+        } else if (role === 'teacher' || role === 'univ_teacher' || role === 'school_mentor') {
+          navigate("/teacher-dashboard");
+        } else {
+          navigate("/dashboard");
+        }
       }
     } catch {
       setError("ログインに失敗しました。");

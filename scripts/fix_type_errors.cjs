@@ -1,33 +1,29 @@
 const fs = require('fs');
 const path = require('path');
 
-// Fix api/client.ts
-const clientPath = path.join(__dirname, '../src/api/client.ts');
-let clientContent = fs.readFileSync(clientPath, 'utf8');
+const filePath = path.join(__dirname, '../src/api/routes/data.ts');
+let content = fs.readFileSync(filePath, 'utf-8');
 
-// Replace "const data = await res.json();" with "const data = await res.json() as any;"
-clientContent = clientContent.replace(/const data = await res\.json\(\);/g, 'const data = await res.json() as any;');
-clientContent = clientContent.replace(/const resData = await res\.json\(\);/g, 'const resData = await res.json() as any;');
+if (!content.includes('import { UserRole }')) {
+  content = content.replace('import { applyAnonymization }', 'import { UserRole } from "../../types";\nimport { applyAnonymization }');
+}
 
-fs.writeFileSync(clientPath, clientContent, 'utf8');
+// c.get("user") -> (c.get("user") as any)
+content = content.replace(/c\.get\("user"\)/g, '(c.get("user") as any)');
 
-// Fix ExternalAnalysisJobPanel.tsx
-const jobPanelPath = path.join(__dirname, '../src/components/ExternalAnalysisJobPanel.tsx');
-let jobPanelContent = fs.readFileSync(jobPanelPath, 'utf8');
+// requireRoles(["student"]) -> requireRoles(["student"] as UserRole[])
+content = content.replace(/requireRoles\(\[\"([^\"]+)\"\]\)/g, 'requireRoles(["$1"] as UserRole[])');
+content = content.replace(/requireRoles\(\[\"([^\"]+)\",\s*\"([^\"]+)\"\]\)/g, 'requireRoles(["$1", "$2"] as UserRole[])');
 
-jobPanelContent = jobPanelContent.replace('const data = await res.json();', 'const data = await res.json() as any;');
-jobPanelContent = jobPanelContent.replace(/res\.success/g, 'data.success');
-jobPanelContent = jobPanelContent.replace(/res\.job_id/g, 'data.job_id');
-jobPanelContent = jobPanelContent.replace(/res\.error/g, 'data.error');
+// `student_id: user.id` => `student_id: (user as any).id`
+content = content.replace(/student_id:\s+user\.id/g, 'student_id: (user as any).id');
+content = content.replace(/user_id:\s+user\.id/g, 'user_id: (user as any).id');
 
-fs.writeFileSync(jobPanelPath, jobPanelContent, 'utf8');
+// `await bcrypt.compare(body.password,` => `await bcrypt.compare((body as any).password,`
+content = content.replace(/await bcrypt\.compare\(body\.password,/g, 'await bcrypt.compare((body as any).password,');
 
-// Fix TeacherDashboardPage.tsx
-const teacherPath = path.join(__dirname, '../src/pages/TeacherDashboardPage.tsx');
-let teacherContent = fs.readFileSync(teacherPath, 'utf8');
+// `Number(body[k])` -> `Number((body as any)[k])`
+content = content.replace(/body\[k\]/g, '(body as any)[k]');
 
-teacherContent = teacherContent.replace('SCHOOL_TYPES[p.school_type] || "不明"', 'SCHOOL_TYPES[p.school_type as keyof typeof SCHOOL_TYPES] || "不明"');
-
-fs.writeFileSync(teacherPath, teacherContent, 'utf8');
-
-console.log('Done fixing type errors');
+fs.writeFileSync(filePath, content);
+console.log("Fixed more types");

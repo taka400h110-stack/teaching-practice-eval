@@ -2,13 +2,24 @@
   "name": "webapp",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build --mode client && vite build",
-    "preview": "wrangler pages dev",
-    "deploy": "npm run build && wrangler pages deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
-    "test": "npx tsx src/tests/score.test.ts"
-  },
+  "dev": "vite",
+  "build": "npx wrangler d1 migrations apply DB --local && vite build --mode client && vite build",
+  "preview": "wrangler pages dev dist --ip 127.0.0.1 --port 8788",
+  "deploy": "npm run build && wrangler pages deploy dist",
+  "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+
+  "test:e2e:smoke": "playwright test tests/e2e/role-ui-audit.onboarded.spec.ts tests/e2e/role-ui-audit.not-onboarded.spec.ts tests/e2e/role-rbac-matrix.spec.ts",
+  "test:e2e:export": "playwright test tests/e2e/export-filter-audit.spec.ts",
+  "test:e2e:stats:normal": "playwright test tests/e2e/statistics-validity.normal.spec.ts",
+  "test:e2e:stats:empty": "playwright test tests/e2e/statistics-validity.empty.spec.ts",
+
+  "test:e2e:optional:stats-malformed": "playwright test tests/e2e/statistics-validity.malformed.spec.ts",
+  "test:e2e:optional:mobile": "playwright test tests/e2e/mobile-interaction-audit.spec.ts",
+  "test:e2e:optional:provider-health": "playwright test tests/e2e/provider-health-audit.spec.ts",
+
+  "test:ui:audit": "npm run test:e2e:smoke && npm run test:e2e:export && npm run test:e2e:stats:normal && npm run test:e2e:stats:empty",
+  "test:ui:audit:optional": "npm run test:e2e:optional:stats-malformed && npm run test:e2e:optional:mobile && npm run test:e2e:optional:provider-health"
+},
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -33,7 +44,6 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^25.5.0",
     "@vitejs/plugin-react": "^5.1.4",
-    "playwright": "^1.58.2",
     "typescript": "^5.9.3",
     "vite": "^6.4.1",
     "wrangler": "^4.4.0"

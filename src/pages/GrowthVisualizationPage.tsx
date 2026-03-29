@@ -57,7 +57,7 @@ export default function GrowthVisualizationPage() {
 
   if (!growth || !growth.weekly_scores || growth.weekly_scores.length === 0) {
     return (
-      <Box maxWidth={1000} mx="auto" p={3}>
+      <Box data-testid="growth-page-root" maxWidth={1000} mx="auto" p={3}>
         <Alert severity="info">成長データがありません。</Alert>
       </Box>
     );
@@ -108,7 +108,7 @@ export default function GrowthVisualizationPage() {
   }));
 
   return (
-    <Box>
+    <Box data-testid="growth-page-root">
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={1}>
         <Typography variant="h5" fontWeight="bold">

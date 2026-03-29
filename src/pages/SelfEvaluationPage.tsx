@@ -138,7 +138,7 @@ export default function SelfEvaluationPage() {
   };
 
   return (
-    <Box>
+    <Box data-testid="self-evaluation-page-root">
       <Typography variant="h5" fontWeight="bold" mb={3}>
         <SelfImprovementIcon sx={{ verticalAlign: "middle", mr: 0.5 }} />
         自己評価

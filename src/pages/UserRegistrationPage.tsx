@@ -251,7 +251,7 @@ export default function UserRegistrationPage() {
   }[field] ?? field);
 
   return (
-    <Box maxWidth={1100} mx="auto">
+    <Box data-testid="user-registration-page-root" maxWidth={1100} mx="auto">
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" gap={1} mb={3}>
         <PersonAddIcon color="primary" />

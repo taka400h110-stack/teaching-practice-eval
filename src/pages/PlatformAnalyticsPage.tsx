@@ -47,7 +47,7 @@ export default function PlatformAnalyticsPage() {
   });
 
   return (
-    <Box>
+    <Box data-testid="platform-analytics-page-root">
       <Typography variant="h4" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
         <Science sx={{ mr: 1 }} />
         データプラットフォーム分析 (準備中) (Analytics Platform)

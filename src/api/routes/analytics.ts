@@ -1,9 +1,10 @@
 import { Hono } from "hono";
+import { requireRoles } from "../middleware/auth";
 
 const analyticsRouter = new Hono<{ Bindings: CloudflareBindings }>();
 
 // L1-L4 Data Pipeline Real Count
-analyticsRouter.get("/pipeline", async (c) => {
+analyticsRouter.get("/pipeline", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -29,7 +30,7 @@ analyticsRouter.get("/pipeline", async (c) => {
 });
 
 // G-Methods (IPTW / MSM) - Mark as Not Available
-analyticsRouter.post("/g-methods", async (c) => {
+analyticsRouter.post("/g-methods", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   return c.json({
     run_id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
@@ -40,7 +41,7 @@ analyticsRouter.post("/g-methods", async (c) => {
 });
 
 // Fairness & Validity Audit
-analyticsRouter.get("/fairness", (c) => {
+analyticsRouter.get("/fairness", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), (c) => {
   return c.json({
     run_id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),

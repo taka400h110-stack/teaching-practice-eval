@@ -217,7 +217,7 @@ export default function StatisticsPage() {
   });
 
   return (
-    <Box>
+    <Box data-testid="statistics-page-root">
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" gap={1} mb={3} flexWrap="wrap">
         <EqualizerIcon color="primary" />

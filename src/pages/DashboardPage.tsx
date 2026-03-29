@@ -115,7 +115,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <Box>
+    <Box data-testid="student-dashboard-root">
       {/* ウェルカム */}
       <Box
         sx={{
