@@ -90,7 +90,7 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <Box data-testid="admin-dashboard-root">
+    <Box data-testid="admin-dashboard-root" sx={{ maxWidth: "100vw", overflowX: "hidden" }}>
       <Typography variant="h5" fontWeight="bold" mb={3}>管理者ダッシュボード</Typography>
 
       {/* Cleanup Alert Banner */}
@@ -124,7 +124,7 @@ export default function AdminDashboardPage() {
         <DeliveryAnalyticsPanel />
         <AlertHistoryPanel />
       <Box sx={{ mt: 4 }} />
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
         <Tab label="学校種別統計" />
         <Tab label="ユーザー管理" />
         <Tab label="システム情報" />

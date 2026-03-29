@@ -82,17 +82,12 @@ export async function mockLongitudinalStatsMalformed(page: Page) {
       body: JSON.stringify({
         cohorts: [
           {
-            id: 'malformed1',
+            id: 'u1',
             school_type: '中学校',
             duration_weeks: 4,
-            profiles: [
-              {
-                user_id: 'u1',
-                weekly_scores: [
-                  { week: null, factor1: -5, factor2: 100, factor3: NaN, factor4: undefined, total: -10 },
-                  { week: 2, factor1: null }
-                ]
-              }
+            weekly_scores: [
+              { week: null, factor1: -5, factor2: 100, factor3: NaN, factor4: undefined, total: -10 },
+              { week: 2, factor1: null }
             ]
           }
         ]
@@ -109,21 +104,16 @@ export async function mockTeacherStatsMalformed(page: Page) {
       body: JSON.stringify({
         cohorts: [
           {
-            id: 'malformed_teacher',
-            profiles: [
-              {
-                id: 'u1',
-                final_total: -100,
-                final_factor1: NaN,
-                growth_delta: Infinity,
-                weekly_scores: []
-              },
-              {
-                id: 'u2',
-                final_total: null,
-                growth_delta: -50
-              }
-            ]
+            id: 'u1',
+            final_total: -100,
+            final_factor1: NaN,
+            growth_delta: Infinity,
+            weekly_scores: []
+          },
+          {
+            id: 'u2',
+            final_total: null,
+            growth_delta: -50
           }
         ]
       })
@@ -155,15 +145,10 @@ export async function mockLongitudinalStats(page: Page, type: 'normal' | 'empty'
       body: JSON.stringify({
         cohorts: [
           {
-            id: 'longitudinal1',
+            id: 'u1',
             school_type: '中学校',
             duration_weeks: 4,
-            profiles: [
-              {
-                user_id: 'u1',
-                weekly_scores
-              }
-            ]
+            weekly_scores
           }
         ]
       })

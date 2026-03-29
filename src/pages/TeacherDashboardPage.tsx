@@ -31,7 +31,7 @@ export default function TeacherDashboardPage() {
     : "—";
 
   return (
-    <Box data-testid="teacher-dashboard-root">
+    <Box data-testid="teacher-dashboard-root" sx={{ maxWidth: "100vw", overflowX: "hidden" }}>
       <Typography variant="h5" fontWeight="bold" mb={3}>教員ダッシュボード</Typography>
 
       {/* サマリ */}
@@ -51,7 +51,7 @@ export default function TeacherDashboardPage() {
         ))}
       </Box>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
         <Tab label="学生一覧" />
         <Tab label="成長サマリ" />
       </Tabs>
