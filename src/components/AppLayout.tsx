@@ -154,6 +154,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "縦断分析（LGCM）", path: "/longitudinal", icon: <AutoGraphIcon /> },
           { label: "SCAT質的分析", path: "/scat", icon: <DescriptionIcon /> },
           { label: "SCATバッチ分析", path: "/scat-batch", icon: <DescriptionIcon /> },
+          { label: "SCAT全体構造", path: "/scat/class", icon: <DescriptionIcon /> },
           { label: "SCATネットワーク分析", path: "/scat-network", icon: <DescriptionIcon /> },
           { label: "SCAT時系列分析", path: "/scat-timeline", icon: <DescriptionIcon /> },
           { label: "統計サマリー", path: "/statistics", icon: <AnalyticsIcon /> },

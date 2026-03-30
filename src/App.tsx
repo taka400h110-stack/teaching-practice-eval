@@ -37,6 +37,9 @@ const SCATAnalysisPage        = lazy(() => import("./pages/SCATAnalysisPage"));
 const SCATBatchAnalysisPage   = lazy(() => import("./pages/SCATBatchAnalysisPage"));
 const SCATNetworkAnalysisPage = lazy(() => import("./pages/SCATNetworkAnalysisPage"));
 const SCATTimelinePage        = lazy(() => import("./pages/SCATTimelinePage"));
+const SCATClassPage           = lazy(() => import("./pages/SCATClassPage"));
+const SCATStudentPage         = lazy(() => import("./pages/SCATStudentPage"));
+const SCATJournalPage         = lazy(() => import("./pages/SCATJournalPage"));
 const AdvancedAnalyticsPage   = lazy(() => import("./pages/AdvancedAnalyticsPage"));
 // 個人
 const SelfEvaluationPage      = lazy(() => import("./pages/SelfEvaluationPage"));
@@ -135,6 +138,9 @@ export default function App() {
           <Route path="platform-analytics"          element={<PrivateRoute allowedRoles={["admin", "researcher"]}><PlatformAnalyticsPage /></PrivateRoute>} />
           <Route path="cohorts"           element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><CohortsManagementPage /></PrivateRoute>} />
           <Route path="scat"              element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATAnalysisPage /></PrivateRoute>} />
+          <Route path="scat/class"        element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATClassPage /></PrivateRoute>} />
+          <Route path="scat/students/:studentId" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATStudentPage /></PrivateRoute>} />
+          <Route path="scat/journals/:journalId" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATJournalPage /></PrivateRoute>} />
           <Route path="scat-batch"        element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATBatchAnalysisPage /></PrivateRoute>} />
           <Route path="scat-network"      element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATNetworkAnalysisPage /></PrivateRoute>} />
           <Route path="scat-timeline"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATTimelinePage /></PrivateRoute>} />
