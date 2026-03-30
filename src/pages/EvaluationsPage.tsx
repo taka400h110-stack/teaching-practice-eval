@@ -69,7 +69,9 @@ export default function EvaluationsPage() {
   });
 
   // 評価対象は submitted / evaluated ステータスの日誌
-  let evalJournals = journals.filter((j) =>
+  const safeJournals = Array.isArray(journals) ? journals : [];
+  console.log("[EvaluationsPage] journals:", journals, "safeJournals:", safeJournals);
+  let evalJournals = safeJournals.filter((j) =>
     j.status !== "draft" &&
     (statusFilter === "all" || j.status === statusFilter)
   );

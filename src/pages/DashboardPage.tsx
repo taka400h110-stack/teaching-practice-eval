@@ -49,10 +49,11 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const user = apiClient.getCurrentUser();
 
-  const { data: journals = [] } = useQuery({
+  const { data: journalsData = [] } = useQuery({
     queryKey: ["journals"],
     queryFn:  () => apiClient.getJournals(),
   });
+  const journals = Array.isArray(journalsData) ? journalsData : [];
   const { data: growth } = useQuery({
     queryKey: ["growth"],
     queryFn:  () => apiClient.getGrowthData(),

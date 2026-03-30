@@ -352,11 +352,12 @@ export default function JournalWorkflowPage() {
   });
 
   // 全日誌一覧（過去日誌選択用）
-  const { data: allJournals = [] } = useQuery({
+  const { data: allJournalsData = [] } = useQuery({
     queryKey: ["journals"],
     queryFn:  () => apiClient.getJournals(),
     enabled: historyOpen, // ダイアログを開いたときのみ取得
   });
+  const allJournals = Array.isArray(allJournalsData) ? allJournalsData : [];
 
   const { data: allEvals = [] } = useQuery({
     queryKey: ["allEvaluations"],

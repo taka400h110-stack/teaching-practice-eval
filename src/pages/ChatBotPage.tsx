@@ -191,10 +191,11 @@ export default function ChatBotPage() {
   });
 
   // 日誌一覧（セッションに対応する日誌タイトルを表示するため）
-  const { data: allJournals = [] } = useQuery({
+  const { data: allJournalsData = [] } = useQuery({
     queryKey: ["journals"],
     queryFn:  () => apiClient.getJournals(),
   });
+  const allJournals = Array.isArray(allJournalsData) ? allJournalsData : [];
 
   useEffect(() => {
     setMessages([]);

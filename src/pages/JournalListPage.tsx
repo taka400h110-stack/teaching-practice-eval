@@ -28,6 +28,8 @@ export default function JournalListPage() {
     queryFn:  () => apiClient.getJournals(),
   });
 
+  const safeJournals = Array.isArray(journals) ? journals : [];
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.deleteJournal(id),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["journals"] }); },
@@ -50,7 +52,7 @@ export default function JournalListPage() {
         )}
       </Box>
 
-      {journals.length === 0 && (
+      {safeJournals.length === 0 && (
         <Card>
           <CardContent sx={{ textAlign: "center", py: 6 }}>
             <MenuBookIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
@@ -61,7 +63,7 @@ export default function JournalListPage() {
         </Card>
       )}
 
-      {journals.map((j: JournalEntry) => {
+      {safeJournals.map((j: JournalEntry) => {
         const cfg = STATUS_CONFIG[j.status];
         return (
           <Card key={j.id} sx={{ mb: 1.5, "&:hover": { boxShadow: 3 }, transition: "box-shadow 0.2s" }}>
