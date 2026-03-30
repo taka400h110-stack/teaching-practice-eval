@@ -33,7 +33,7 @@ export const requireRoles = (allowedRoles: UserRole[]) => {
       return c.json({ success: false, error: "unauthorized", message: "User not authenticated or role missing" }, 401);
     }
     
-    const userRoles: string[] = user.roles || [user.role];
+    const userRoles: string[] = (user.roles || [user.role]).map((r: string) => r.toLowerCase());
     const hasRole = userRoles.some(r => allowedRoles.includes(r as UserRole));
     
     if (!hasRole) {

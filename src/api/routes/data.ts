@@ -2180,10 +2180,13 @@ dataRouter.post("/auth/login", async (c) => {
     const secret = (c.env as any)?.JWT_SECRET || "default_local_secret_key_for_dev_only";
     
     // Generate actual JWT
+    const rawRole = (user as any).role || ((user as any).email.includes('admin') ? 'admin' : (user as any).email.includes('researcher') ? 'researcher' : 'student');
+    const normalizedRole = typeof rawRole === 'string' ? rawRole.toLowerCase() : rawRole;
+    
     const payload = {
       id: (user as any).id,
       email: (user as any).email,
-      role: (user as any).role || ((user as any).email.includes('admin') ? 'admin' : (user as any).email.includes('researcher') ? 'researcher' : 'student'),
+      role: normalizedRole,
       name: (user as any).name,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours expiration
     };
@@ -2196,7 +2199,7 @@ dataRouter.post("/auth/login", async (c) => {
         id: (user as any).id,
         email: (user as any).email,
         name: (user as any).name,
-        role: (user as any).role || ((user as any).email.includes('admin') ? 'admin' : (user as any).email.includes('researcher') ? 'researcher' : 'student'),
+        role: normalizedRole,
         student_number: (user as any).student_number,
         grade: user.grade
       }, 

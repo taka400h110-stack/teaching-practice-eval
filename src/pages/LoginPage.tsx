@@ -153,7 +153,9 @@ export default function LoginPage() {
       } else {
         const user = apiClient.getCurrentUser();
         const rawRole = user?.role || user?.user?.role || user?.roles?.[0] || 'student';
-        const role = typeof rawRole === 'string' ? rawRole : (Array.isArray(rawRole) ? rawRole[0] : 'student');
+        const roleStr = typeof rawRole === 'string' ? rawRole : (Array.isArray(rawRole) ? rawRole[0] : 'student');
+        const role = String(roleStr).toLowerCase();
+        
         if (role === 'admin' || role === 'researcher') {
           navigate("/admin");
         } else if (role === 'teacher' || role === 'univ_teacher' || role === 'school_mentor') {

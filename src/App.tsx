@@ -78,7 +78,7 @@ function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, a
     }
     
     // adminが含まれるか確実にチェック（大文字小文字の違いなどを吸収）
-    const hasRole = userRoles.some((r: string) => allowedRoles.includes(r.toLowerCase()));
+    const hasRole = userRoles.some((r: string) => allowedRoles.some((ar: string) => ar.toLowerCase() === r.toLowerCase()));
     
     console.log("[PrivateRoute] path:", window.location.pathname, "user:", user, "userRoles:", userRoles, "hasRole:", hasRole);
     if (!user || !hasRole) {
