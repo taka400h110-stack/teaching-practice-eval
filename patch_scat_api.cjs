@@ -1,134 +1,53 @@
 const fs = require('fs');
-const path = '/home/user/webapp/src/api/routes/data.ts';
-let content = fs.readFileSync(path, 'utf8');
 
-const scatApi = `
-// ────────────────────────────────────────────────────────────────
-// SCAT API
-// ────────────────────────────────────────────────────────────────
+let content = fs.readFileSync('/home/user/webapp/src/api/routes/scat.ts', 'utf8');
 
-// プロジェクト一覧取得
-dataRouter.get('/scat/projects', async (c) => {
-  const { env } = c;
+const postRun = `// B. POST /api/data/scat/journals/:journalId/run
+scatRouter.post("/journals/:journalId/run", requireRoles(["researcher", "admin"]), async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  
+  const journalId = c.req.param("journalId");
+  
   try {
-    const { results } = await env.DB.prepare('SELECT * FROM scat_projects ORDER BY created_at DESC').all();
-    return c.json({ projects: results });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
-  }
-});
-
-// プロジェクト作成
-dataRouter.post('/scat/projects', async (c) => {
-  const { env } = c;
-  try {
-    const body = await c.req.json();
-    const id = "scat-proj-" + Date.now();
-    await env.DB.prepare('INSERT INTO scat_projects (id, title, description, created_by) VALUES (?, ?, ?, ?)')
-      .bind(id, body.title, body.description || "", body.created_by || "unknown")
-      .run();
-    return c.json({ id, title: body.title });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
-  }
-});
-
-// セグメント一覧取得
-dataRouter.get('/scat/projects/:projectId/segments', async (c) => {
-  const { env } = c;
-  const projectId = c.req.param('projectId');
-  try {
-    const { results } = await env.DB.prepare('SELECT * FROM scat_segments WHERE project_id = ? ORDER BY segment_order ASC')
-      .bind(projectId)
-      .all();
-    return c.json({ segments: results });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
-  }
-});
-
-// セグメント作成（一括）
-dataRouter.post('/scat/segments', async (c) => {
-  const { env } = c;
-  try {
-    const body = await c.req.json();
-    const { project_id, segments } = body;
+    const journal = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(journalId).first();
+    if (!journal) return c.json({ error: "Journal not found" }, 404);
     
-    for (const seg of segments) {
-      const segId = seg.id || "scat-seg-" + Date.now() + "-" + Math.floor(Math.random()*1000);
-      await env.DB.prepare('INSERT INTO scat_segments (id, project_id, segment_order, text_content, source_journal_id) VALUES (?, ?, ?, ?, ?)')
-        .bind(segId, project_id, seg.segment_order, seg.text_content, seg.source_journal_id || null)
-        .run();
-    }
-    return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
-  }
-});
-
-// コード一覧取得（プロジェクト全体）
-dataRouter.get('/scat/projects/:projectId/codes', async (c) => {
-  const { env } = c;
-  const projectId = c.req.param('projectId');
-  try {
-    // JOIN scat_segments
-    const query = \`
-      SELECT c.* 
-      FROM scat_codes c
-      JOIN scat_segments s ON c.segment_id = s.id
-      WHERE s.project_id = ?
-    \`;
-    const { results } = await env.DB.prepare(query).bind(projectId).all();
-    return c.json({ codes: results });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
-  }
-});
-
-// コード保存（UPSERT）
-dataRouter.post('/scat/codes', async (c) => {
-  const { env } = c;
-  try {
-    const body = await c.req.json();
-    const id = body.id || "scat-code-" + Date.now() + "-" + Math.floor(Math.random()*1000);
+    // Simulate LLM extraction & DB update
+    const runId = 'run-' + Date.now();
+    await db.prepare("INSERT INTO scat_runs (id, journal_id, student_id, run_date, status) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'completed')").bind(runId, journalId, journal.student_id).run();
     
-    // Auth context (mocked for now, as user_info is in localStorage, UI should send it, but we can trust token if we had one)
-    // Actually, user passes researcher_id from frontend (from user_info).
-    const researcherId = body.researcher_id;
-    if (!researcherId) return c.json({ error: "researcher_id is required" }, 400);
-
-    const check = await env.DB.prepare('SELECT id FROM scat_codes WHERE segment_id = ? AND researcher_id = ?')
-      .bind(body.segment_id, researcherId)
-      .first();
-
-    if (check) {
-      await env.DB.prepare(\`
-        UPDATE scat_codes 
-        SET step1_keywords = ?, step2_thesaurus = ?, step3_concept = ?, step4_theme = ?, memo = ?, factor = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      \`)
-      .bind(body.step1_keywords || "", body.step2_thesaurus || "", body.step3_concept || "", body.step4_theme || "", body.memo || "", body.factor || "", check.id)
-      .run();
-      return c.json({ success: true, id: check.id });
-    } else {
-      await env.DB.prepare(\`
-        INSERT INTO scat_codes (id, segment_id, researcher_id, step1_keywords, step2_thesaurus, step3_concept, step4_theme, memo, factor)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      \`)
-      .bind(id, body.segment_id, researcherId, body.step1_keywords || "", body.step2_thesaurus || "", body.step3_concept || "", body.step4_theme || "", body.memo || "", body.factor || "")
-      .run();
-      return c.json({ success: true, id });
+    const elementsRes = await db.prepare("SELECT element_code FROM scat_learning_element_master").all();
+    const allElements = elementsRes.results || [];
+    const randomElements = allElements.sort(() => 0.5 - Math.random()).slice(0, 3);
+    
+    for (const el of randomElements) {
+        await db.prepare("INSERT OR IGNORE INTO scat_journal_elements (journal_id, element_code, present) VALUES (?, ?, 1)").bind(journalId, el.element_code).run();
+        const smId = 'sm-' + journal.student_id + '-' + el.element_code;
+        await db.prepare("INSERT OR IGNORE INTO scat_student_mastery (id, student_id, element_code, mastered, first_journal_id, first_week_number) VALUES (?, ?, ?, 1, ?, 1)").bind(smId, journal.student_id, el.element_code, journalId).run();
     }
+    
+    return c.json({ success: true, message: "Run completed (mocked DB update)" });
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    console.error("SCAT API Error", err);
+    return c.json({ error: String(err) }, 500);
   }
-});
+});`;
 
-`;
+content = content.replace(/\/\/ B\. POST \/api\/data\/scat\/journals\/:journalId\/run[\s\S]*?\/\/ C\./, postRun + "\n\n// C.");
 
-content = content.replace(
-  '// ────────────────────────────────────────────────────────────────\\n// Namikawa BFI (Big Five Inventory) Routes',
-  scatApi + '\\n// ────────────────────────────────────────────────────────────────\\n// Namikawa BFI (Big Five Inventory) Routes'
-);
+// Add mock mermaid to C.
+content = content.replace(/success: true,\n\s*studentId,\n\s*journals: journals.results \|\| \[\],\n\s*mastery: mastery.results \|\| \[\],\n\s*elements/, `success: true,
+      studentId,
+      journals: journals.results || [],
+      mastery: mastery.results || [],
+      elements,
+      mermaidChart: 'graph TD\\n  M1-->M2\\n  M2-->M5\\n  M3-->M5'`);
 
-fs.writeFileSync(path, content);
+// Add mock mermaid to D.
+content = content.replace(/transmissionCoefficients: spTable.map\(s => \(\{ studentId: s.studentId, studentName: s.studentName, coefficient: 0.85, type: '構造型' \}\)\) \/\/ Mock\n\s*\}\);/, `transmissionCoefficients: spTable.map(s => ({ studentId: s.studentId, studentName: s.studentName, coefficient: 0.85, type: '構造型' })),
+      mermaidChart: 'graph TD\\n  M1-->M2\\n  M1-->M3\\n  M2-->M4\\n  M3-->M5\\n  M4-->M5'
+    });`);
+
+fs.writeFileSync('/home/user/webapp/src/api/routes/scat.ts', content);
+console.log("Patched scat.ts");
