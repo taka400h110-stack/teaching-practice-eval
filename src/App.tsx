@@ -59,7 +59,7 @@ const Spinner = () => (
 
 function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
   if (!apiClient.isAuthenticated()) return <Navigate to="/login" replace />;
-  if (apiClient.requiresOnboarding()) return <Navigate to="/onboarding" replace />;
+  
   
   if (allowedRoles && allowedRoles.length > 0) {
     const user = apiClient.getCurrentUser();
@@ -94,7 +94,7 @@ export default function App() {
     <Suspense fallback={<Spinner />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
+        {/* <Route path="/onboarding" element={<OnboardingPage />} /> */}
         <Route
           path="/"
           element={

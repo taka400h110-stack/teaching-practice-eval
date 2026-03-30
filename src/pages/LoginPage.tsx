@@ -148,21 +148,16 @@ export default function LoginPage() {
       const result = await apiClient.login(loginEmail, loginPw) as any;
       const user = apiClient.getCurrentUser();
       console.log("LOGIN RESULT", result, "USER", user);
-      if (result.requiresOnboarding) {
-        navigate("/onboarding");
+      const rawRole = user?.role || user?.user?.role || user?.roles?.[0] || 'student';
+      const roleStr = typeof rawRole === 'string' ? rawRole : (Array.isArray(rawRole) ? rawRole[0] : 'student');
+      const role = String(roleStr).toLowerCase();
+      
+      if (role === 'admin' || role === 'researcher') {
+        navigate("/admin");
+      } else if (role === 'teacher' || role === 'univ_teacher' || role === 'school_mentor') {
+        navigate("/teacher-dashboard");
       } else {
-        const user = apiClient.getCurrentUser();
-        const rawRole = user?.role || user?.user?.role || user?.roles?.[0] || 'student';
-        const roleStr = typeof rawRole === 'string' ? rawRole : (Array.isArray(rawRole) ? rawRole[0] : 'student');
-        const role = String(roleStr).toLowerCase();
-        
-        if (role === 'admin' || role === 'researcher') {
-          navigate("/admin");
-        } else if (role === 'teacher' || role === 'univ_teacher' || role === 'school_mentor') {
-          navigate("/teacher-dashboard");
-        } else {
-          navigate("/dashboard");
-        }
+        navigate("/dashboard");
       }
     } catch {
       setError("ログインに失敗しました。");

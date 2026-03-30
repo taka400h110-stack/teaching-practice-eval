@@ -151,13 +151,7 @@ const apiClient = {
     localStorage.setItem("user_info", JSON.stringify(user));
     localStorage.setItem("auth_token", data.token);
     
-    // Check if onboarding is done (for students)
-    const onboardingDone = localStorage.getItem(`onboarding_done_${user.id}`);
-    if (!onboardingDone && user.role === "student") {
-      localStorage.setItem("pending_onboarding", "true");
-    }
-    
-    return { ...user, requiresOnboarding: !onboardingDone && user.role === "student" };
+    return { ...user, requiresOnboarding: false };
   },
   logout: async () => {
     
@@ -194,7 +188,7 @@ const apiClient = {
     }
   },
 
-  requiresOnboarding: () => localStorage.getItem("pending_onboarding") === "true",
+  requiresOnboarding: () => false,
   completeOnboarding: (userId: string) => {
     localStorage.setItem(`onboarding_done_${userId}`, "true");
     localStorage.removeItem("pending_onboarding");
