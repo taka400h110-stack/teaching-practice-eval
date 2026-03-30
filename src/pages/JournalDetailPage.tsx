@@ -581,6 +581,16 @@ const JournalDetailPage: React.FC = () => {
   });
   const hourRecords = parseHourRecords(journal.content);
   const isNewFormat = hourRecords !== null;
+  
+  let actualReflectionText = journal.reflection_text;
+  if (!actualReflectionText && journal.content) {
+    try {
+      const p = JSON.parse(journal.content);
+      if (p.version === 2 && p.reflection) {
+        actualReflectionText = p.reflection;
+      }
+    } catch {}
+  }
 
   // ── コメント入力 ──
   // 実習形態ベースでコメント種別を判定
@@ -664,7 +674,7 @@ const JournalDetailPage: React.FC = () => {
             try {
               const p = JSON.parse(journal.content);
               // version:2形式だがrecordsが空の場合
-              if (p.version === 2) return p.reflection || journal.reflection_text || null;
+              if (p.version === 2) return p.reflection || actualReflectionText || null;
               return journal.content;
             } catch {
               return journal.content;
@@ -681,10 +691,10 @@ const JournalDetailPage: React.FC = () => {
 
       {/* 省察 */}
       <Section icon={<PsychologyIcon />} title="省察・振り返り" color="secondary.main" bgcolor="#F3E5F5" borderColor="#CE93D8">
-        <BodyText text={journal.reflection_text} fallback="（省察テキストなし）" />
-        {journal.reflection_text && (
+        <BodyText text={actualReflectionText} fallback="（省察テキストなし）" />
+        {actualReflectionText && (
           <Typography variant="caption" color="text.disabled" display="block" textAlign="right" mt={1}>
-            {journal.reflection_text.length} 文字
+            {actualReflectionText.length} 文字
           </Typography>
         )}
       </Section>

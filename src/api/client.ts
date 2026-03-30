@@ -211,7 +211,8 @@ const apiClient = {
   getJournal: async (id: string): Promise<JournalEntry> => {
     const res = await apiFetch(`/api/data/journals/${id}`, { headers: {  } });
     if (!res.ok) throw new Error(`Journal ${id} not found`);
-    return await res.json();
+    const data = await res.json() as any;
+    return data.journal || data;
   },
   createJournal: async (data: Record<string, unknown>): Promise<JournalEntry> => {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
