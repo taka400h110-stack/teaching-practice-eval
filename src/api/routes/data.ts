@@ -532,9 +532,16 @@ dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_
     const { condition, params } = buildScopeFilter(scope, "student_id");
     
     let query;
+    const cond = condition.replace(/student_id/g, 'journal_entries.student_id');
     if (journalId) {
-      // Need to join journal to get student_id or assume evaluation has it
-      query = db.prepare(`SELECT * FROM evaluations WHERE journal_id = ? AND ${condition} ORDER BY evaluated_at DESC`).bind(journalId, ...params);
+      // Need to join journal to get student_id
+      query = db.prepare(`
+        SELECT evaluations.*, journal_entries.student_id 
+        FROM evaluations 
+        JOIN journal_entries ON evaluations.journal_id = journal_entries.id
+        WHERE evaluations.journal_id = ? AND ${cond} 
+        ORDER BY evaluations.created_at DESC
+      `).bind(journalId, ...params);
     } else if (studentId) {
       if (!assertCanAccessStudent(scope, studentId)) {
         setAuditReadContext(c, {
@@ -544,9 +551,21 @@ dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_
         });
         return c.json({ success: false, error: "forbidden" }, 403);
       }
-      query = db.prepare("SELECT * FROM evaluations WHERE student_id = ? ORDER BY evaluated_at DESC").bind(studentId);
+      query = db.prepare(`
+        SELECT evaluations.*, journal_entries.student_id 
+        FROM evaluations 
+        JOIN journal_entries ON evaluations.journal_id = journal_entries.id
+        WHERE journal_entries.student_id = ? 
+        ORDER BY evaluations.created_at DESC
+      `).bind(studentId);
     } else {
-      query = db.prepare(`SELECT * FROM evaluations WHERE ${condition} ORDER BY evaluated_at DESC`).bind(...params);
+      query = db.prepare(`
+        SELECT evaluations.*, journal_entries.student_id 
+        FROM evaluations 
+        JOIN journal_entries ON evaluations.journal_id = journal_entries.id
+        WHERE ${cond} 
+        ORDER BY evaluations.created_at DESC
+      `).bind(...params);
     }
 
     const { results } = await query.all();
