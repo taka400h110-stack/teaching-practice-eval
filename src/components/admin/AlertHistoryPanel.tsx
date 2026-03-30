@@ -19,7 +19,7 @@ export const AlertHistoryPanel: React.FC = () => {
     limit: 50,
   });
 
-  const { data, isLoading, error, refetch } = useCleanupAlertHistory(query);
+  const { data, isLoadingrror, refetch } = useCleanupAlertHistory(query);
   const [selectedRow, setSelectedRow] = useState<AlertHistoryRow | null>(null);
 
   const handleQueryChange = (key: keyof AlertHistoryQuery, value: any) => {
@@ -28,7 +28,7 @@ export const AlertHistoryPanel: React.FC = () => {
 
   const handleExportCSV = () => {
     if (!data?.items) return;
-    const headers = ["ID", "Time", "Event Type", "Severity", "Channel", "Outcome", "Fingerprint", "Reason", "Error Count"];
+    const headers = ["ID", "日時", "イベントタイプ", "重要度", "Channel", "結果", "Fingerprint", "Reason", "Error Count"];
     const rows = data.items.map(r => [
       r.id, 
       r.createdAt, 
@@ -55,7 +55,7 @@ export const AlertHistoryPanel: React.FC = () => {
     <Card sx={{ mt: 4 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">Cleanup Alert History</Typography>
+          <Typography variant="h6">クリーンアップアラート履歴</Typography>
           <Stack direction="row" spacing={1}>
             <Button startIcon={<Refresh />} onClick={() => refetch()} size="small" variant="outlined">
               Refresh
@@ -80,10 +80,10 @@ export const AlertHistoryPanel: React.FC = () => {
           </ToggleButtonGroup>
 
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Event Type</InputLabel>
+            <InputLabel>イベントタイプ</InputLabel>
             <Select
               value={query.eventTypes || ""}
-              label="Event Type"
+              label="イベントタイプ"
               onChange={(e) => handleQueryChange('eventTypes', e.target.value)}
             >
               <MenuItem value="">All</MenuItem>
@@ -96,10 +96,10 @@ export const AlertHistoryPanel: React.FC = () => {
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Severity</InputLabel>
+            <InputLabel>重要度</InputLabel>
             <Select
               value={query.severities || ""}
-              label="Severity"
+              label="重要度"
               onChange={(e) => handleQueryChange('severities', e.target.value)}
             >
               <MenuItem value="">All</MenuItem>
@@ -127,21 +127,21 @@ export const AlertHistoryPanel: React.FC = () => {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Time</TableCell>
-                <TableCell>Event Type</TableCell>
-                <TableCell>Severity</TableCell>
-                <TableCell>Outcome</TableCell>
-                <TableCell>Fingerprint / Reason</TableCell>
-                <TableCell align="right">Action</TableCell>
+                <TableCell>日時</TableCell>
+                <TableCell>イベントタイプ</TableCell>
+                <TableCell>重要度</TableCell>
+                <TableCell>結果</TableCell>
+                <TableCell>フィンガープリント / 理由</TableCell>
+                <TableCell align="right">アクション</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} align="center">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} align="center">読み込み中...</TableCell></TableRow>
               ) : error ? (
-                <TableRow><TableCell colSpan={6} align="center" sx={{ color: 'error.main' }}>Error loading data</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} align="center" sx={{ color: 'error.main' }}>データの読み込みに失敗しました</TableCell></TableRow>
               ) : !data || !Array.isArray(data.items) || data.items.length === 0 ? (
-                <TableRow><TableCell colSpan={6} align="center">No records found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} align="center">レコードが見つかりません</TableCell></TableRow>
               ) : (
                 data.items.map((row) => (
                   <TableRow key={row.id || Math.random()} hover>
@@ -174,7 +174,7 @@ export const AlertHistoryPanel: React.FC = () => {
         <Drawer anchor="right" open={Boolean(selectedRow)} onClose={() => setSelectedRow(null)}>
           <Box sx={{ width: 400, p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Event Details</Typography>
+              <Typography variant="h6">イベント詳細</Typography>
               <IconButton onClick={() => setSelectedRow(null)}><Close /></IconButton>
             </Box>
             {selectedRow && (
@@ -184,11 +184,11 @@ export const AlertHistoryPanel: React.FC = () => {
                   <Typography variant="body2">{selectedRow.id}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="subtitle2" color="textSecondary">Time</Typography>
+                  <Typography variant="subtitle2" color="textSecondary">日時</Typography>
                   <Typography variant="body2">{new Date(selectedRow.createdAt).toLocaleString()}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="subtitle2" color="textSecondary">Event Type</Typography>
+                  <Typography variant="subtitle2" color="textSecondary">イベントタイプ</Typography>
                   <Chip size="small" label={selectedRow.eventType} />
                 </Box>
                 <Box>
@@ -196,11 +196,11 @@ export const AlertHistoryPanel: React.FC = () => {
                   <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{selectedRow.fingerprint}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="subtitle2" color="textSecondary">Outcome</Typography>
+                  <Typography variant="subtitle2" color="textSecondary">結果</Typography>
                   <Typography variant="body2">{selectedRow.outcome}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="subtitle2" color="textSecondary">Severity / Channel</Typography>
+                  <Typography variant="subtitle2" color="textSecondary">重要度 / Channel</Typography>
                   <Typography variant="body2">{selectedRow.severity || 'N/A'} / {selectedRow.channel || 'N/A'}</Typography>
                 </Box>
                 <Box>
@@ -213,7 +213,7 @@ export const AlertHistoryPanel: React.FC = () => {
                 </Box>
                 {selectedRow.changeSummaryJson && (
                   <Box>
-                    <Typography variant="subtitle2" color="textSecondary">Change Summary</Typography>
+                    <Typography variant="subtitle2" color="textSecondary">変更の要約</Typography>
                     <Box component="pre" sx={{ bgcolor: 'grey.100', p: 1, borderRadius: 1, overflowX: 'auto', fontSize: '0.75rem' }}>
                       {JSON.stringify(JSON.parse(selectedRow.changeSummaryJson), null, 2)}
                     </Box>

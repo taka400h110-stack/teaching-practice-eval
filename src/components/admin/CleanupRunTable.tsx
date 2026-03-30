@@ -22,8 +22,8 @@ export const CleanupRunTable: React.FC<Props> = ({ runs }) => {
                 <TableCell>Date</TableCell>
                 <TableCell>Cron</TableCell>
                 <TableCell>Outcome</TableCell>
-                <TableCell align="right">Tokens</TableCell>
-                <TableCell align="right">Objects</TableCell>
+                <TableCell align="right">トークン</TableCell>
+                <TableCell align="right">オブジェクト</TableCell>
                 <TableCell align="right">Orphans</TableCell>
                 <TableCell align="right">Errors</TableCell>
                 <TableCell>Dry Run</TableCell>
@@ -45,8 +45,8 @@ export const CleanupRunTable: React.FC<Props> = ({ runs }) => {
                     {row.outcome === 'failed' && <Chip label="Failed" color="error" size="small" />}
                     {row.outcome === 'warning' && <Chip label="Warning" color="warning" size="small" />}
                   </TableCell>
-                  <TableCell align="right">{row.deletedTokens}</TableCell>
-                  <TableCell align="right">{row.deletedObjects}</TableCell>
+                  <TableCell align="right">{row.deletedトークン}</TableCell>
+                  <TableCell align="right">{row.deletedオブジェクト}</TableCell>
                   <TableCell align="right">{row.deletedOrphans}</TableCell>
                   <TableCell align="right" sx={{ color: row.errors > 0 ? 'error.main' : 'inherit' }}>
                     {row.errors}

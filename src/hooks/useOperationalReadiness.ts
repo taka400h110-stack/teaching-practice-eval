@@ -10,6 +10,8 @@ export function useOperationalReadiness() {
       if (!res.ok) throw new Error('Failed to fetch operational readiness');
       return res.json();
     },
-    refetchInterval: 60000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 }

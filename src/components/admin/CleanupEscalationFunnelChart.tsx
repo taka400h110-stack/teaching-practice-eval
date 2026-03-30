@@ -13,7 +13,7 @@ export const CleanupEscalationFunnelChart = ({ data }: { data: any }) => {
   return (
     <Card variant="outlined" sx={{ height: '100%' }}>
       <CardContent>
-        <Typography variant="h6" gutterBottom>Escalation Funnel</Typography>
+        <Typography variant="h6" gutterBottom>エスカレーションファネル</Typography>
         <Box height={300}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>

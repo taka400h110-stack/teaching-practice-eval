@@ -7,8 +7,8 @@ export function useCleanupAlertHistory(query: AlertHistoryQuery) {
   return useQuery<AlertHistoryResponse, Error>({
     queryKey: ["admin", "cleanupAlertHistory", query],
     queryFn: () => getCleanupAlertHistory(query),
-    staleTime: 60 * 1000,
-    refetchInterval: 60 * 1000,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 }

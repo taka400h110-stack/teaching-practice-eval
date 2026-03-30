@@ -23,10 +23,10 @@ export const CleanupMetricsPanel: React.FC = () => {
       <Box sx={{ mt: 4 }}>
         <Alert severity="error" action={
           <Button color="inherit" size="small" onClick={() => refetch()}>
-            Retry
+            再試行
           </Button>
         }>
-          Failed to load cleanup metrics.
+          クリーンアップメトリクスの読み込みに失敗しました。
         </Alert>
       </Box>
     );
@@ -36,27 +36,27 @@ export const CleanupMetricsPanel: React.FC = () => {
     <Box sx={{ mt: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" component="h2">
-          Cleanup Metrics
+          クリーンアップ実行指標
         </Typography>
         <ButtonGroup size="small">
           <Button 
             variant={range === '7d' ? 'contained' : 'outlined'} 
             onClick={() => setRange('7d')}
           >
-            7 Days
+            7日間
           </Button>
           <Button 
             variant={range === '30d' ? 'contained' : 'outlined'} 
             onClick={() => setRange('30d')}
           >
-            30 Days
+            30日間
           </Button>
         </ButtonGroup>
       </Box>
 
       {data.summary.executions === 0 ? (
         <Alert severity="info" sx={{ mb: 2 }}>
-          No cleanup executions found in the selected period.
+          選択された期間にクリーンアップの実行記録がありません。
         </Alert>
       ) : null}
 

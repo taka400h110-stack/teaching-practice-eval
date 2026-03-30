@@ -6,6 +6,8 @@ export function useCleanupMetrics(range: "7d" | "30d") {
   return useQuery<CleanupMetricsResponse>({
     queryKey: ["admin", "cleanupMetrics", range],
     queryFn: () => getCleanupMetrics(range),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 }

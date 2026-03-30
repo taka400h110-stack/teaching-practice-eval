@@ -13,7 +13,7 @@ export const CleanupKpiCards: React.FC<Props> = ({ summary }) => {
         <Card>
           <CardContent>
             <Typography color="textSecondary" gutterBottom>
-              Executions
+              実行回数
             </Typography>
             <Typography variant="h4">{summary.executions}</Typography>
           </CardContent>
@@ -27,7 +27,7 @@ export const CleanupKpiCards: React.FC<Props> = ({ summary }) => {
             </Typography>
             <Typography variant="h4">{summary.deletedTotal}</Typography>
             <Typography variant="caption" color="textSecondary">
-              Tokens: {summary.deletedTokens} / Objects: {summary.deletedObjects}
+              トークン: {summary.deletedTokens} / オブジェクト: {summary.deletedObjects}
             </Typography>
           </CardContent>
         </Card>
@@ -36,7 +36,7 @@ export const CleanupKpiCards: React.FC<Props> = ({ summary }) => {
         <Card>
           <CardContent>
             <Typography color="textSecondary" gutterBottom>
-              Errors
+              エラー数
             </Typography>
             <Typography variant="h4" color={summary.errors > 0 ? "error" : "inherit"}>
               {summary.errors}

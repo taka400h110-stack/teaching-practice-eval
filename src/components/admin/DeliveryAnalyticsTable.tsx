@@ -8,22 +8,22 @@ export const DeliveryAnalyticsTable = ({ failures }: { failures: any[] }) => {
   return (
     <Card variant="outlined" sx={{ mt: 3 }}>
       <CardContent>
-        <Typography variant="h6" gutterBottom>Recent Delivery Failures</Typography>
+        <Typography variant="h6" gutterBottom>最近の配信失敗</Typography>
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Date</TableCell>
-                <TableCell>Provider</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Fingerprint</TableCell>
-                <TableCell>Reason</TableCell>
+                <TableCell>日時</TableCell>
+                <TableCell>プロバイダー</TableCell>
+                <TableCell>ステータス</TableCell>
+                <TableCell>フィンガープリント</TableCell>
+                <TableCell>理由</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {safeFailures.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">No recent failures found</TableCell>
+                  <TableCell colSpan={5} align="center">最近の失敗はありません</TableCell>
                 </TableRow>
               ) : (
                 safeFailures.map((f) => (

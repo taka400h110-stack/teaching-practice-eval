@@ -355,16 +355,19 @@ export default function JournalWorkflowPage() {
   const { data: allJournals = [] } = useQuery({
     queryKey: ["journals"],
     queryFn:  () => apiClient.getJournals(),
+    enabled: historyOpen, // ダイアログを開いたときのみ取得
   });
 
   const { data: allEvals = [] } = useQuery({
     queryKey: ["allEvaluations"],
     queryFn:  () => apiClient.getAllEvaluations(),
+    enabled: step >= 1, // 評価結果が必要になるタブ以降で取得
   });
 
   const { data: chatSession } = useQuery({
     queryKey: ["chat", savedJournalId ?? "journal-004"],
     queryFn:  () => apiClient.getChatSession(savedJournalId ?? "journal-004"),
+    enabled: step === 2 && !!savedJournalId, // チャットタブ表示時のみ取得
   });
 
   // 既存データ復元（URLパラメータで日誌を開いた時）

@@ -6,7 +6,7 @@ export const DeliveryOutcomeTrendChart = ({ data }: { data: any[] }) => {
   return (
     <Card variant="outlined" sx={{ height: '100%' }}>
       <CardContent>
-        <Typography variant="h6" gutterBottom>Delivery Trend</Typography>
+        <Typography variant="h6" gutterBottom>配信トレンド</Typography>
         <Box height={300}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>

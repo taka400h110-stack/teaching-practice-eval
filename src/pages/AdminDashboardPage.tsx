@@ -61,7 +61,8 @@ export default function AdminDashboardPage() {
       } catch (e) {
         return [];
       }
-    }
+    },
+    enabled: tab === 3,
   });
   
   const [page, setPage] = useState(0);
@@ -128,17 +129,23 @@ export default function AdminDashboardPage() {
         システム稼働中 — 最終同期: {new Date().toLocaleString("ja-JP")}
       </Alert>
 
-            <CleanupMetricsPanel />
-      <ProviderHealthPanel />
-        <DeliveryAnalyticsPanel />
-        <AlertHistoryPanel />
-      <Box sx={{ mt: 4 }} />
+      <Box sx={{ mt: 2 }} />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
         <Tab label="学校種別統計" />
         <Tab label="ユーザー管理" />
         <Tab label="システム情報" />
         <Tab label="データエクスポート" />
+        <Tab label="監視・アラート" />
       </Tabs>
+
+      {tab === 4 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <CleanupMetricsPanel />
+          <ProviderHealthPanel />
+          <DeliveryAnalyticsPanel />
+          <AlertHistoryPanel />
+        </Box>
+      )}
 
       {tab === 3 && (
         <Card>

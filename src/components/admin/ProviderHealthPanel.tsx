@@ -7,7 +7,7 @@ import { useOperationalReadiness } from '../../hooks/useOperationalReadiness';
 export const ProviderHealthPanel: React.FC = () => {
   const { data, isLoading, error } = useOperationalReadiness();
 
-  if (isLoading) return <Typography>Loading readiness status...</Typography>;
+  if (isLoading) return <Typography>ステータスを読み込んでいます...</Typography>;
   if (error || !data) return <Alert severity="error">Failed to load readiness status.</Alert>;
 
   const blockingIssues = Array.isArray(data.readiness?.blockingIssues) ? data.readiness.blockingIssues : [];
@@ -18,10 +18,10 @@ export const ProviderHealthPanel: React.FC = () => {
     <Card sx={{ mb: 4 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">Operational Readiness & Provider Health</Typography>
+          <Typography variant="h6">システム稼働状況とプロバイダーの健全性</Typography>
           <Box>
             {data.readiness?.ok ? (
-              <Chip icon={<CheckCircleIcon />} label="System Ready" color="success" />
+              <Chip icon={<CheckCircleIcon />} label="System 準備完了" color="success" />
             ) : (
               <Chip icon={<WarningIcon />} label="Issues Detected" color="error" />
             )}
@@ -43,7 +43,7 @@ export const ProviderHealthPanel: React.FC = () => {
           </Alert>
         )}
 
-        <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>Provider Status</Typography>
+        <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>プロバイダーのステータス</Typography>
         <Grid container spacing={2}>
           {providers.map(provider => (
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={provider.name || Math.random()}>
@@ -69,7 +69,7 @@ export const ProviderHealthPanel: React.FC = () => {
                     />
                   </Box>
                   <Typography variant="body2" color="textSecondary">
-                    24h Failures: <strong>{provider.failureCount24h}</strong> ({provider.failureRate24h != null ? (provider.failureRate24h * 100).toFixed(1) : 0}%)
+                    24時間以内のエラー: <strong>{provider.failureCount24h}</strong> ({provider.failureRate24h != null ? (provider.failureRate24h * 100).toFixed(1) : 0}%)
                   </Typography>
                   {provider.lastError && (
                     <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>

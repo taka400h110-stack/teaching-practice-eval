@@ -7,7 +7,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
       <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
-            <Typography color="text.secondary" variant="caption">Total Notifications</Typography>
+            <Typography color="text.secondary" variant="caption">総通知数</Typography>
             <Typography variant="h5">{summary?.totalNotifications || 0}</Typography>
           </CardContent>
         </Card>
@@ -15,7 +15,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
       <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
-            <Typography color="text.secondary" variant="caption">Success Rate</Typography>
+            <Typography color="text.secondary" variant="caption">成功率</Typography>
             <Typography variant="h5" color={summary?.successRate > 90 ? 'success.main' : 'warning.main'}>
               {summary?.successRate?.toFixed(1) || 0}%
             </Typography>
@@ -25,7 +25,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
       <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
-            <Typography color="text.secondary" variant="caption">Bounce Rate</Typography>
+            <Typography color="text.secondary" variant="caption">バウンス率</Typography>
             <Typography variant="h5" color={summary?.bounceRate > 5 ? 'error.main' : 'text.primary'}>
               {summary?.bounceRate?.toFixed(1) || 0}%
             </Typography>
@@ -35,7 +35,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
       <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
-            <Typography color="text.secondary" variant="caption">Resend / SendGrid Fail Rate</Typography>
+            <Typography color="text.secondary" variant="caption">プロバイダー別失敗率</Typography>
             <Box display="flex" gap={1}>
               <Typography variant="h6">{summary?.providerFailureRate?.resend?.toFixed(1) || 0}%</Typography>
               <Typography variant="h6">/</Typography>
@@ -47,7 +47,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
       <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
-            <Typography color="text.secondary" variant="caption">Escalation L3 Reach Rate</Typography>
+            <Typography color="text.secondary" variant="caption">L3エスカレーション到達率</Typography>
             <Typography variant="h5" color={summary?.escalationReachRate?.l3 > 0 ? 'error.main' : 'text.primary'}>
               {summary?.escalationReachRate?.l3?.toFixed(1) || 0}%
             </Typography>
