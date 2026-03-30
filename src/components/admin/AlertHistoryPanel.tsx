@@ -19,7 +19,7 @@ export const AlertHistoryPanel: React.FC = () => {
     limit: 50,
   });
 
-  const { data, isLoadingrror, refetch } = useCleanupAlertHistory(query);
+  const { data, isLoading, error, refetch } = useCleanupAlertHistory(query);
   const [selectedRow, setSelectedRow] = useState<AlertHistoryRow | null>(null);
 
   const handleQueryChange = (key: keyof AlertHistoryQuery, value: any) => {

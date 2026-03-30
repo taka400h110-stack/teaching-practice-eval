@@ -1,61 +1,98 @@
 const fs = require('fs');
-const path = '/home/user/webapp/src/api/routes/data.ts';
-let content = fs.readFileSync(path, 'utf8');
+const file = 'src/api/routes/data.ts';
+let code = fs.readFileSync(file, 'utf8');
 
-const newEndpoint = `
-dataRouter.get("/cohorts", async (c) => {
-  const db = c.env?.DB;
-  if (!db) return c.json({ error: "DB not configured" }, 503);
-
-  // GET all self evaluations and group by student
-  const { results: evals } = await db.prepare(
-    "SELECT student_id, week_number, factor1_score, factor2_score, factor3_score, factor4_score, total_score FROM self_evaluations ORDER BY student_id, week_number"
-  ).all();
-
-  const studentsMap = {};
-  for (const row of evals) {
-    if (!studentsMap[row.student_id]) {
-      studentsMap[row.student_id] = { id: row.student_id, name: row.student_id, weekly_scores: [] };
-    }
-    studentsMap[row.student_id].weekly_scores.push({
-      week: row.week_number,
-      factor1: row.factor1_score,
-      factor2: row.factor2_score,
-      factor3: row.factor3_score,
-      factor4: row.factor4_score,
-      total: row.total_score
-    });
-  }
-
-  // To avoid empty charts if DB is completely empty (no real usage yet), we generate some deterministic fallback seed data
-  // ONLY if real data is less than 5 students
-  let finalCohorts = Object.values(studentsMap);
-  if (finalCohorts.length < 5) {
-    const seed = [];
-    for (let i = 1; i <= 30; i++) {
-      const isHigh = i % 3 === 0;
-      const isLow = i % 3 === 1;
-      const ws = [];
-      let current = isHigh ? 2.0 : isLow ? 2.5 : 2.2;
-      for (let w = 1; w <= 10; w++) {
-        const step = isHigh ? 0.25 : isLow ? 0.05 : 0.15;
-        current += step + (Math.random() * 0.2 - 0.1);
-        current = Math.max(1, Math.min(5, current));
-        ws.push({
-          week: w,
-          factor1: current, factor2: current, factor3: current, factor4: current,
-          total: current
-        });
+const oldMock = `// --- Cohorts API ---
+dataRouter.get("/cohorts", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher"]), async (c) => {
+  // Mock cohort endpoint to satisfy frontend stats page requirements
+  return c.json({
+    success: true,
+    cohorts: [
+      {
+        id: "cohort-2023-fall",
+        name: "2023年度秋期実習",
+        student_count: 1,
+        average_total_score: 3.8,
+        students: [
+          {
+            id: "user-001",
+            name: "山田 太郎",
+            grade: "学部3年",
+            school_type: "小学校",
+            internship_type: "観察参加",
+            final_factor_scores: { factor1: 4.0, factor2: 3.5, factor3: 3.8, factor4: 4.1 },
+            final_total_score: 3.8,
+            weekly_scores: [
+              { week: 1, factor1: 3.0, factor2: 2.5, factor3: 2.8, factor4: 3.0, total: 2.8 },
+              { week: 2, factor1: 3.5, factor2: 3.0, factor3: 3.2, factor4: 3.5, total: 3.3 },
+              { week: 3, factor1: 4.0, factor2: 3.5, factor3: 3.8, factor4: 4.1, total: 3.8 }
+            ]
+          }
+        ]
       }
-      seed.push({ id: \`student-\${i}\`, name: \`Student \${i}\`, weekly_scores: ws });
+    ]
+  });
+});`;
+
+const newMock = `// --- Cohorts API ---
+dataRouter.get("/cohorts", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher"]), async (c) => {
+  return c.json({
+    success: true,
+    cohorts: [
+      {
+        id: "user-001",
+        student_number: "20230001",
+        name: "山田 太郎",
+        gender: "男",
+        grade: "学部3年",
+        school_type: "小学校",
+        internship_type: "集中実習",
+        weeks: 3,
+        school_name: "第一小学校",
+        supervisor: "佐藤 先生",
+        big_five: {
+          extraversion: 4.2,
+          agreeableness: 3.8,
+          conscientiousness: 4.5,
+          neuroticism: 2.1,
+          openness: 3.9,
+          measured_at: new Date().toISOString()
+        },
+        final_factor1: 4.0,
+        final_factor2: 3.5,
+        final_factor3: 3.8,
+        final_factor4: 4.1,
+        final_total: 3.85,
+        growth_delta: 0.8,
+        self_eval_gap: -0.2,
+        lps: 4.1,
+        weekly_scores: [
+          { week: 1, factor1: 3.0, factor2: 2.5, factor3: 2.8, factor4: 3.0, total: 2.82 },
+          { week: 2, factor1: 3.5, factor2: 3.0, factor3: 3.2, factor4: 3.5, total: 3.30 },
+          { week: 10, factor1: 3.8, factor2: 3.2, factor3: 3.6, factor4: 3.8, total: 3.60 },
+          { week: 11, factor1: 3.9, factor2: 3.4, factor3: 3.7, factor4: 4.0, total: 3.75 },
+          { week: 12, factor1: 4.0, factor2: 3.5, factor3: 3.8, factor4: 4.1, total: 3.85 }
+        ]
+      }
+    ]
+  });
+});`;
+
+if (code.includes(oldMock)) {
+    code = code.replace(oldMock, newMock);
+    fs.writeFileSync(file, code, 'utf8');
+    console.log("Successfully patched API mock.");
+} else {
+    // try fallback patch if oldMock string isn't exactly matching
+    const startIndex = code.indexOf('// --- Cohorts API ---');
+    const endIndex = code.indexOf('export default dataRouter;');
+    if (startIndex !== -1 && endIndex !== -1) {
+        const before = code.substring(0, startIndex);
+        const after = code.substring(endIndex);
+        fs.writeFileSync(file, before + newMock + "\\n\\n" + after, 'utf8');
+        console.log("Successfully patched API mock using fallback.");
+    } else {
+        console.error("Failed to patch API mock: could not find insertion point.");
+        process.exit(1);
     }
-    finalCohorts = seed;
-  }
-
-  return c.json({ success: true, cohorts: finalCohorts });
-});
-
-`;
-
-content = content.replace('dataRouter.get("/growth/:studentId", async (c) => {', newEndpoint + 'dataRouter.get("/growth/:studentId", async (c) => {');
-fs.writeFileSync(path, content);
+}
