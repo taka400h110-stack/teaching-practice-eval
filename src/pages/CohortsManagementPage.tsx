@@ -89,7 +89,7 @@ export default function CohortsManagementPage() {
     profiles.forEach((p: any) => {
       if (!map[p.school_type]) map[p.school_type] = { n: 0, total: 0 };
       map[p.school_type].n++;
-      map[p.school_type].total += p.final_total;
+      map[p.school_type].total += (p.final_total ?? 0);
     });
     return Object.entries(map).map(([type, v]) => ({
       type: SCHOOL_TYPE_LABELS[type] ?? type,
@@ -204,7 +204,7 @@ export default function CohortsManagementPage() {
                       <TableCell>{p.final_factor2}</TableCell>
                       <TableCell>{p.final_factor3}</TableCell>
                       <TableCell>{p.final_factor4}</TableCell>
-                      <TableCell><b>{p.final_total}</b></TableCell>
+                      <TableCell><b>{(p.final_total ?? 0)}</b></TableCell>
                       <TableCell>
                         <Chip label={`+${p.growth_delta}`} size="small"
                           color={p.growth_delta >= 0.8 ? "success" : p.growth_delta >= 0.5 ? "primary" : "default"}
@@ -325,7 +325,7 @@ export default function CohortsManagementPage() {
                     <Scatter
                       name="学生"
                       data={filtered.map((p: any) => ({
-                        x: p.growth_delta, y: p.final_total,
+                        x: p.growth_delta, y: (p.final_total ?? 0),
                         name: p.name,
                       }))}
                       fill="#1976d2" opacity={0.7}
@@ -380,7 +380,7 @@ export default function CohortsManagementPage() {
                     const labels = ["外向性", "協調性", "誠実性", "神経症傾向", "開放性"];
                     return keys.map((k, i) => ({
                       factor: labels[i],
-                      value: +(profiles.reduce((s: any, p: any) => s + p.big_five[k], 0) / (profiles.length || 1)).toFixed(2),
+                      value: +(profiles.reduce((s: any, p: any) => s + (p.big_five?.[k] ?? 0), 0) / (profiles.length || 1)).toFixed(2),
                     }));
                   })()}>
                     <PolarGrid />
@@ -406,7 +406,7 @@ export default function CohortsManagementPage() {
                       label={{ value: "最終スコア", angle: -90, position: "insideLeft" }} />
                     <RechartTooltip />
                     <Scatter
-                      data={filtered.map((p: any) => ({ x: p.big_five.extraversion, y: p.final_total }))}
+                      data={filtered.map((p: any) => ({ x: (p.big_five?.extraversion ?? 0), y: (p.final_total ?? 0) }))}
                       fill="#7b1fa2" opacity={0.7}
                     />
                   </ScatterChart>

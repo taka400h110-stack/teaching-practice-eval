@@ -92,19 +92,19 @@ export default function StatisticsPage() {
       schoolTypeMap[p.school_type] ?? p.school_type,
       p.internship_type === "intensive" ? "集中実習" : "分散実習",
       String(p.weeks),
-      p.final_factor1.toFixed(3),
-      p.final_factor2.toFixed(3),
-      p.final_factor3.toFixed(3),
-      p.final_factor4.toFixed(3),
-      p.final_total.toFixed(3),
-      p.growth_delta.toFixed(3),
+      (p.final_factor1 ?? 0).toFixed(3),
+      (p.final_factor2 ?? 0).toFixed(3),
+      (p.final_factor3 ?? 0).toFixed(3),
+      (p.final_factor4 ?? 0).toFixed(3),
+      (p.final_total ?? 0).toFixed(3),
+      (p.growth_delta ?? 0).toFixed(3),
       (p.self_eval_gap ?? 0).toFixed(3),
       (p.lps ?? 0).toFixed(3),
-      p.big_five.extraversion.toFixed(2),
-      p.big_five.agreeableness.toFixed(2),
-      p.big_five.conscientiousness.toFixed(2),
-      p.big_five.neuroticism.toFixed(2),
-      p.big_five.openness.toFixed(2),
+      (p.big_five?.extraversion ?? 0).toFixed(2),
+      (p.big_five?.agreeableness ?? 0).toFixed(2),
+      (p.big_five?.conscientiousness ?? 0).toFixed(2),
+      (p.big_five?.neuroticism ?? 0).toFixed(2),
+      (p.big_five?.openness ?? 0).toFixed(2),
       p.school_name,
       p.supervisor,
     ]);
@@ -121,11 +121,11 @@ export default function StatisticsPage() {
           anonymize ? `ID-${p.id.slice(0, 4)}` : (p.student_number ?? p.id),
           anonymize ? "匿名ユーザー" : p.name,
           String(ws.week),
-          ws.factor1.toFixed(3),
-          ws.factor2.toFixed(3),
-          ws.factor3.toFixed(3),
-          ws.factor4.toFixed(3),
-          ws.total.toFixed(3),
+          (ws.factor1 ?? 0).toFixed(3),
+          (ws.factor2 ?? 0).toFixed(3),
+          (ws.factor3 ?? 0).toFixed(3),
+          (ws.factor4 ?? 0).toFixed(3),
+          (ws.total ?? 0).toFixed(3),
         ]);
       });
     });
@@ -476,7 +476,7 @@ export default function StatisticsPage() {
                               : "transparent",
                           }}
                         >
-                          {v.toFixed(2)}
+                          {(v ?? 0).toFixed(2)}
                         </TableCell>
                       ))}
                     </TableRow>
