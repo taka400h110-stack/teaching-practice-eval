@@ -1,0 +1,102 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "手書き日誌OCR" [level=6] [ref=e6]
+      - generic [ref=e8]: 実習生
+      - generic [ref=e10]: 実習生
+  - navigation [ref=e11]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - img [ref=e15]
+        - generic [ref=e17]:
+          - generic [ref=e18]: AI支援
+          - heading "教育実習評価システム" [level=6] [ref=e19]
+      - separator [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]: 山
+        - generic [ref=e23]:
+          - paragraph [ref=e24]: 山田 太郎
+          - generic [ref=e26]: 実習生
+          - generic [ref=e28]: 実習生
+          - generic [ref=e29]:
+            - generic [ref=e30]: "学籍: 2023A001"
+            - generic [ref=e31]: 3年生
+      - separator [ref=e32]
+      - generic [ref=e33]:
+        - button "週次サイクル（RQ3）" [ref=e34] [cursor=pointer]:
+          - generic [ref=e36]: 週次サイクル（RQ3）
+          - img [ref=e37]
+        - list [ref=e42]:
+          - button "ダッシュボード" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: ダッシュボード
+          - button "実習日誌ワークフロー" [ref=e49] [cursor=pointer]:
+            - img [ref=e51]
+            - generic [ref=e55]: 実習日誌ワークフロー
+          - button "手書き日誌OCR" [ref=e56] [cursor=pointer]:
+            - img [ref=e58]
+            - generic [ref=e61]: 手書き日誌OCR
+          - button "過去の日誌一覧" [ref=e62] [cursor=pointer]:
+            - img [ref=e64]
+            - generic [ref=e67]: 過去の日誌一覧
+          - button "チャット履歴" [ref=e68] [cursor=pointer]:
+            - img [ref=e70]
+            - generic [ref=e73]: チャット履歴
+        - button "自己評価・成長（RQ3）" [ref=e74] [cursor=pointer]:
+          - generic [ref=e76]: 自己評価・成長（RQ3）
+          - img [ref=e77]
+        - list [ref=e82]:
+          - button "自己評価入力" [ref=e83] [cursor=pointer]:
+            - img [ref=e85]
+            - generic [ref=e89]: 自己評価入力
+          - button "成長グラフ" [ref=e90] [cursor=pointer]:
+            - img [ref=e92]
+            - generic [ref=e95]: 成長グラフ
+          - button "目標履歴（SMART）" [ref=e96] [cursor=pointer]:
+            - img [ref=e98]
+            - generic [ref=e101]: 目標履歴（SMART）
+      - separator [ref=e102]
+      - list [ref=e103]:
+        - button "ログアウト" [ref=e104] [cursor=pointer]:
+          - img [ref=e106]
+          - generic [ref=e109]: ログアウト
+  - main [ref=e110]:
+    - generic [ref=e112]:
+      - generic [ref=e113]:
+        - button [ref=e114] [cursor=pointer]:
+          - img [ref=e115]
+        - img [ref=e117]
+        - generic [ref=e119]:
+          - heading "手書き日誌 OCR読み込み" [level=5] [ref=e120]
+          - text: Google Cloud Vision API / Tesseract.js フォールバック対応
+      - generic [ref=e121]:
+        - generic [ref=e123]:
+          - img [ref=e125]:
+            - generic [ref=e127]: "1"
+          - generic [ref=e129]: 画像を選択
+        - generic [ref=e133]:
+          - img [ref=e135]:
+            - generic [ref=e137]: "2"
+          - generic [ref=e139]: OCR解析
+        - generic [ref=e143]:
+          - img [ref=e145]:
+            - generic [ref=e147]: "3"
+          - generic [ref=e149]: 結果確認・編集
+        - generic [ref=e153]:
+          - img [ref=e155]:
+            - generic [ref=e157]: "4"
+          - generic [ref=e159]: フォームに反映
+      - generic [ref=e161]:
+        - heading "📷 画像を選択（最大20ページ）" [level=6] [ref=e162]
+        - paragraph [ref=e163]: "対応形式: JPG / PNG / HEIC / PDF 対応OCR: 手書き文字・印刷文字"
+        - generic [ref=e164]:
+          - button "カメラで撮影" [ref=e165] [cursor=pointer]:
+            - img [ref=e167]
+            - text: カメラで撮影
+          - button "ギャラリーから選択" [active] [ref=e170] [cursor=pointer]:
+            - img [ref=e172]
+            - text: ギャラリーから選択
+```

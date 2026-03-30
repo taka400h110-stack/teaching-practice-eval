@@ -30,7 +30,7 @@ export async function loginAs(page: Page, options: TestUserOptions | 'student' |
   
   // Wait for the login API and redirect
   await page.waitForURL(url => !url.href.includes('/login'), { timeout: 10000 });
-  await page.waitForLoadState('networkidle');
+  // await page.waitForLoadState('networkidle');
 }
 
 export async function expectLandingForState(page: Page, state: string, role: string) {

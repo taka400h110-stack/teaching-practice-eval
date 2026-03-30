@@ -6,7 +6,7 @@ import { AnalyticsRange } from '../../types/adminAnalytics';
 const app = new Hono<{ Bindings: Env }>();
 
 app.get('/delivery', async (c) => {
-  const user = c.get('user') as any;
+  const user = c.get('user' as any) as any;
   if (!user || user.role !== 'admin') {
     return c.json({ error: 'Forbidden' }, 403);
   }

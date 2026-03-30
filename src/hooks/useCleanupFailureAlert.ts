@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { getCleanupFailureAlert } from "../api/client";
-import { CleanupFailureAlertResponse } from "../types/adminAlerts";
+import { CleanupFailureAlertResponse, CleanupFailureAlertResponseWithAck } from "../types/adminAlerts";
 
 export function useCleanupFailureAlert() {
-  return useQuery<CleanupFailureAlertResponse, Error>({
+  return useQuery<CleanupFailureAlertResponseWithAck, Error>({
     queryKey: ["admin", "cleanupFailureAlert"],
     queryFn: () => getCleanupFailureAlert(),
     staleTime: 60 * 1000,

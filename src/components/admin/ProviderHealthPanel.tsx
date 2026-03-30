@@ -46,7 +46,7 @@ export const ProviderHealthPanel: React.FC = () => {
         <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>Provider Status</Typography>
         <Grid container spacing={2}>
           {providers.map(provider => (
-            <Grid item xs={12} sm={6} md={4} key={provider.name || Math.random()}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={provider.name || Math.random()}>
               <Card variant="outlined" sx={{ 
                 borderColor: provider.status === 'failing' ? 'error.main' : 
                              provider.status === 'degraded' ? 'warning.main' : 
@@ -72,7 +72,7 @@ export const ProviderHealthPanel: React.FC = () => {
                     24h Failures: <strong>{provider.failureCount24h}</strong> ({provider.failureRate24h != null ? (provider.failureRate24h * 100).toFixed(1) : 0}%)
                   </Typography>
                   {provider.lastError && (
-                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1, noWrap: true, textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                       {provider.lastError}
                     </Typography>
                   )}

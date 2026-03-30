@@ -20,8 +20,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import Button from "@mui/material/Button";
 import DownloadIcon from "@mui/icons-material/Download";
-import Button from "@mui/material/Button";
-import DownloadIcon from "@mui/icons-material/Download";
 import apiClient from "../api/client";
 
 const FACTOR_COLORS = {

@@ -44,13 +44,13 @@ export const DeliveryAnalyticsPanel = () => {
         <>
           <DeliveryKpiCards summary={data.summary} />
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <DeliveryProviderFailureChart data={data.providerBreakdown} />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <DeliveryOutcomeTrendChart data={data.dailySeries} />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <CleanupEscalationFunnelChart data={data.escalationFunnel} />
             </Grid>
           </Grid>

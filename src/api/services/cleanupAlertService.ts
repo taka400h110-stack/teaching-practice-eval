@@ -156,9 +156,9 @@ export async function getCleanupFailureAlert(
         resolveDeadlineAt = row.deadline_at;
         resolveBreached = !!row.breached_at;
       }
-      renotifyCount = Math.max(renotifyCount, row.notification_count || 0);
+      renotifyCount = Math.max(renotifyCount, (row.notification_count as number) || 0);
       if (row.last_notified_at) {
-        if (!lastRenotifiedAt || new Date(row.last_notified_at) > new Date(lastRenotifiedAt)) {
+        if (!lastRenotifiedAt || new Date(row.last_notified_at as string) > new Date(lastRenotifiedAt as string)) {
           lastRenotifiedAt = row.last_notified_at;
         }
       }

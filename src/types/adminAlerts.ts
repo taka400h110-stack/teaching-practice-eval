@@ -35,7 +35,7 @@ export type AlertHistoryRow = {
   createdAt: string;
   fingerprint: string | null;
   severity: "warning" | "critical" | "unknown";
-  eventType: "notify_sent" | "notify_suppressed" | "dismissed" | "alert_generated";
+  eventType: "notify_sent" | "notify_suppressed" | "dismissed" | "alert_generated" | "acknowledged";
   channel: "slack" | "email" | "ui" | null;
   outcome: "success" | "failed" | "suppressed" | "unknown";
   errorCount: number | null;
@@ -43,6 +43,7 @@ export type AlertHistoryRow = {
   topReason: string | null;
   reason: string | null;
   actorUserId: string | null;
+  changeSummaryJson?: string | null;
 };
 
 export type AlertAcknowledgment = {

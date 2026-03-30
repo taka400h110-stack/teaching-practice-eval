@@ -19,12 +19,12 @@ export async function calculateSlaDeadline(env: Env, severity: string, slaType: 
   let minutes = 0;
   if (slaType === 'ack') {
     minutes = severity === 'critical' ? 
-      parseInt(env.CLEANUP_ALERT_SLA_ACK_CRITICAL_MINUTES || '15', 10) : 
-      parseInt(env.CLEANUP_ALERT_SLA_ACK_WARNING_MINUTES || '60', 10);
+      parseInt(env.CLEANUP_ALERT_ACK_SLA_CRITICAL_MINUTES || '15', 10) : 
+      parseInt(env.CLEANUP_ALERT_ACK_SLA_WARNING_MINUTES || '60', 10);
   } else {
     minutes = severity === 'critical' ? 
-      parseInt(env.CLEANUP_ALERT_SLA_RESOLVE_CRITICAL_MINUTES || '240', 10) : 
-      parseInt(env.CLEANUP_ALERT_SLA_RESOLVE_WARNING_MINUTES || '1440', 10);
+      parseInt(env.CLEANUP_ALERT_RESOLVE_SLA_CRITICAL_MINUTES || '240', 10) : 
+      parseInt(env.CLEANUP_ALERT_RESOLVE_SLA_WARNING_MINUTES || '1440', 10);
   }
 
   return new Date(new Date(createdAt).getTime() + minutes * 60000).toISOString();

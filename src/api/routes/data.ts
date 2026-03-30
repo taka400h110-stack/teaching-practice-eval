@@ -2182,9 +2182,9 @@ dataRouter.post("/auth/login", async (c) => {
     // Generate actual JWT
     const payload = {
       id: (user as any).id,
-      email: user.email,
-      role: (user as any).role || (user.email.includes('admin') ? 'admin' : user.email.includes('researcher') ? 'researcher' : 'student'),
-      name: user.name,
+      email: (user as any).email,
+      role: (user as any).role || ((user as any).email.includes('admin') ? 'admin' : (user as any).email.includes('researcher') ? 'researcher' : 'student'),
+      name: (user as any).name,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours expiration
     };
     
@@ -2194,10 +2194,10 @@ dataRouter.post("/auth/login", async (c) => {
       success: true, 
       user: {
         id: (user as any).id,
-        email: user.email,
-        name: user.name,
-        role: (user as any).role || (user.email.includes('admin') ? 'admin' : user.email.includes('researcher') ? 'researcher' : 'student'),
-        student_number: user.student_number,
+        email: (user as any).email,
+        name: (user as any).name,
+        role: (user as any).role || ((user as any).email.includes('admin') ? 'admin' : (user as any).email.includes('researcher') ? 'researcher' : 'student'),
+        student_number: (user as any).student_number,
         grade: user.grade
       }, 
       token 

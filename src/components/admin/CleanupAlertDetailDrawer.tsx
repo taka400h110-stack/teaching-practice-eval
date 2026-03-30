@@ -37,17 +37,17 @@ export const CleanupAlertDetailDrawer: React.FC<Props> = ({ open, onClose, alert
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="subtitle2" color="textSecondary" gutterBottom>Assignee</Typography>
-        <CleanupAlertAssigneeSelect fingerprint={alert.fingerprint} currentAssigneeId={alert.acknowledgment?.assigneeUserId || null} />
+        <CleanupAlertAssigneeSelect fingerprint={alert.fingerprint || ''} currentAssignee={alert.acknowledgment?.assigneeUserId || null} />
       </Box>
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="subtitle2" color="textSecondary" gutterBottom>Escalation Timeline</Typography>
-        <CleanupAlertEscalationTimeline fingerprint={alert.fingerprint} />
+        <CleanupAlertEscalationTimeline fingerprint={alert.fingerprint || ''} />
       </Box>
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="subtitle2" color="textSecondary" gutterBottom>Comments</Typography>
-        <CleanupAlertCommentsList fingerprint={alert.fingerprint} />
+        <CleanupAlertCommentsList fingerprint={alert.fingerprint || ''} />
       </Box>
 
     </Drawer>

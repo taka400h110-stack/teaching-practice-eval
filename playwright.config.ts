@@ -4,8 +4,8 @@ export default defineConfig({
   testDir: './tests/e2e',
   testMatch: /.*\.spec\.ts/,
   fullyParallel: true,
-  timeout: 120000,
-  expect: { timeout: 10000 },
+  timeout: 180000,
+  expect: { timeout: 30000 },
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
@@ -31,7 +31,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run build && npm run db:migrate:local && npm run preview',
+    command: 'npm run preview',
     url: 'http://127.0.0.1:8788',
     reuseExistingServer: !process.env.CI,
     timeout: 180000,

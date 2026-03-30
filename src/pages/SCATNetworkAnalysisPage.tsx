@@ -10,7 +10,7 @@ export const SCATNetworkAnalysisPage: React.FC = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['scatNetwork', filterPeriod],
     queryFn: async () => {
-      return apiFetch('/api/data/scat/network');
+      const res = await apiFetch('/api/data/scat/network'); return res.json() as any;
     }
   });
 
@@ -33,7 +33,7 @@ export const SCATNetworkAnalysisPage: React.FC = () => {
 
   const handleExportCSV = () => {
     const csvContent = "Source,Target,Weight\n" + 
-      graphData.links.map((l: any) => `${l.source.id || l.source},${l.target.id || l.target},${l.val}`).join("\n");
+      (graphData?.links || []).map((l: any) => `${l.source.id || l.source},${l.target.id || l.target},${l.val}`).join("\n");
     
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

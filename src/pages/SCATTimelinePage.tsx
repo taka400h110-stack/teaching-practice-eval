@@ -9,7 +9,7 @@ export const SCATTimelinePage: React.FC = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['scatTimeline'],
     queryFn: async () => {
-      return apiFetch('/api/data/scat/network/timeline');
+      const res = await apiFetch('/api/data/scat/network/timeline'); return res.json() as any;
     }
   });
 

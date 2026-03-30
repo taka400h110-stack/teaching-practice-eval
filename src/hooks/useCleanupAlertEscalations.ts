@@ -7,7 +7,7 @@ export function useCleanupAlertEscalations(fingerprint: string | null) {
     queryFn: async () => {
       if (!fingerprint) return null;
       const res = await apiFetch(`/api/admin/alerts/cleanup-failure/escalations?fingerprint=${encodeURIComponent(fingerprint)}`);
-      const data = await res.json();
+      const data = await res.json() as any;
       return data.escalations || [];
     },
     enabled: !!fingerprint,

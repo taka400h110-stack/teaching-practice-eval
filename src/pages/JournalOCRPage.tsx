@@ -4,7 +4,7 @@
  * 論文第3章 3.7節：JournalOCRService
  * - Google Cloud Vision API（プライマリ）
  * - Tesseract.js（オフライン時フォールバック）
- * 最大5ページ、JPG/PNG/HEIC/PDF対応
+ * 最大20ページ、JPG/PNG/HEIC/PDF対応
  * 低信頼箇所の警告表示・フォームへの反映
  */
 import React, { useState, useRef, useCallback } from "react";
@@ -253,7 +253,7 @@ export default function JournalOCRPage() {
         canvas.toBlob((blob) => {
           if (blob) {
             const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
-            setSelectedFiles((prev) => [...prev, file].slice(0, 5));
+            setSelectedFiles((prev) => [...prev, file].slice(0, 20));
             setActiveStep(0);
           }
         }, "image/jpeg", 0.9);
@@ -267,15 +267,15 @@ export default function JournalOCRPage() {
   // ────────────────────────────
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const files = Array.from(e.target.files).slice(0, 5); // 最大5ページ
-    const allowed = ["image/jpeg", "image/png", "image/heic", "image/heif", "application/pdf"];
-    const valid = files.filter((f) => allowed.includes(f.type) || f.name.endsWith(".heic") || f.name.endsWith(".HEIC"));
+    const files = Array.from(e.target.files).slice(0, 20); // 最大20ページ
+    const allowed = ["image/jpeg", "image/png", "image/heic", "image/heif", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    const valid = files.filter((f) => allowed.includes(f.type) || f.name.endsWith(".heic") || f.name.endsWith(".HEIC") || f.name.endsWith(".docx"));
 
     if (valid.length !== files.length) {
-      setSnackbar({ open: true, message: "対応形式: JPG / PNG / HEIC / PDF", severity: "error" });
+      setSnackbar({ open: true, message: "対応形式: JPG / PNG / HEIC / PDF / DOCX", severity: "error" });
     }
     if (valid.length > 0) {
-      setSelectedFiles((prev) => [...prev, ...valid].slice(0, 5));
+      setSelectedFiles((prev) => [...prev, ...valid].slice(0, 20));
       setActiveStep(0);
     }
     e.target.value = "";
@@ -386,7 +386,7 @@ export default function JournalOCRPage() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" fontWeight={700} gutterBottom>
-              📷 画像を選択（最大5ページ）
+              📷 画像を選択（最大20ページ）
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={2}>
               対応形式: JPG / PNG / HEIC / PDF　対応OCR: 手書き文字・印刷文字
@@ -412,7 +412,7 @@ export default function JournalOCRPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/heic,application/pdf"
+              accept="image/jpeg,image/png,image/heic,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               multiple
               style={{ display: "none" }}
               onChange={handleFileSelect}
@@ -431,17 +431,23 @@ export default function JournalOCRPage() {
               <>
                 <Divider sx={{ my: 2 }} />
                 <Typography variant="subtitle2" gutterBottom>
-                  選択済み画像（{selectedFiles.length}/5ページ）
+                  選択済み画像（{selectedFiles.length}/20ページ）
                 </Typography>
                 <Grid container spacing={2}>
                   {selectedFiles.map((file, idx) => (
                     <Grid key={idx} size={{ xs: 6, sm: 4, md: 3 }}>
                       <Paper sx={{ p: 1, position: "relative" }}>
-                        <Box
-                          component="img"
-                          src={URL.createObjectURL(file)}
-                          sx={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 1 }}
-                        />
+                        {file.name.endsWith(".docx") ? (
+                          <Box sx={{ width: "100%", height: 120, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "grey.200", borderRadius: 1 }}>
+                            <Typography variant="body2" color="text.secondary">DOCX</Typography>
+                          </Box>
+                        ) : (
+                          <Box
+                            component="img"
+                            src={URL.createObjectURL(file)}
+                            sx={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 1 }}
+                          />
+                        )}
                         <Typography variant="caption" display="block" noWrap sx={{ mt: 0.5 }}>
                           P{idx + 1}: {file.name}
                         </Typography>

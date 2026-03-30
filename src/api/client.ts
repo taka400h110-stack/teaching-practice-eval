@@ -21,7 +21,7 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
  */
 
 import type { CleanupMetricsResponse } from "../types/adminMetrics";
-import type { CleanupFailureAlertResponse, AlertHistoryRow } from "../types/adminAlerts";
+import type { CleanupFailureAlertResponse, CleanupFailureAlertResponseWithAck, AlertHistoryRow } from "../types/adminAlerts";
 import type {
   JournalEntry, EvaluationResult, GrowthData, SelfEvaluation,
   LpsWeek, GoalEntry, ChatSession, UserRole, ChatMessage, User,
@@ -768,7 +768,7 @@ export async function getCleanupMetrics(range: "7d" | "30d"): Promise<CleanupMet
   return res.json();
 }
 
-export async function getCleanupFailureAlert(): Promise<CleanupFailureAlertResponse> {
+export async function getCleanupFailureAlert(): Promise<CleanupFailureAlertResponseWithAck> {
   const res = await apiFetch(`/api/admin/alerts/cleanup-failure`);
   if (!res.ok) throw new Error("Failed to fetch cleanup failure alert");
   return res.json();
@@ -821,12 +821,10 @@ export async function getCleanupAlertHistory(query: any): Promise<any> {
 }
 
 export async function acknowledgeCleanupFailureAlert(fingerprint: string, status: "acknowledged" | "investigating" | "resolved", note?: string): Promise<any> {
-  const token = getToken();
-  const res = await fetch(`${API_BASE_URL}/api/admin/alerts/cleanup-failure/acknowledge`, {
+  const res = await apiFetch(`/api/admin/alerts/cleanup-failure/acknowledge`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ fingerprint, status, note }),
   });

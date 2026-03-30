@@ -16,8 +16,8 @@ export async function runCleanupAlertSlaJob(env: Env) {
 
   // 2. Fetch breached SLAs that need notification
   // Wait interval logic (default 30 mins)
-  const renotifyIntervalMinutes = parseInt(env.CLEANUP_ALERT_SLA_RENOTIFY_INTERVAL_MINUTES || '30', 10);
-  const maxNotifCount = parseInt(env.CLEANUP_ALERT_SLA_MAX_RENOTIFY_COUNT || '3', 10);
+  const renotifyIntervalMinutes = parseInt(env.CLEANUP_ALERT_RENOTIFY_INTERVAL_MINUTES || '30', 10);
+  const maxNotifCount = parseInt(env.CLEANUP_ALERT_RENOTIFY_MAX_COUNT || '3', 10);
 
   const slasToNotify = await env.DB.prepare(`
     SELECT * FROM cleanup_alert_sla_events
@@ -27,8 +27,8 @@ export async function runCleanupAlertSlaJob(env: Env) {
   `).bind(maxNotifCount, renotifyIntervalMinutes).all();
 
   const notificationService = new NotificationService();
-  if (env.CLEANUP_ALERT_SLA_CHANNELS?.includes('slack')) notificationService.register(new SlackNotifier());
-  if (env.CLEANUP_ALERT_SLA_CHANNELS?.includes('email')) notificationService.register(new EmailNotifier());
+  if (env.CLEANUP_ALERT_RENOTIFY_CHANNELS?.includes('slack')) notificationService.register(new SlackNotifier());
+  if (env.CLEANUP_ALERT_RENOTIFY_CHANNELS?.includes('email')) notificationService.register(new EmailNotifier());
 
   for (const sla of slasToNotify.results) {
     // Send Notification

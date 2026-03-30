@@ -9,7 +9,7 @@ export function useCleanupIncidents(fingerprint: string | null) {
     queryFn: async () => {
       if (!fingerprint) return [];
       const res = await apiFetch(`/api/admin/incidents/cleanup?fingerprint=${encodeURIComponent(fingerprint)}`);
-      const data = await res.json();
+      const data = await res.json() as any;
       return data.incidents || [];
     },
     enabled: !!fingerprint,

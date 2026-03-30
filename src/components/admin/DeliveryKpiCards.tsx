@@ -4,7 +4,7 @@ import { Grid, Card, CardContent, Typography, Box } from '@mui/material';
 export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
-      <Grid item xs={12} sm={6} md={2.4}>
+      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
             <Typography color="text.secondary" variant="caption">Total Notifications</Typography>
@@ -12,7 +12,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
           </CardContent>
         </Card>
       </Grid>
-      <Grid item xs={12} sm={6} md={2.4}>
+      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
             <Typography color="text.secondary" variant="caption">Success Rate</Typography>
@@ -22,7 +22,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
           </CardContent>
         </Card>
       </Grid>
-      <Grid item xs={12} sm={6} md={2.4}>
+      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
             <Typography color="text.secondary" variant="caption">Bounce Rate</Typography>
@@ -32,7 +32,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
           </CardContent>
         </Card>
       </Grid>
-      <Grid item xs={12} sm={6} md={2.4}>
+      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
             <Typography color="text.secondary" variant="caption">Resend / SendGrid Fail Rate</Typography>
@@ -44,7 +44,7 @@ export const DeliveryKpiCards = ({ summary }: { summary: any }) => {
           </CardContent>
         </Card>
       </Grid>
-      <Grid item xs={12} sm={6} md={2.4}>
+      <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
         <Card variant="outlined">
           <CardContent>
             <Typography color="text.secondary" variant="caption">Escalation L3 Reach Rate</Typography>

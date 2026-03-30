@@ -8,7 +8,7 @@ import { buildCleanupAlertEmail } from "../templates/cleanupAlertEmail";
 export class EmailNotifier implements CleanupAlertNotifier {
   channel = "email";
 
-  async send(env: Env, alert: CleanupFailureAlertResponse): Promise<any> {
+  async send(alert: CleanupFailureAlertResponse, env: Env): Promise<any> {
     if (env.EMAIL_CLEANUP_ALERT_ENABLED !== "true") {
       console.log("Email cleanup alert is disabled");
       return;

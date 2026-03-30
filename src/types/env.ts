@@ -59,6 +59,9 @@ export interface Env {
   EMAIL_CLEANUP_ALERT_TO?: string;
   EMAIL_CLEANUP_ALERT_FROM?: string;
   EMAIL_PROVIDER_API_KEY?: string;
+  EMAIL_PROVIDER?: string;
+  RESEND_API_KEY?: string;
+  SENDGRID_API_KEY?: string;
 
   CLEANUP_ALERT_COOLDOWN_MINUTES?: string;
   CLEANUP_ALERT_CRITICAL_COOLDOWN_MINUTES?: string;

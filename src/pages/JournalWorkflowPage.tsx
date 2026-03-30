@@ -471,17 +471,23 @@ export default function JournalWorkflowPage() {
   // ── ③ チャット：送信 ──
   const sendMessage = async (text?: string) => {
     const content = text ?? chatInput.trim();
-    if (!content || chatLoading) return;
+    if (!content || chatLoading || !savedJournalId) return; // 未保存時は送信不可
     setChatInput("");
     const rdLevel = estimateReflectionDepth(content);
     setRdHistory((prev) => [...prev, rdLevel]);
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", content, timestamp: new Date().toISOString() };
     setMessages((prev) => [...prev, userMsg]);
     setChatLoading(true);
-    await new Promise((r) => setTimeout(r, 700 + Math.random() * 600));
-    const botMsg: ChatMessage = { id: `b-${Date.now()}`, role: "assistant", content: generateCoTResponse(content, rdLevel), timestamp: new Date().toISOString() };
-    setMessages((prev) => [...prev, botMsg]);
-    setChatLoading(false);
+    try {
+      await new Promise((r) => setTimeout(r, 700 + Math.random() * 600));
+      const botMsg: ChatMessage = { id: `b-${Date.now()}`, role: "assistant", content: generateCoTResponse(content, rdLevel), timestamp: new Date().toISOString() };
+      setMessages((prev) => [...prev, botMsg]);
+    } catch (e) {
+      console.error(e);
+      // エラー時のフォールバック等があればここ
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   // ── 評価データ ──
@@ -1149,18 +1155,26 @@ export default function JournalWorkflowPage() {
               </Box>
 
               {/* 入力エリア */}
-              <Box display="flex" gap={1} p={1.5}>
-                <TextField
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }}
-                  placeholder="今日の実習について話しましょう…（ルーブリック因子を意識して書くとフィードバックが充実します）"
-                  fullWidth size="small" multiline maxRows={3}
-                />
-                <Button variant="contained" onClick={() => sendMessage()}
-                  disabled={!chatInput.trim() || chatLoading} sx={{ minWidth: 48, px: 1.5 }}>
-                  <SendIcon />
-                </Button>
+              <Box p={1.5}>
+                {!savedJournalId && (
+                  <Alert severity="warning" sx={{ mb: 1, py: 0, '& .MuiAlert-message': { py: 0.5 } }}>
+                    省察チャットを開始するには、まず「① 日誌記入」タブで日誌を提出してください。
+                  </Alert>
+                )}
+                <Box display="flex" gap={1}>
+                  <TextField
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void sendMessage(); } }}
+                    placeholder={savedJournalId ? "今日の実習について話しましょう…（ルーブリック因子を意識して書くとフィードバックが充実します）" : "日誌を提出後にチャットが利用できます"}
+                    fullWidth size="small" multiline maxRows={3}
+                    disabled={!savedJournalId || chatLoading}
+                  />
+                  <Button variant="contained" onClick={() => sendMessage()}
+                    disabled={!chatInput.trim() || chatLoading || !savedJournalId} sx={{ minWidth: 48, px: 1.5 }}>
+                    <SendIcon />
+                  </Button>
+                </Box>
               </Box>
             </Card>
 
