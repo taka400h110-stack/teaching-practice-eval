@@ -428,7 +428,7 @@ async function callOpenAI(
 // POST /api/ai/evaluate  (CoT-A)
 // ────────────────────────────────────────────────────────────────
 openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : undefined);
   if (!apiKey) {
     return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
   }
@@ -494,7 +494,7 @@ openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher
 // POST /api/ai/reflection-depth  (CoT-B)
 // ────────────────────────────────────────────────────────────────
 openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : undefined);
   if (!apiKey) {
     return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
   }
@@ -531,7 +531,7 @@ openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ
 // POST /api/ai/generate-goal  (CoT-C)
 // ────────────────────────────────────────────────────────────────
 openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : undefined);
   if (!apiKey) {
     return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
   }
@@ -607,7 +607,7 @@ openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_te
 // CoT-B判定後に適切な問いかけを生成
 // ────────────────────────────────────────────────────────────────
 openaiRouter.post("/chat", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : undefined);
   if (!apiKey) {
     return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
   }
