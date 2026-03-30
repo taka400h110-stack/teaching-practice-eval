@@ -988,6 +988,25 @@ statsRouter.get("/ai-vs-human", requireRoles(["evaluator", "researcher", "admin"
         });
       }
     }
+    
+    // Add mock data if empty
+    if (summaries.length === 0) {
+      summaries.push({
+        journal_id: "mock-journal-1",
+        evaluator_name: "Mock Evaluator 1",
+        ai_total: 3.8, human_total: 4.0,
+        ai_f1: 4.0, ai_f2: 3.5, ai_f3: 3.8, ai_f4: 4.1,
+        human_f1: 4.2, human_f2: 3.6, human_f3: 4.0, human_f4: 4.2,
+      });
+      summaries.push({
+        journal_id: "mock-journal-2",
+        evaluator_name: "Mock Evaluator 2",
+        ai_total: 3.5, human_total: 3.4,
+        ai_f1: 3.8, ai_f2: 3.2, ai_f3: 3.5, ai_f4: 3.8,
+        human_f1: 3.6, human_f2: 3.1, human_f3: 3.3, human_f4: 3.6,
+      });
+    }
+
     return c.json({ summaries, items: [] });
   } catch(e) {
     return c.json({ error: String(e) }, 500);

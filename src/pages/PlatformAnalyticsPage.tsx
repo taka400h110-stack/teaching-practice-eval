@@ -156,14 +156,14 @@ export default function PlatformAnalyticsPage() {
                     <>
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2">RD-Chat × RD-Journal 収束妥当性</Typography>
-                        <Typography variant="body1">相関: r = {(fairnessData as any)?.convergence?.correlation} <Chip size="small" color="primary" label={(fairnessData as any)?.convergence?.status} sx={{ ml: 1 }}/></Typography>
+                        <Typography variant="body1">相関: r = {(fairnessData as any)?.convergence?.correlation ?? 'N/A'} <Chip size="small" color="primary" label={(fairnessData as any)?.convergence?.status ?? 'N/A'} sx={{ ml: 1 }}/></Typography>
                       </Box>
                       <Box>
                         <Typography variant="subtitle2">縦断的測定不変性 (Longitudinal Invariance)</Typography>
                         <Typography variant="body1">
-                          RMSEA: {(fairnessData as any)?.longitudinal_invariance?.rmsea} / CFI: {(fairnessData as any)?.longitudinal_invariance?.cfi}
+                          RMSEA: {(fairnessData as any)?.longitudinal_invariance?.rmsea ?? 'N/A'} / CFI: {(fairnessData as any)?.longitudinal_invariance?.cfi ?? 'N/A'}
                         </Typography>
-                        <Chip size="small" color="success" label={(fairnessData as any)?.longitudinal_invariance?.status} sx={{ mt: 1 }} />
+                        <Chip size="small" color="success" label={(fairnessData as any)?.longitudinal_invariance?.status ?? 'N/A'} sx={{ mt: 1 }} />
                       </Box>
                     </>
                   )}
@@ -181,13 +181,13 @@ export default function PlatformAnalyticsPage() {
                     <>
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2">学校種別 (School Type) バイアス</Typography>
-                        <Typography variant="body2">p-value: {(fairnessData as any)?.fairness?.school_type_bias?.p_value}</Typography>
-                        <Chip size="small" color="success" variant="outlined" label={(fairnessData as any)?.fairness?.school_type_bias?.status} sx={{ mt: 0.5 }} />
+                        <Typography variant="body2">p-value: {(fairnessData as any)?.fairness?.school_type_bias?.p_value ?? 'N/A'}</Typography>
+                        <Chip size="small" color="success" variant="outlined" label={(fairnessData as any)?.fairness?.school_type_bias?.status ?? 'N/A'} sx={{ mt: 0.5 }} />
                       </Box>
                   <Box>
                         <Typography variant="subtitle2">性別 (Gender) バイアス</Typography>
-                        <Typography variant="body2">p-value: {(fairnessData as any)?.fairness?.gender_bias?.p_value}</Typography>
-                        <Chip size="small" color="success" variant="outlined" label={(fairnessData as any)?.fairness?.gender_bias?.status} sx={{ mt: 0.5 }} />
+                        <Typography variant="body2">p-value: {(fairnessData as any)?.fairness?.gender_bias?.p_value ?? 'N/A'}</Typography>
+                        <Chip size="small" color="success" variant="outlined" label={(fairnessData as any)?.fairness?.gender_bias?.status ?? 'N/A'} sx={{ mt: 0.5 }} />
                       </Box>
                     </>
                   )}

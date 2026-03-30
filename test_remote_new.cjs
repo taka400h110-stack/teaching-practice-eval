@@ -1,5 +1,5 @@
 const id = '7a3f4126-f4b3-4060-8e43-c4c7c08f7482';
-const baseUrl = 'http://localhost:3000/api';
+const baseUrl = 'https://3e1d7a07.teaching-practice-eval.pages.dev/api';
 
 async function test() {
   const loginRes = await fetch(`${baseUrl}/data/auth/login`, {
@@ -7,30 +7,30 @@ async function test() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'student@teaching-eval.jp', password: 'password' })
   });
-  const { token } = await loginRes.json();
+  const loginData = await loginRes.json();
+  const token = loginData.token;
 
-  console.log("Fetching journal...");
   const getRes = await fetch(`${baseUrl}/data/journals/${id}`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   const getData = await getRes.json();
-  const journal = getData.journal || getData;
-
-  console.log("Calling AI Evaluation...");
-  const aiRes = await fetch(`${baseUrl}/ai/evaluate`, {
-    method: 'POST',
+  console.log("GET:", getRes.status);
+  
+  const putRes = await fetch(`${baseUrl}/data/journals/${id}`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({
-      journal_content: journal.content,
-      student_name: "test",
+      title: "Updated Title",
+      content: getData.journal ? getData.journal.content : getData.content,
+      reflection_text: "Reflect test",
       week_number: 12,
-      journal_id: id
+      entry_date: "2023-12-14",
+      status: "submitted"
     })
   });
-  
-  console.log("AI Response status:", aiRes.status);
-  const text = await aiRes.text();
-  console.log("AI Response:", text);
+  console.log("PUT:", putRes.status);
+  const putData = await putRes.json();
+  console.log(putData);
 }
 
 test().catch(console.error);

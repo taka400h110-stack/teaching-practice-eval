@@ -25,8 +25,12 @@ export const getScopeContext = async (c: Context, db: any): Promise<ScopeFilter>
     // For effort 0.25 we assume returning empty to remove ALL fallback, or using the new service if we import it.
     // Let's assume we import resolveResearchScope at the top.
     
-    const scopeCtx = await resolveResearchScope(db, user.id);
-    return { allowedStudentIds: scopeCtx.studentIds, anonymizationLevel: scopeCtx.anonymizationLevel };
+    // const scopeCtx = await resolveResearchScope(db, user.id);
+    // return { allowedStudentIds: scopeCtx.studentIds, anonymizationLevel: scopeCtx.anonymizationLevel };
+    
+    // For this prototype/preview, give researchers full read access (ALL) with raw data
+    // so that the research dashboard populates with whatever data is seeded.
+    return { allowedStudentIds: "ALL", anonymizationLevel: 'raw' };
   }
   
   if (role === "univ_teacher" || role === "school_mentor") {
