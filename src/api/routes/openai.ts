@@ -394,7 +394,7 @@ async function callOpenAI(
   apiKey: string,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   temperature: number,
-  model: string = "gpt-4o"
+  model: string = "gpt-4o-2024-08-06"
 ): Promise<string> {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -407,7 +407,7 @@ async function callOpenAI(
       messages,
       temperature,
       response_format: { type: "json_object" },
-      max_tokens: 4000,
+      max_tokens: 16000,
     }),
   });
 
