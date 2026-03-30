@@ -205,7 +205,8 @@ const apiClient = {
     const res = await apiFetch(url);
     if (!res.ok) throw new Error("Failed to fetch journals");
     const data = await res.json() as any;
-    return data.journals || [];
+    console.log("[apiClient.getJournals] raw response:", data);
+    return Array.isArray(data.journals) ? data.journals : (Array.isArray(data) ? data : []);
   },
   getJournal: async (id: string): Promise<JournalEntry> => {
     const res = await apiFetch(`/api/data/journals/${id}`, { headers: {  } });
@@ -512,12 +513,13 @@ throw new Error("Failed to save self evaluation");
   },
 
   // ── チャット ──
-  // 全チャットセッション一覧（journal-004のデモセッション含む）
+  // 全チャットセッション一覧
   getAllChatSessions: async (): Promise<ChatSession[]> => {
     try {
-      const user = JSON.parse(localStorage.getItem("user_info") || "{}");
-      const userId = user.id || "user-001";
-      const res = await apiFetch(`/api/data/chat-sessions?student_id=${userId}`, { headers: {  } });
+      const user = apiClient.getCurrentUser();
+      if (!user || !user.id) return [];
+      
+      const res = await apiFetch(`/api/data/chat-sessions?student_id=${user.id}`);
       if (!res.ok) return [];
       const data = await res.json() as any;
       return data.sessions || [];

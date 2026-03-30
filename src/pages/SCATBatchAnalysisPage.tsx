@@ -44,14 +44,24 @@ export const SCATBatchAnalysisPage: React.FC = () => {
 
   const batchMutation = useMutation({
     mutationFn: async () => {
-      return apiFetch('/api/openai/scat-analysis/batch', {
+      const res = await apiFetch('/api/external-jobs', {
         method: 'POST',
-        body: JSON.stringify({ journal_ids: selectedJournals })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          job_type: 'scat-batch',
+          dataset_type: 'scat_analysis',
+          parameters: { journal_ids: selectedJournals }
+        })
       });
+      if (!res.ok) throw new Error("Batch analysis request failed");
+      return res.json();
     },
     onSuccess: () => {
       alert('バッチ分析ジョブを開始しました');
       setSelectedJournals([]);
+    },
+    onError: (err) => {
+      alert('エラーが発生しました: ' + String(err));
     }
   });
 

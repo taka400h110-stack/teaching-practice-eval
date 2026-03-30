@@ -89,6 +89,21 @@ async function ensureSchema(db: D1Database): Promise<void> {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (journal_id) REFERENCES journal_entries(id)
     );`,
+    `CREATE TABLE IF NOT EXISTS external_analysis_jobs (
+      id TEXT PRIMARY KEY,
+      job_type TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      role TEXT NOT NULL,
+      dataset_type TEXT,
+      parameters_json TEXT,
+      status TEXT DEFAULT 'queued',
+      result_summary_json TEXT,
+      output_file_path TEXT,
+      error_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME
+    );`,
     `CREATE TABLE IF NOT EXISTS evaluation_items (
       id TEXT PRIMARY KEY,
       evaluation_id TEXT NOT NULL,
@@ -1866,6 +1881,11 @@ dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", 
     const session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
     if (!session) return c.json({ error: "Not found" }, 404);
     
+    const scope = await getScopeContext(c, db);
+    if (!assertCanAccessStudent(scope, (session as any).student_id)) {
+      return c.json({ error: "forbidden" }, 403);
+    }
+    
     const messages = await db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY message_order ASC").bind((session as any)?.id).all();
     
     return c.json({
@@ -1888,12 +1908,20 @@ dataRouter.post("/chat-sessions/:journalId/messages", requireRoles(["student"] a
   const body = await c.req.json();
   
   try {
+    const user = c.get("user");
+    const requestStudentId = user?.id || body.student_id || "user-001";
     // Session取得か作成
     let session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
+    
+    // 他人のセッションにアクセスしようとした場合はエラー
+    if (session && (session as any).student_id !== requestStudentId) {
+      return c.json({ error: "forbidden" }, 403);
+    }
+    
     if (!session) {
       const sessionId = "chat-" + Date.now();
       await db.prepare("INSERT INTO chat_sessions (id, journal_id, student_id, phase, created_at) VALUES (?, ?, ?, ?, ?)")
-        .bind(sessionId, journalId, body.student_id || "user-001", "phase1", new Date().toISOString())
+        .bind(sessionId, journalId, requestStudentId, "phase1", new Date().toISOString())
         .run();
       session = await db.prepare("SELECT * FROM chat_sessions WHERE id = ?").bind(sessionId).first();
     }
@@ -1947,17 +1975,23 @@ dataRouter.put("/goals/:id", requireRoles(["student"] as UserRole[]), async (c) 
 });
 
 
-dataRouter.get("/chat-sessions", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.get("/chat-sessions", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
   const studentId = c.req.query("student_id");
   try {
+    const scope = await getScopeContext(c, db);
+    const filter = buildScopeFilter(scope, "student_id");
+    
     let sessions;
     if (studentId) {
+      if (!assertCanAccessStudent(scope, studentId)) {
+        return c.json({ error: "forbidden" }, 403);
+      }
       sessions = await db.prepare("SELECT * FROM chat_sessions WHERE student_id = ? ORDER BY created_at DESC").bind(studentId).all();
     } else {
-      sessions = await db.prepare("SELECT * FROM chat_sessions ORDER BY created_at DESC").all();
+      sessions = await db.prepare(`SELECT * FROM chat_sessions WHERE ${filter.condition} ORDER BY created_at DESC`).bind(...filter.params).all();
     }
     return c.json({ sessions: sessions.results || [] });
   } catch (err) {

@@ -366,8 +366,8 @@ export default function JournalWorkflowPage() {
   });
 
   const { data: chatSession } = useQuery({
-    queryKey: ["chat", savedJournalId ?? "journal-004"],
-    queryFn:  () => apiClient.getChatSession(savedJournalId ?? "journal-004"),
+    queryKey: ["chat", savedJournalId],
+    queryFn:  () => apiClient.getChatSession(savedJournalId || ""),
     enabled: step === 2 && !!savedJournalId, // チャットタブ表示時のみ取得
   });
 
@@ -475,7 +475,7 @@ export default function JournalWorkflowPage() {
   // ── ③ チャット：送信 ──
   const sendMessage = async (text?: string) => {
     const content = text ?? chatInput.trim();
-    if (!content || chatLoading || !savedJournalId) return; // 未保存時は送信不可
+    if (!content || chatLoading || !savedJournalId || "") return; // 未保存時は送信不可
     setChatInput("");
     const rdLevel = estimateReflectionDepth(content);
     setRdHistory((prev) => [...prev, rdLevel]);
@@ -495,7 +495,7 @@ export default function JournalWorkflowPage() {
   };
 
   // ── 評価データ ──
-  const targetJournalId = savedJournalId ?? "journal-004";
+  const targetJournalId = savedJournalId;
   // 過去日誌を選択してワークフローに読み込む
   const loadPastJournal = (j: JournalEntry) => {
     const { records: recs, reflection: ref } = contentToRecords(j.content);

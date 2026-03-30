@@ -170,7 +170,7 @@ function MessageBubble({ msg, rdLevel }: { msg: ChatMessage; rdLevel?: number })
 export default function ChatBotPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const journalId = params.get("journalId") ?? "journal-004";
+  const journalId = params.get("journalId") || "";
   const [messages, setMessages]    = useState<ChatMessage[]>([]);
   const [rdHistory, setRdHistory]  = useState<number[]>([]);
   const [input, setInput]          = useState("");
@@ -182,12 +182,14 @@ export default function ChatBotPage() {
   const { data: session } = useQuery({
     queryKey: ["chat", journalId],
     queryFn:  () => apiClient.getChatSession(journalId),
+    enabled: !!journalId
   });
 
   // 全チャットセッション一覧
   const { data: allSessions = [] } = useQuery({
     queryKey: ["allChatSessions"],
     queryFn:  () => (apiClient as unknown as { getAllChatSessions: () => Promise<import("../types").ChatSession[]> }).getAllChatSessions(),
+    enabled: historyOpen
   });
 
   // 日誌一覧（セッションに対応する日誌タイトルを表示するため）
