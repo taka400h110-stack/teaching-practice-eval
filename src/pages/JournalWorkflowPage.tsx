@@ -979,7 +979,7 @@ export default function JournalWorkflowPage() {
                 {/* スコアサマリ */}
                 <Grid container spacing={2} mb={2}>
                   {[
-                    { label: "総合スコア",  value: evalData.total_score.toFixed(2), color: "#1976d2" },
+                    { label: "総合スコア",  value: (evalData.total_score || 0).toFixed(2), color: "#1976d2" },
                     ...FACTOR_KEYS.map((k, i) => ({
                       label: FACTOR_LABELS[i],
                       value: (evalData.factor_scores[k] ?? 0).toFixed(2),

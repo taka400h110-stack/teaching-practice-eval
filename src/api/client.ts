@@ -248,28 +248,29 @@ const apiClient = {
       const res = await apiFetch(`/api/data/evaluations/${journalId}`, { headers: {  } });
       if (!res.ok) throw new Error("Failed to fetch evaluation");
       const data = await res.json() as any;
+      const evalData = data.evaluation || data;
+      const items = data.items || (evalData.items_json ? JSON.parse(evalData.items_json) : []);
       return {
-        id: data.id,
-        journal_id: data.journal_id,
+        id: evalData.id,
+        journal_id: evalData.journal_id,
         status: "completed",
-        // overall_score: data.total_score,
         factor_scores: {
-          factor1: data.factor1_score,
-          factor2: data.factor2_score,
-          factor3: data.factor3_score,
-          factor4: data.factor4_score
+          factor1: evalData.factor1_score || 0,
+          factor2: evalData.factor2_score || 0,
+          factor3: evalData.factor3_score || 0,
+          factor4: evalData.factor4_score || 0
         },
-        evaluation_items: JSON.parse((data as any).items_json || "[]").map((i: any) => ({
+        evaluation_items: items.map((i: any) => ({
           item_number: i.item_number || i.item,
-          score: i.score,
-          evidence: i.evidence,
-          feedback: i.feedback
+          score: i.score || 0,
+          evidence: i.evidence || "",
+          feedback: i.feedback || ""
         })),
-        overall_comment: data.overall_comment || "",
-        total_score: data.total_score || 0,
-        evaluated_item_count: data.evaluated_item_count || 0,
-        tokens_used: data.tokens_used || 0,
-        halo_check: data.halo_check || false
+        overall_comment: evalData.overall_comment || "",
+        total_score: evalData.total_score || 0,
+        evaluated_item_count: evalData.evaluated_item_count || items.length || 0,
+        tokens_used: evalData.tokens_used || 0,
+        halo_check: evalData.halo_check || false
       };
     } catch { throw new Error("Evaluation not found"); }
   },
@@ -286,16 +287,16 @@ const apiClient = {
         status: "completed",
          
         factor_scores: {
-          factor1: e.factor1_score,
-          factor2: e.factor2_score,
-          factor3: e.factor3_score,
-          factor4: e.factor4_score
+          factor1: e.factor1_score || 0,
+          factor2: e.factor2_score || 0,
+          factor3: e.factor3_score || 0,
+          factor4: e.factor4_score || 0
         },
-        evaluation_items: JSON.parse(e.items_json || "[]").map((i: any) => ({
+        evaluation_items: (e.items_json ? JSON.parse(e.items_json) : (e.items || [])).map((i: any) => ({
           item_number: i.item_number || i.item,
-          score: i.score,
-          evidence: i.evidence,
-          feedback: i.feedback
+          score: i.score || 0,
+          evidence: i.evidence || "",
+          feedback: i.feedback || ""
         })),
         overall_comment: e.overall_comment || "",
         total_score: e.total_score || 0,

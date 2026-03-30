@@ -244,7 +244,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
             <AssessmentIcon sx={{ color: "#1976d2" }} />
             <Typography variant="subtitle1" fontWeight="bold" color="#1565c0">AI評価 — 因子別レーダーチャート</Typography>
             <Box ml="auto">
-              <Chip label={`総合: ${evalData.total_score.toFixed(2)} / 5.0`} size="small" color="primary" />
+              <Chip label={`総合: ${(evalData.total_score || 0).toFixed(2)} / 5.0`} size="small" color="primary" />
             </Box>
           </Box>
           <Divider sx={{ mb: 2 }} />
@@ -282,7 +282,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
                         </Typography>
                       </Box>
                       <Typography variant="body2" fontWeight="bold" color={FACTOR_COLORS[i]}>
-                        {fs[key].toFixed(2)} / 5.0
+                        {(fs[key] || 0).toFixed(2)} / 5.0
                       </Typography>
                     </Box>
                     <ScoreBar value={fs[key]} color={FACTOR_COLORS[i]} />
@@ -522,7 +522,7 @@ const JournalDetailPage: React.FC = () => {
   
   const currentGoal = journal ? goals.find(g => g.week === journal.week_number) : undefined;
 
-  const { data: evalData } = useQuery<EvaluationResult>({
+  const { data: evalData, isLoading: evalLoading, isError: evalError } = useQuery<EvaluationResult>({
     queryKey: ["evaluation", journalId],
     queryFn:  () => apiClient.getEvaluation(journalId ?? ""),
     enabled:  !!journalId && journal?.status === "evaluated",
@@ -820,6 +820,12 @@ const JournalDetailPage: React.FC = () => {
             weekNumber={journal.week_number}
            currentSelfEval={currentSelfEval} />
         </Box>
+      ) : journal.status === "evaluated" && evalError ? (
+        <Alert severity="warning" sx={{ mt: 2, mb: 3 }}>
+          評価ステータスは更新済みですが、評価詳細が見つかりません。
+        </Alert>
+      ) : journal.status === "evaluated" && evalLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
       ) : journal.status !== "evaluated" ? (
         <Paper
           variant="outlined"
