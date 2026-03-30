@@ -27,7 +27,7 @@ export const CleanupFailureAlertBanner: React.FC<CleanupFailureAlertBannerProps>
 
   const queryClient = useQueryClient();
   const { data: escalations } = useCleanupAlertEscalations(alert.fingerprint);
-  const latestEscalation = escalations && escalations.length > 0 ? escalations[0] : null;
+  const latestEscalation = Array.isArray(escalations) && escalations.length > 0 ? escalations[0] : null;
 
   useEffect(() => {
     if (alert.hasAlert && alert.fingerprint) {

@@ -74,18 +74,27 @@ export default function AdminDashboardPage() {
   const [jdStudentFilter, setJdStudentFilter] = useState("ALL");
 
 
-  const bySchoolType = ["elementary","middle","high","special"].map((t) => ({
-    label: { elementary:"小学校", middle:"中学校", high:"高校", special:"特支" }[t as "elementary"],
-    count: profiles.filter((p) => p.school_type === t).length,
-    avg:   profiles.filter((p) => p.school_type === t).length
-      ? (profiles.filter((p) => p.school_type === t).reduce((s, p) => s + p.final_total, 0) / profiles.filter((p) => p.school_type === t).length).toFixed(2)
-      : "—",
-  }));
+  const safeProfiles = Array.isArray(profiles) ? profiles : [];
+  const safeJournals = Array.isArray(journals) ? journals : [];
+
+  const bySchoolType = ["elementary","middle","high","special"].map((t) => {
+    const matched = safeProfiles.filter((p: any) => p.school_type === t);
+    const count = matched.length;
+    const avg = count > 0 
+      ? (matched.reduce((s: number, p: any) => s + (typeof p.final_total === 'number' ? p.final_total : 0), 0) / count).toFixed(2) 
+      : "—";
+
+    return {
+      label: { elementary:"小学校", middle:"中学校", high:"高校", special:"特支" }[t as "elementary"],
+      count,
+      avg
+    };
+  });
 
   const stats = [
-    { label: "総ユーザー数",   value: profiles.length + 5,  icon: <PeopleIcon />,    color: "primary.main" },
-    { label: "日誌総数",       value: journals.length,      icon: <MenuBookIcon />,  color: "success.main" },
-    { label: "AI評価実施済み", value: journals.filter((j) => j.status === "evaluated").length, icon: <AssessmentIcon />, color: "warning.main" },
+    { label: "総ユーザー数",   value: safeProfiles.length + 5,  icon: <PeopleIcon />,    color: "primary.main" },
+    { label: "日誌総数",       value: safeJournals.length,      icon: <MenuBookIcon />,  color: "success.main" },
+    { label: "AI評価実施済み", value: safeJournals.filter((j: any) => j.status === "evaluated").length, icon: <AssessmentIcon />, color: "warning.main" },
     { label: "DBレコード数",   value: "1,157",              icon: <StorageIcon />,   color: "error.main" },
   ];
 
@@ -177,7 +186,7 @@ export default function AdminDashboardPage() {
                     <Chip label={`平均 ${s.avg}`} size="small" color="primary" variant="outlined" />
                   </Box>
                 </Box>
-                <LinearProgress variant="determinate" value={(s.count / profiles.length) * 100} sx={{ height: 8, borderRadius: 4 }} />
+                <LinearProgress variant="determinate" value={safeProfiles.length > 0 ? (s.count / safeProfiles.length) * 100 : 0} sx={{ height: 8, borderRadius: 4 }} />
               </Box>
             ))}
           </CardContent>
@@ -198,7 +207,7 @@ export default function AdminDashboardPage() {
                 </TableHead>
                 <TableBody>
                   {[
-                    { role: "student",        count: profiles.length, perm: "日誌・自己評価・チャット" },
+                    { role: "student",        count: safeProfiles.length, perm: "日誌・自己評価・チャット" },
                     { role: "univ_teacher",   count: 3,              perm: "学生管理・評価・統計閲覧" },
                     { role: "school_mentor",  count: 8,              perm: "担当学生閲覧・コメント" },
                     { role: "researcher",     count: 2,              perm: "全統計・分析データ閲覧" },

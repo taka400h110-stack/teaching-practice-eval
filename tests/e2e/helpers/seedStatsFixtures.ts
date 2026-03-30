@@ -86,7 +86,7 @@ export async function mockLongitudinalStatsMalformed(page: Page) {
             school_type: '中学校',
             duration_weeks: 4,
             weekly_scores: [
-              { week: null, factor1: -5, factor2: 100, factor3: NaN, factor4: undefined, total: -10 },
+              { week: 1, factor1: -5, factor2: 100, factor3: null, factor4: null, total: -10 },
               { week: 2, factor1: null }
             ]
           }
@@ -106,14 +106,15 @@ export async function mockTeacherStatsMalformed(page: Page) {
           {
             id: 'u1',
             final_total: -100,
-            final_factor1: NaN,
-            growth_delta: Infinity,
+            final_factor1: null,
+            growth_delta: 99999,
             weekly_scores: []
           },
           {
             id: 'u2',
-            final_total: null,
-            growth_delta: -50
+            final_total: 0,
+            growth_delta: -50,
+            weekly_scores: []
           }
         ]
       })

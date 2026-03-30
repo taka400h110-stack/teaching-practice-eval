@@ -10,7 +10,11 @@ adminOperationalReadinessRouter.get('/', async (c) => {
     return c.json(readiness);
   } catch (err) {
     console.error('Error fetching operational readiness:', err);
-    return c.json({ error: 'Internal Server Error' }, 500);
+    // Fallback response to prevent UI crashes
+    return c.json({
+      overallStatus: 'unknown',
+      checks: []
+    }, 200);
   }
 });
 

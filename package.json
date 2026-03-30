@@ -3,7 +3,8 @@
   "type": "module",
   "scripts": {
   "dev": "vite",
-  "build": "npx wrangler d1 migrations apply DB --local && vite build --mode client && vite build",
+  "build": "vite build --mode client && vite build",
+  "db:migrate:local": "npx wrangler d1 migrations apply DB --local",
   "preview": "wrangler pages dev dist --ip 127.0.0.1 --port 8788",
   "deploy": "npm run build && wrangler pages deploy dist",
   "cf-typegen": "wrangler types --env-interface CloudflareBindings",

@@ -70,20 +70,20 @@ function genLCGATrajectories(weeks: number, lcgaResult: LCGAResult | null, isSam
     return [];
   }
 
-  return classes.map((c: LCGAClass) => ({ 
+  return (classes || []).map((c: LCGAClass) => ({ 
     id: String(c.class_id), 
     label: `Class ${c.class_id} (${Math.round(c.proportion*100)}%)`, 
     color: c.class_id === 1 ? '#2e7d32' : c.class_id === 2 ? '#1565c0' : '#e65100', 
     pct: Math.round(c.proportion*100), 
     desc: `軌跡: y = ${c.intercept} ${c.slope>=0?'+':''} ${c.slope}x`, 
     initScore: c.intercept, 
-    finalScore: +(c.intercept + c.slope * weeks).toFixed(2), 
+    finalScore: +(c.intercept + c.slope * weeks)?.toFixed(2), 
     slope: c.slope 
   })).map((cls) => ({
     ...cls,
     trajectory: Array.from({ length: weeks }, (_, i) => ({
       week: i + 1,
-      score: Math.min(5, Math.max(1, +(cls.initScore + cls.slope * i).toFixed(2))),
+      score: Math.min(5, Math.max(1, +(cls.initScore + cls.slope * i)?.toFixed(2))),
     })),
   }));
 }
@@ -172,7 +172,7 @@ export default function LongitudinalAnalysisPage() {
 
   const weeks = React.useMemo(() => {
     if (!cohorts || cohorts.length === 0) return 10;
-    return Math.max(...cohorts.flatMap((c: CohortProfile) => (c.weekly_scores || []).map((ws: WeeklyScore) => ws.week)), 10);
+    return Math.max(...(cohorts || []).flatMap((c: CohortProfile) => (c.weekly_scores || []).map((ws: WeeklyScore) => ws.week)), 10);
   }, [cohorts]);
 
   const lcgaTrajectories = React.useMemo(() => genLCGATrajectories(weeks, lcgaResult, isSampleMode), [weeks, lcgaResult, isSampleMode]);
@@ -183,8 +183,8 @@ export default function LongitudinalAnalysisPage() {
     
     const overlay = Array.from({ length: maxWeek }, (_, i) => { 
       const row: OverlayPlotData = { week: i + 1 }; 
-      cohorts.slice(0, 10).forEach((p: any, idx: number) => { 
-        const ws = (p.weekly_scores || []).find((w: any) => w.week === i + 1); 
+      (cohorts || []).slice(0, 10).forEach((p: any, idx: number) => { 
+        const ws = (p.weekly_scores || [])?.find?.((w: any) => w.week === i + 1); 
         if(ws) row[`user_${idx}`] = ws.total; 
       }); 
       return row; 
@@ -193,16 +193,16 @@ export default function LongitudinalAnalysisPage() {
 
     const stats: WeeklyStat[] = Array.from({ length: maxWeek }, (_, i) => {
       const week = i + 1;
-      const weekScores = cohorts.map((c: CohortProfile) => (c.weekly_scores || []).find((ws: WeeklyScore) => ws.week === week)).filter((ws): ws is WeeklyScore => Boolean(ws));
-      const mean = (k: keyof WeeklyScore) => weekScores.length ? (weekScores.reduce((a: number, b: WeeklyScore) => a + (Number(b[k]) || 0), 0) / weekScores.length) || 0 : 0;
-      const sd = (k: keyof WeeklyScore, m: number) => weekScores.length ? Math.sqrt(weekScores.reduce((a: number, b: WeeklyScore) => a + Math.pow((Number(b[k])||0) - m, 2), 0) / weekScores.length) : 0;
+      const weekScores = (cohorts || []).map((c: CohortProfile) => (c.weekly_scores || [])?.find?.((ws: WeeklyScore) => ws.week === week)).filter((ws): ws is WeeklyScore => Boolean(ws));
+      const mean = (k: keyof WeeklyScore) => weekScores.length ? ((weekScores || []).reduce((a: number, b: WeeklyScore) => a + (Number(b[k]) || 0), 0) / weekScores.length) || 0 : 0;
+      const sd = (k: keyof WeeklyScore, m: number) => weekScores.length ? Math.sqrt((weekScores || []).reduce((a: number, b: WeeklyScore) => a + Math.pow((Number(b[k])||0) - m, 2), 0) / weekScores.length) : 0;
       return {
         week,
-        f1_mean: +(mean('factor1').toFixed(2)), f1_sd: +(sd('factor1', mean('factor1')).toFixed(2)),
-        f2_mean: +(mean('factor2').toFixed(2)), f2_sd: +(sd('factor2', mean('factor2')).toFixed(2)),
-        f3_mean: +(mean('factor3').toFixed(2)), f3_sd: +(sd('factor3', mean('factor3')).toFixed(2)),
-        f4_mean: +(mean('factor4').toFixed(2)), f4_sd: +(sd('factor4', mean('factor4')).toFixed(2)),
-        total_mean: +(mean('total').toFixed(2)), total_sd: +(sd('total', mean('total')).toFixed(2)),
+        f1_mean: +(mean('factor1')?.toFixed(2)), f1_sd: +(sd('factor1', mean('factor1'))?.toFixed(2)),
+        f2_mean: +(mean('factor2')?.toFixed(2)), f2_sd: +(sd('factor2', mean('factor2'))?.toFixed(2)),
+        f3_mean: +(mean('factor3')?.toFixed(2)), f3_sd: +(sd('factor3', mean('factor3'))?.toFixed(2)),
+        f4_mean: +(mean('factor4')?.toFixed(2)), f4_sd: +(sd('factor4', mean('factor4'))?.toFixed(2)),
+        total_mean: +(mean('total')?.toFixed(2)), total_sd: +(sd('total', mean('total'))?.toFixed(2)),
       };
     });
     setWeeklyStats(stats);
@@ -219,7 +219,7 @@ export default function LongitudinalAnalysisPage() {
     setIsCalcLGCM(true);
 
     try {
-      const weeklyMatrix = cohorts.slice(0, 30).map((p) =>
+      const weeklyMatrix = (cohorts || []).slice(0, 30).map((p) =>
         (p.weekly_scores || []).map((ws) => ws.total)
       );
       const resp = await apiFetch("/api/stats/lgcm", {
@@ -322,19 +322,19 @@ export default function LongitudinalAnalysisPage() {
               {(["factor1","factor2","factor3","factor4"] as const).map((f) => {
                 const first = myScores[0]?.[f] ?? 0;
                 const last  = myScores[myScores.length - 1]?.[f] ?? 0;
-                const delta = +(last - first).toFixed(2);
+                const delta = +(last - first)?.toFixed(2);
                 return (
                   <Grid key={f} size={{ xs: 6, sm: 3 }}>
                     <Paper sx={{ p: 2, borderLeft: `4px solid ${FACTOR_COLORS[f]}` }}>
                       <Typography variant="caption" color="text.secondary">{FACTOR_LABELS[f]}</Typography>
                       <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.5}>
-                        <Typography variant="h6" fontWeight={700}>{last.toFixed(2)}</Typography>
+                        <Typography variant="h6" fontWeight={700}>{last?.toFixed(2)}</Typography>
                         <Chip label={delta >= 0 ? `+${delta}` : delta} size="small"
                           color={delta >= 1.0 ? "success" : delta >= 0.5 ? "primary" : "default"}
                         />
                       </Box>
                       <Typography variant="caption" color="text.secondary">
-                        開始: {first.toFixed(2)} → 最終: {last.toFixed(2)}
+                        開始: {first?.toFixed(2)} → 最終: {last?.toFixed(2)}
                       </Typography>
                     </Paper>
                   </Grid>
@@ -413,8 +413,8 @@ export default function LongitudinalAnalysisPage() {
                     <AreaChart data={weeklyStats.map((d) => ({
                       week: d.week,
                       mean: (d as unknown as Record<string, number>)[`f${idx+1}_mean`],
-                      upper: +((d as unknown as Record<string, number>)[`f${idx+1}_mean`] + (d as unknown as Record<string, number>)[`f${idx+1}_sd`]).toFixed(2),
-                      lower: +((d as unknown as Record<string, number>)[`f${idx+1}_mean`] - (d as unknown as Record<string, number>)[`f${idx+1}_sd`]).toFixed(2),
+                      upper: +((d as unknown as Record<string, number>)[`f${idx+1}_mean`] + (d as unknown as Record<string, number>)[`f${idx+1}_sd`])?.toFixed(2),
+                      lower: +((d as unknown as Record<string, number>)[`f${idx+1}_mean`] - (d as unknown as Record<string, number>)[`f${idx+1}_sd`])?.toFixed(2),
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="week" />
@@ -517,9 +517,9 @@ export default function LongitudinalAnalysisPage() {
                     <TableBody>
                       {[
                         { name: "χ²(df)", value: lgcmResult ? `${lgcmResult.chi2}(${lgcmResult.chi2_df})` : "", ref: "p<.05", ok: true, note: "p<.01" },
-                        { name: "CFI", value: typeof lgcmResult?.cfi === "number" ? lgcmResult.cfi.toFixed(3) : "", ref: "≥0.90", ok: typeof lgcmResult?.cfi === "number" ? lgcmResult.cfi >= 0.90 : false },
-                        { name: "RMSEA", value: typeof lgcmResult?.rmsea === "number" ? lgcmResult.rmsea.toFixed(3) : "", ref: "≤0.08", ok: typeof lgcmResult?.rmsea === "number" ? lgcmResult.rmsea <= 0.08 : false },
-                        { name: "SRMR", value: typeof lgcmResult?.srmr === "number" ? lgcmResult.srmr.toFixed(4) : "", ref: "≤0.08", ok: typeof lgcmResult?.srmr === "number" ? lgcmResult.srmr <= 0.08 : false },
+                        { name: "CFI", value: typeof lgcmResult?.cfi === "number" ? lgcmResult.cfi?.toFixed(3) : "", ref: "≥0.90", ok: typeof lgcmResult?.cfi === "number" ? lgcmResult.cfi >= 0.90 : false },
+                        { name: "RMSEA", value: typeof lgcmResult?.rmsea === "number" ? lgcmResult.rmsea?.toFixed(3) : "", ref: "≤0.08", ok: typeof lgcmResult?.rmsea === "number" ? lgcmResult.rmsea <= 0.08 : false },
+                        { name: "SRMR", value: typeof lgcmResult?.srmr === "number" ? lgcmResult.srmr?.toFixed(4) : "", ref: "≤0.08", ok: typeof lgcmResult?.srmr === "number" ? lgcmResult.srmr <= 0.08 : false },
                       ].map((r) => (
                         <TableRow key={r.name} hover>
                           <TableCell><strong>{r.name}</strong></TableCell>
@@ -593,7 +593,7 @@ export default function LongitudinalAnalysisPage() {
           {/* クラスサマリー */}
           <Grid size={{ xs: 12 }}>
             <Grid container spacing={2}>
-              {lcgaTrajectories.map((cls) => (
+              {(lcgaTrajectories || []).map((cls) => (
                 <Grid key={cls.id} size={{ xs: 12, sm: 4 }}>
                   <Card sx={{ borderLeft: `6px solid ${cls.color}` }}>
                     <CardContent>
@@ -639,7 +639,7 @@ export default function LongitudinalAnalysisPage() {
                       label={{ value: "スコア（5段階）", angle: -90, position: "insideLeft" }} />
                     <RechartTooltip />
                     <Legend />
-                    {lcgaTrajectories.map((cls) => (
+                    {(lcgaTrajectories || []).map((cls) => (
                       <Line
                         key={cls.id}
                         data={cls.trajectory}
@@ -696,7 +696,7 @@ export default function LongitudinalAnalysisPage() {
                           <TableCell>{r.pre_m} ({r.pre_sd})</TableCell>
                           <TableCell>{r.post_m} ({r.post_sd})</TableCell>
                           <TableCell>
-                            <Chip label={`+${(r.post_m - r.pre_m).toFixed(2)}`} size="small" color="success" />
+                            <Chip label={`+${(r.post_m - r.pre_m)?.toFixed(2)}`} size="small" color="success" />
                           </TableCell>
                           <TableCell>{r.t}</TableCell>
                           <TableCell>{r.df}</TableCell>

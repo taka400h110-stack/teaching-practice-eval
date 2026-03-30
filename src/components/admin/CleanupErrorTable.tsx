@@ -7,6 +7,8 @@ type Props = {
 };
 
 export const CleanupErrorTable: React.FC<Props> = ({ errors }) => {
+  const safeErrors = Array.isArray(errors) ? errors : [];
+  
   return (
     <Card sx={{ mt: 3 }}>
       <CardContent>
@@ -25,14 +27,14 @@ export const CleanupErrorTable: React.FC<Props> = ({ errors }) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {errors.length === 0 && (
+              {safeErrors.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center">No recent errors</TableCell>
                 </TableRow>
               )}
-              {errors.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{new Date(row.createdAt).toLocaleString()}</TableCell>
+              {safeErrors.map((row) => (
+                <TableRow key={row.id || Math.random()}>
+                  <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleString() : ''}</TableCell>
                   <TableCell>{row.action}</TableCell>
                   <TableCell>{row.resourceType || '-'}</TableCell>
                   <TableCell>{row.resourceId || '-'}</TableCell>
