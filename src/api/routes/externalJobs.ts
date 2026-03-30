@@ -24,7 +24,7 @@ externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator"
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'job-' + Date.now() + '-' + Math.floor(Math.random()*1000);
 
     const stmt = db.prepare(`
-      INSERT INTO external_analysis_jobs (id, job_type, created_by, role, dataset_type, parameters_json, status)
+      INSERT INTO external_analysis_jobs (id, job_type, created_by_user_id, created_by_role, source_dataset_type, parameters_json, status)
       VALUES (?, ?, ?, ?, ?, ?, 'queued')
     `).bind(
       id,

@@ -64,7 +64,7 @@ export default function JournalListPage() {
       )}
 
       {safeJournals.map((j: JournalEntry) => {
-        const cfg = STATUS_CONFIG[j.status];
+        const cfg = STATUS_CONFIG[j.status as keyof typeof STATUS_CONFIG] || { label: j.status || "不明", color: "default" };
         return (
           <Card key={j.id} sx={{ mb: 1.5, "&:hover": { boxShadow: 3 }, transition: "box-shadow 0.2s" }}>
             <CardContent sx={{ p: "12px 16px !important" }}>

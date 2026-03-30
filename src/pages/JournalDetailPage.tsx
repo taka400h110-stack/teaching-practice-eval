@@ -575,7 +575,7 @@ const JournalDetailPage: React.FC = () => {
   if (isError || !journal) return (
     <Box p={3}><Alert severity="error">日誌の取得に失敗しました。</Alert></Box>
   );
-  const statusConfig = STATUS_CONFIG[journal.status];
+  const statusConfig = STATUS_CONFIG[journal.status as JournalStatus] || { label: journal.status || "不明", color: "default" };
   const formattedDate = new Date(journal.entry_date).toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
   });
