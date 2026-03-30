@@ -12,7 +12,7 @@ const adminMetricsRouter = new Hono<Env>();
 
 // 必須ミドルウェア
 adminMetricsRouter.use("*", requireAuth);
-adminMetricsRouter.use("*", requireRoles(["admin"] as any));
+adminMetricsRouter.use("*", requireRoles(["admin", "researcher"] as any));
 
 adminMetricsRouter.get("/cleanup", async (c) => {
   const range = c.req.query("range") as "7d" | "30d" | undefined;

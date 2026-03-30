@@ -445,7 +445,7 @@ dataRouter.get("/journals", requireRoles(["student", "teacher", "univ_teacher", 
 
     return c.json({ success: true, journals: finalResults, count: finalResults.length });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -479,7 +479,7 @@ dataRouter.post("/journals", requireRoles(["student"] as UserRole[]), async (c) 
     });
     return c.json({ success: result.success, id });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -516,7 +516,7 @@ dataRouter.get("/journals/:id", requireRoles(["student", "teacher", "univ_teache
     });
     return c.json({ success: true, journal });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -568,7 +568,7 @@ dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_
 
     return c.json({ success: true, evaluations: finalResults });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -589,7 +589,7 @@ dataRouter.get("/evaluations/:journalId", requireRoles(["student", "teacher", "u
 
     return c.json({ success: true, evaluation: eval_, items: items.results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -658,7 +658,7 @@ dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin"
     });
     return c.json({ success: true, human_eval_id: id });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -669,7 +669,7 @@ dataRouter.get("/human-evals", requireRoles(["evaluator", "researcher", "admin",
     const evals = await db.prepare("SELECT * FROM human_evaluations ORDER BY created_at DESC").all();
     return c.json({ success: true, evaluations: evals.results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -696,7 +696,7 @@ dataRouter.get("/human-evals/:journalId", requireRoles(["evaluator", "researcher
     
     return c.json({ evaluations: evals });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -738,7 +738,7 @@ dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c
 
     return c.json({ success: true, self_eval_id: id });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -796,7 +796,7 @@ dataRouter.post("/goals", requireRoles(["student"] as UserRole[]), async (c) => 
 
     return c.json({ success: true, goal_id: id });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -855,7 +855,7 @@ dataRouter.post("/icc-results", requireRoles(["researcher", "admin", "collaborat
 
     return c.json({ success: true });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -889,7 +889,7 @@ dataRouter.get("/students", requireRoles(["teacher", "univ_teacher", "school_men
 
     return c.json({ success: true, students: finalResults });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -919,7 +919,7 @@ dataRouter.get("/reliability-results", requireRoles(["researcher", "admin", "col
     const results = await db.prepare(query).all();
     return c.json({ success: true, results: results.results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -961,7 +961,7 @@ dataRouter.get("/reliability-results/:runId", requireRoles(["researcher", "admin
     const results = await db.prepare(query).bind(runId).all();
     return c.json({ success: true, details: results.results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1008,7 +1008,7 @@ dataRouter.get("/export/evaluations-csv", requireRoles(["researcher", "admin", "
       },
     });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1053,7 +1053,7 @@ dataRouter.get("/export/reliability-csv", requireRoles(["researcher", "admin", "
       },
     });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1540,7 +1540,7 @@ dataRouter.get("/export/joint-display-csv", requireRoles(["researcher", "admin",
       }
     });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1579,7 +1579,7 @@ dataRouter.get("/export/chat-goals-csv", requireRoles(["researcher", "admin", "c
       }
     });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1593,7 +1593,7 @@ dataRouter.get("/evaluator-profiles", requireRoles(["evaluator", "researcher", "
     const { results } = await db.prepare("SELECT * FROM evaluator_profiles").all();
     return c.json({ success: true, profiles: results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1612,7 +1612,7 @@ dataRouter.post("/evaluator-profiles", requireRoles(["evaluator", "researcher", 
     `).bind(body.evaluator_id, body.years_of_experience || 0, body.training_background || "").run();
     return c.json({ success: true });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1645,7 +1645,7 @@ dataRouter.get("/joint-display", requireRoles(["researcher", "admin", "collabora
     `).all();
     return c.json({ success: true, jointData: results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1658,7 +1658,7 @@ dataRouter.get("/scat/projects", requireRoles(["researcher", "admin", "collabora
     const { results } = await db.prepare("SELECT * FROM scat_projects ORDER BY created_at DESC").all();
     return c.json({ projects: results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1671,7 +1671,7 @@ dataRouter.post("/scat/projects", requireRoles(["researcher", "admin", "collabor
     await db.prepare("INSERT INTO scat_projects (id, title, description, created_by) VALUES (?, ?, ?, ?)").bind(id, title, description, created_by).run();
     return c.json({ success: true, id });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1693,7 +1693,7 @@ dataRouter.put("/scat/projects/:projectId/theorization", requireRoles(["research
       .bind(storyline || "", theoretical_description || "", projectId).run();
     return c.json({ success: true });
   } catch (err: any) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1705,7 +1705,7 @@ dataRouter.get("/scat/segments/:projectId", requireRoles(["researcher", "admin",
     const { results } = await db.prepare("SELECT * FROM scat_segments WHERE project_id = ? ORDER BY created_at ASC").bind(c.req.param("projectId")).all();
     return c.json({ segments: results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1722,7 +1722,7 @@ dataRouter.post("/scat/segments/:projectId", requireRoles(["researcher", "admin"
     }
     return c.json({ success: true });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1733,7 +1733,7 @@ dataRouter.get("/scat/codes/:projectId", requireRoles(["researcher", "admin", "c
     const { results } = await db.prepare("SELECT c.* FROM scat_codes c JOIN scat_segments s ON c.segment_id = s.id WHERE s.project_id = ?").bind(c.req.param("projectId")).all();
     return c.json({ codes: results });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1756,7 +1756,7 @@ dataRouter.post("/scat/codes", requireRoles(["researcher", "admin", "collaborato
     `).bind(id, body.segment_id, body.researcher_id, body.step1_words || "", body.step2_words || "", body.step3_concepts || "", body.step4_themes || "", body.memo || "").run();
     return c.json({ success: true, id });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1810,7 +1810,7 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
 
     return c.json(updated);
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1832,7 +1832,7 @@ dataRouter.delete("/journals/:id", requireRoles(["student", "admin"] as UserRole
   await db.prepare("DELETE FROM journal_entries WHERE id = ?").bind(id).run();
     return c.json({ success: true });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1857,7 +1857,7 @@ dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", 
       messages: messages.results || []
     });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1897,7 +1897,7 @@ dataRouter.post("/chat-sessions/:journalId/messages", requireRoles(["student"] a
     
     return c.json({ success: true, message_id: msgId });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1923,7 +1923,7 @@ dataRouter.put("/goals/:id", requireRoles(["student"] as UserRole[]), async (c) 
     const updated = await db.prepare("SELECT * FROM goals WHERE id = ?").bind(id).first();
     return c.json(updated);
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1942,7 +1942,7 @@ dataRouter.get("/chat-sessions", requireRoles(["researcher", "admin", "collabora
     }
     return c.json({ sessions: sessions.results || [] });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -1961,7 +1961,7 @@ dataRouter.get("/scat/journals/:journalId", requireRoles(["researcher", "admin",
     
     return c.json({ analysis, segments });
   } catch (err: any) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -2015,7 +2015,7 @@ dataRouter.get("/scat/network", requireRoles(["researcher", "admin", "collaborat
 
     return c.json({ nodes, edges });
   } catch (err: any) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -2110,7 +2110,7 @@ dataRouter.post("/users", requireRoles(["admin"] as UserRole[]), async (c) => {
     `).bind(id, body.email, body.name, body.role || 'student', body.student_number || null, body.grade || null).run();
     return c.json({ success: true, user: { ...body, id } });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -2126,7 +2126,7 @@ dataRouter.put("/users/:id", requireRoles(["admin"] as UserRole[]), async (c) =>
     `).bind(body.email, body.name, body.role, body.student_number || null, body.grade || null, id).run();
     return c.json({ success: true, user: { ...body, id } });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -2138,7 +2138,7 @@ dataRouter.delete("/users/:id", requireRoles(["admin"] as UserRole[]), async (c)
     await db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
     return c.json({ success: true });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 
@@ -2207,7 +2207,7 @@ dataRouter.post("/auth/login", async (c) => {
     });
   } catch (err) {
     console.error("Login error:", err);
-    return c.json({ error: String(err) }, 500);
+    console.error("JOURNALS ERROR", err); return c.json({ error: String(err) }, 500);
   }
 });
 

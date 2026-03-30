@@ -8,7 +8,7 @@ import { Env } from "../../types/env";
 export const adminAlertsRouter = new Hono<{ Bindings: Env; Variables: any }>();
 
 adminAlertsRouter.use("*", requireAuth);
-adminAlertsRouter.use("*", requireRoles(["admin"]));
+adminAlertsRouter.use("*", requireRoles(["admin", "researcher"]));
 
 adminAlertsRouter.get("/cleanup-failure", async (c) => {
   const db = c.env.DB;
