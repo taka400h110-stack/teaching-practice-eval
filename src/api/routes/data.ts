@@ -535,6 +535,67 @@ dataRouter.get("/journals/:id", requireRoles(["student", "teacher", "univ_teache
   }
 });
 
+
+dataRouter.post("/evaluations", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  const body = await c.req.json();
+  const { journal_id, evaluation, model_name, prompt_version } = body;
+  const total_score = body.total_score ?? evaluation?.total_score;
+  const factor_scores = body.factor_scores ?? evaluation?.factor_scores;
+  const overall_comment = body.overall_comment ?? evaluation?.overall_comment;
+  const evalId = crypto.randomUUID();
+
+  try {
+    await ensureSchema(db);
+    
+    // First, insert evaluation
+    await db.prepare(`
+      INSERT INTO evaluations (
+        id, journal_id, eval_type, model_name, prompt_version,
+        total_score, factor1_score, factor2_score, factor3_score, factor4_score,
+        overall_comment, reasoning, created_at
+      ) VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      evalId, journal_id, model_name || 'gpt-4o', prompt_version || '1.0',
+      total_score, factor_scores?.factor1 || 0, factor_scores?.factor2 || 0,
+      factor_scores?.factor3 || 0, factor_scores?.factor4 || 0,
+      overall_comment || evaluation?.overall_comment || '',
+      evaluation?.reasoning || ''
+    ).run();
+
+    // Next, insert items if any
+    if (evaluation && Array.isArray(evaluation.items)) {
+      const stmt = db.prepare(`
+        INSERT INTO evaluation_items (
+          id, evaluation_id, item_number, score, rd_level, is_na, evidence, feedback, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `);
+      const batch = evaluation.items.map((it) => 
+        stmt.bind(
+          crypto.randomUUID(),
+          evalId,
+          it.item_number,
+          it.score,
+          it.rd_level || '',
+          it.is_na ? 1 : 0,
+          it.evidence || '',
+          it.feedback || ''
+        )
+      );
+      await db.batch(batch);
+    }
+    
+    // Update journal status to evaluated
+    await db.prepare("UPDATE journal_entries SET status = 'evaluated' WHERE id = ?").bind(journal_id).run();
+
+    return c.json({ success: true, id: evalId });
+  } catch (err) {
+    console.error("EVALUATIONS POST ERROR", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -1811,7 +1872,8 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
       return c.json({ success: false, error: "forbidden", message: "Out of data scope" }, 403);
     }
 
-    const fields = Object.keys(body).filter(k => k !== 'id' && k !== 'student_id');
+    const allowedFields = ['entry_date', 'week_number', 'title', 'content', 'word_count', 'status', 'ocr_source', 'ocr_confidence'];
+    const fields = Object.keys(body).filter(k => allowedFields.includes(k));
     if (fields.length === 0) return c.json({ success: true });
     
     const setClause = fields.map(k => `${k} = ?`).join(", ");

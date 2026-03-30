@@ -5,14 +5,7 @@ async function test() {
     body: JSON.stringify({ email: "admin@teaching-eval.jp", password: "password" })
   }).then(r => r.json());
   
-  if (!loginRes.token) {
-    console.error("Login failed", loginRes);
-    return;
-  }
-  
   const token = loginRes.token;
-  console.log("Logged in as admin.");
-  
   const res = await fetch("https://fix-admin-bugs.teaching-practice-eval.pages.dev/api/external-jobs", {
     method: "POST",
     headers: { 
@@ -27,8 +20,6 @@ async function test() {
   });
   
   console.log("Status:", res.status);
-  const text = await res.text();
-  console.log("Response:", text);
+  console.log("Response:", await res.text());
 }
-
 test();

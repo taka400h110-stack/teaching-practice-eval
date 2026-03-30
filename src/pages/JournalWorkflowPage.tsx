@@ -413,6 +413,8 @@ export default function JournalWorkflowPage() {
       setSnackMsg(isDraft ? "下書きを保存しました" : "日誌を提出しました ✓");
       setSnackOpen(true);
       if (!isDraft) {
+        // Automatically run evaluation if not draft
+        evaluateMutation.mutate(data.id);
         setTimeout(() => setStep(1), 1000); // 提出後は自動的にAI評価タブへ
       }
     },
@@ -435,6 +437,20 @@ export default function JournalWorkflowPage() {
     const title = subject ? `第${weekNumber}週 実習日誌（${subject}）` : `第${weekNumber}週 実習日誌`;
     saveMutation.mutate({ title, content, reflection_text: reflection, entry_date: entryDate, week_number: weekNumber, status } as JournalCreateRequest);
   };
+
+  const evaluateMutation = useMutation<EvaluationResult, Error, string>({
+    mutationFn: (id) => apiClient.runEvaluation(id),
+    onSuccess: () => {
+      void queryClient_.invalidateQueries({ queryKey: ["evaluations"] });
+      void queryClient_.invalidateQueries({ queryKey: ["journals"] });
+      setSnackMsg("AI評価が完了しました ✓");
+      setSnackOpen(true);
+    },
+    onError: () => {
+      setSnackMsg("AI評価に失敗しました");
+      setSnackOpen(true);
+    }
+  });
 
   // ── ① 日誌：ブロック操作 ──
   const updateRecord = useCallback((id: string, field: keyof HourRecord, value: string) => {
@@ -508,7 +524,7 @@ export default function JournalWorkflowPage() {
     setStep(j.status === "evaluated" ? 1 : 0);
   };
 
-  const evalData = allEvals.find((e) => e.journal_id === targetJournalId) ?? allEvals[0];
+  const evalData = allEvals.find((e) => e.journal_id === targetJournalId);
   const radarData = evalData ? FACTOR_KEYS.map((k, i) => ({
     factor: FACTOR_LABELS[i],
     score:  evalData.factor_scores[k] ?? 0,
@@ -944,9 +960,20 @@ export default function JournalWorkflowPage() {
             </Card>
 
             {!evalData ? (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                日誌を提出するとAI評価が生成されます。まず「① 日誌記入」タブで日誌を提出してください。
-              </Alert>
+              <Box>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  日誌は提出されましたが、まだAI評価が実行されていません。
+                </Alert>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => savedJournalId && evaluateMutation.mutate(savedJournalId)}
+                  disabled={evaluateMutation.isPending || !savedJournalId}
+                  startIcon={evaluateMutation.isPending ? <CircularProgress size={20} color="inherit" /> : <SmartToyIcon />}
+                >
+                  {evaluateMutation.isPending ? "AI評価を実行中..." : "AI評価を実行する"}
+                </Button>
+              </Box>
             ) : (
               <>
                 {/* スコアサマリ */}

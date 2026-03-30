@@ -361,9 +361,7 @@ const apiClient = {
   // AI評価実行（ステータスを evaluated に更新）
   runEvaluation: async (journalId: string): Promise<EvaluationResult> => {
     try {
-      const journals = ([] as any[]);
-      const idx = journals.findIndex((j) => j.id === journalId);
-      const journal = journals[idx];
+      const journal = await apiClient.getJournal(journalId);
       const user = JSON.parse(localStorage.getItem("user_info") ?? "{}");
 
       // 1. AI評価APIを呼び出す
@@ -394,11 +392,7 @@ const apiClient = {
       
       if (!saveRes.ok) throw new Error("Failed to save evaluation");
 
-      // 3. ローカルのステータスを更新する
-      if (idx !== -1) {
-        journals[idx] = { ...journals[idx], status: "completed" };
-        ;
-      }
+      // 3. (ステータスはサーバー側で更新済み)
 
       // 4. 保存した評価結果を取得して返す
       return await apiClient.getEvaluation(journalId);
