@@ -166,8 +166,16 @@ const apiClient = {
     localStorage.removeItem("pending_onboarding");
   },
   getCurrentUser: () => {
-    const raw = localStorage.getItem("user_info");
-    return raw ? JSON.parse(raw) : null;
+    try {
+      const raw = localStorage.getItem("user_info");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      // userがネストしている場合の対応
+      return parsed.user ? parsed.user : parsed;
+    } catch (e) {
+      console.error("Failed to parse user_info:", e);
+      return null;
+    }
   },
   
   isAuthenticated: () => {

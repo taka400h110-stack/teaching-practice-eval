@@ -152,7 +152,8 @@ export default function LoginPage() {
         navigate("/onboarding");
       } else {
         const user = apiClient.getCurrentUser();
-        const role = user?.role || user?.roles?.[0] || 'student';
+        const rawRole = user?.role || user?.user?.role || user?.roles?.[0] || 'student';
+        const role = typeof rawRole === 'string' ? rawRole : (Array.isArray(rawRole) ? rawRole[0] : 'student');
         if (role === 'admin' || role === 'researcher') {
           navigate("/admin");
         } else if (role === 'teacher' || role === 'univ_teacher' || role === 'school_mentor') {

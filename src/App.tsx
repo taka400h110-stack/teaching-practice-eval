@@ -64,10 +64,25 @@ function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, a
   if (allowedRoles && allowedRoles.length > 0) {
     const user = apiClient.getCurrentUser();
     // 下位互換対応
-    const userRoles = (user as any)?.roles || [(user as any)?.role || "student"];
-    const hasRole = userRoles.some((r: string) => allowedRoles.includes(r));
+    const roles = (user as any)?.roles;
+    const rawRole = (user as any)?.role || (user as any)?.user?.role;
+    let singleRole = "student";
+    if (typeof rawRole === 'string') singleRole = rawRole;
+    else if (Array.isArray(rawRole) && rawRole.length > 0) singleRole = rawRole[0];
+    
+    let userRoles: string[] = ["student"];
+    if (Array.isArray(roles) && roles.length > 0) {
+      userRoles = roles;
+    } else if (singleRole) {
+      userRoles = [singleRole];
+    }
+    
+    // adminが含まれるか確実にチェック（大文字小文字の違いなどを吸収）
+    const hasRole = userRoles.some((r: string) => allowedRoles.includes(r.toLowerCase()));
+    
+    console.log("[PrivateRoute] path:", window.location.pathname, "user:", user, "userRoles:", userRoles, "hasRole:", hasRole);
     if (!user || !hasRole) {
-      return <Navigate to="/unauthorized" replace />;
+      console.error("REDIRECTING TO UNAUTHORIZED. user:", user, "hasRole:", hasRole, "roles:", userRoles); return <Navigate to="/unauthorized" replace state={{ user, userRoles, allowedRoles, hasRole }} />;
     }
   }
   

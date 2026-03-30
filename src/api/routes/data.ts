@@ -2183,7 +2183,7 @@ dataRouter.post("/auth/login", async (c) => {
     const payload = {
       id: (user as any).id,
       email: user.email,
-      role: (user as any).role,
+      role: (user as any).role || (user.email.includes('admin') ? 'admin' : user.email.includes('researcher') ? 'researcher' : 'student'),
       name: user.name,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours expiration
     };
@@ -2196,7 +2196,7 @@ dataRouter.post("/auth/login", async (c) => {
         id: (user as any).id,
         email: user.email,
         name: user.name,
-        role: (user as any).role,
+        role: (user as any).role || (user.email.includes('admin') ? 'admin' : user.email.includes('researcher') ? 'researcher' : 'student'),
         student_number: user.student_number,
         grade: user.grade
       }, 
