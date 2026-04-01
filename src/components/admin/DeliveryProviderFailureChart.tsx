@@ -6,7 +6,7 @@ export const DeliveryProviderFailureChart = ({ data }: { data: any[] }) => {
   return (
     <Card variant="outlined" sx={{ height: '100%' }}>
       <CardContent>
-        <Typography variant="h6" gutterBottom>Provider Status Breakdown</Typography>
+        <Typography variant="h6" gutterBottom>プロバイダー状態内訳</Typography>
         <Box height={300}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>

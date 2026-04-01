@@ -322,11 +322,20 @@ const JournalEditorPage: React.FC = () => {
     },
     onSuccess: (data, payload) => {
       void queryClient_.invalidateQueries({ queryKey: ["journals"] });
+      
       setSnackbarMessage(payload.status === "submitted" ? "日誌を提出しました" : "下書きを保存しました");
       setSnackbarOpen(true);
+      
+      // SCAT分析を非同期でキックする
+      if (payload.status === "submitted") {
+        apiClient.post("/api/openai/scat-analysis/journal", { journal_id: data.id })
+          .catch(err => console.error("Auto SCAT analysis failed:", err));
+      }
+
       if (payload.status === "submitted") {
         setTimeout(() => navigate("/journals"), 1500);
-      } else if (!isEditMode && data.id) {
+      }
+ else if (!isEditMode && data.id) {
         navigate(`/journals/${data.id}/edit`, { replace: true });
       }
     },

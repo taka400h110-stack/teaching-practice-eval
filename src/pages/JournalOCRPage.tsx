@@ -70,7 +70,7 @@ const BLOCK_FIELD_MAP: { keywords: string[]; field: string; label: string }[] = 
   { keywords: ["清掃", "掃除"], field: "block_cleaning", label: "清掃" },
   { keywords: ["帰り", "帰りの会", "終わりの会", "SHR"], field: "block_closing", label: "帰りの会" },
   { keywords: ["放課後", "部活", "クラブ"], field: "block_after", label: "放課後" },
-  { keywords: ["省察", "振り返り", "リフレクション", "感想", "気づき"], field: "reflection", label: "省察・振り返り" },
+  { keywords: ["省察", "振り返り", "リフレクション", "感想", "気づき", "学ばせていただいたこと", "学ばせていただいた", "次回に向けて", "抱負"], field: "reflection", label: "省察・振り返り" },
 ];
 
 function mapToField(text: string): string | undefined {

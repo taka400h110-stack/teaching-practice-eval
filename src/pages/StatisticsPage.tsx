@@ -168,15 +168,15 @@ export default function StatisticsPage() {
 
   // 基本統計量
   const scores  = cohorts.map((p: any) => p.final_total);
-  const mean    = +(scores.reduce((s: any, v: any) => s + v, 0) / scores.length).toFixed(2);
-  const variance = +(scores.reduce((s: any, v: any) => s + (v - mean) ** 2, 0) / scores.length).toFixed(3);
+  const mean    = scores.length > 0 ? +(scores.reduce((s: any, v: any) => s + v, 0) / scores.length).toFixed(2) : 0;
+  const variance = scores.length > 0 ? +(scores.reduce((s: any, v: any) => s + (v - mean) ** 2, 0) / scores.length).toFixed(3) : 0;
   const sd      = +Math.sqrt(+variance).toFixed(2);
   const sorted  = [...scores].sort((a, b) => a - b);
-  const median  = +(scores.length % 2 === 0
+  const median  = scores.length > 0 ? +(scores.length % 2 === 0
     ? (sorted[scores.length / 2 - 1] + sorted[scores.length / 2]) / 2
-    : sorted[Math.floor(scores.length / 2)]).toFixed(2);
-  const minScore = Math.min(...scores);
-  const maxScore = Math.max(...scores);
+    : sorted[Math.floor(scores.length / 2)]).toFixed(2) : 0;
+  const minScore = scores.length > 0 ? Math.min(...scores) : 0;
+  const maxScore = scores.length > 0 ? Math.max(...scores) : 0;
 
   // ヒストグラム
   const histBins = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5];

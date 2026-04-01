@@ -531,7 +531,16 @@ export default function ReliabilityAnalysisPage() {
 
   const data = result;
 
-  if (!cohorts || cohorts.length === 0) return null;
+  if (!cohorts || cohorts.length === 0) return (
+    <Box p={3}>
+      <Card variant="outlined" sx={{ p: 3, textAlign: 'center', bgcolor: '#f9f9f9' }}>
+        <Typography variant="h6" color="text.secondary">データがありません</Typography>
+        <Typography variant="body2" color="text.secondary">
+          分析対象となるコホートデータが存在しません。データが蓄積されるのをお待ちください。
+        </Typography>
+      </Card>
+    </Box>
+  );
 
   if (isLoading) return <LinearProgress />;
 

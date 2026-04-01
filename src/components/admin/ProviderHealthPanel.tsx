@@ -39,11 +39,11 @@ export const ProviderHealthPanel: React.FC = () => {
 
         {missingSecrets.length > 0 && (
           <Alert severity="warning" sx={{ mb: 3 }}>
-            <strong>Missing Required Secrets:</strong> {missingSecrets.join(', ')}
+            <strong>不足しているシークレットキー:</strong> {missingSecrets.join(', ')}
           </Alert>
         )}
 
-        <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>Provider Status</Typography>
+        <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>プロバイダー状態</Typography>
         <Grid container spacing={2}>
           {providers.map(provider => (
             <Grid item xs={12} sm={6} md={4} key={provider.name || Math.random()}>

@@ -1,0 +1,6 @@
+doc_id,coefficient,classification
+DOC_001,0.45,structure
+DOC_002,0.55,structure
+DOC_003,0.85,structure
+DOC_004,0.35,quasi-structure
+DOC_005,0.20,non-structure

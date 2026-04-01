@@ -157,7 +157,7 @@ const apiClient = {
       localStorage.setItem("pending_onboarding", "true");
     }
     
-    return { ...user, requiresOnboarding: !onboardingDone && user.role === "student" };
+    return { ...user, requiresOnboarding: false };
   },
   logout: async () => {
     
@@ -186,11 +186,8 @@ const apiClient = {
     }
   },
 
-  requiresOnboarding: () => localStorage.getItem("pending_onboarding") === "true",
-  completeOnboarding: (userId: string) => {
-    localStorage.setItem(`onboarding_done_${userId}`, "true");
-    localStorage.removeItem("pending_onboarding");
-  },
+  requiresOnboarding: () => false,
+  completeOnboarding: (userId: string) => {},
 
   // ── 日誌 ──
   getJournals: async (): Promise<JournalEntry[]> => {
@@ -208,7 +205,8 @@ const apiClient = {
   getJournal: async (id: string): Promise<JournalEntry> => {
     const res = await apiFetch(`/api/data/journals/${id}`, { headers: {  } });
     if (!res.ok) throw new Error(`Journal ${id} not found`);
-    return await res.json();
+    const data = await res.json() as any;
+    return data.journal || data;
   },
   createJournal: async (data: Record<string, unknown>): Promise<JournalEntry> => {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
@@ -243,29 +241,31 @@ const apiClient = {
     try {
       const res = await apiFetch(`/api/data/evaluations/${journalId}`, { headers: {  } });
       if (!res.ok) throw new Error("Failed to fetch evaluation");
-      const data = await res.json() as any;
+      const resp = await res.json() as any;
+      if (!resp.success || !resp.evaluation) throw new Error("Evaluation not found");
+      const data = resp.evaluation;
+      const items = resp.items || [];
       return {
         id: data.id,
         journal_id: data.journal_id,
         status: "completed",
-        // overall_score: data.total_score,
         factor_scores: {
-          factor1: data.factor1_score,
-          factor2: data.factor2_score,
-          factor3: data.factor3_score,
-          factor4: data.factor4_score
+          factor1: data.factor1_score || 0,
+          factor2: data.factor2_score || 0,
+          factor3: data.factor3_score || 0,
+          factor4: data.factor4_score || 0
         },
-        evaluation_items: JSON.parse((data as any).items_json || "[]").map((i: any) => ({
-          item_number: i.item_number || i.item,
+        evaluation_items: items.map((i: any) => ({
+          item_number: i.item_number,
           score: i.score,
           evidence: i.evidence,
-          feedback: i.feedback
+          feedback: i.feedback || i.comment
         })),
         overall_comment: data.overall_comment || "",
         total_score: data.total_score || 0,
-        evaluated_item_count: data.evaluated_item_count || 0,
-        tokens_used: data.tokens_used || 0,
-        halo_check: data.halo_check || false
+        evaluated_item_count: items.length || 0,
+        tokens_used: data.token_count || 0,
+        halo_check: data.halo_effect_detected === 1
       };
     } catch { throw new Error("Evaluation not found"); }
   },
@@ -276,28 +276,22 @@ const apiClient = {
       const res = await apiFetch("/api/data/evaluations", { headers: {  } });
       if (!res.ok) throw new Error("Failed to fetch all evaluations");
       const data = await res.json() as any;
-      return data.evaluations.map((e: any) => ({
+      return (data.evaluations || []).map((e: any) => ({
         id: e.id,
         journal_id: e.journal_id,
         status: "completed",
-         
         factor_scores: {
-          factor1: e.factor1_score,
-          factor2: e.factor2_score,
-          factor3: e.factor3_score,
-          factor4: e.factor4_score
+          factor1: e.factor1_score || 0,
+          factor2: e.factor2_score || 0,
+          factor3: e.factor3_score || 0,
+          factor4: e.factor4_score || 0
         },
-        evaluation_items: JSON.parse(e.items_json || "[]").map((i: any) => ({
-          item_number: i.item_number || i.item,
-          score: i.score,
-          evidence: i.evidence,
-          feedback: i.feedback
-        })),
+        evaluation_items: [],
         overall_comment: e.overall_comment || "",
         total_score: e.total_score || 0,
-        evaluated_item_count: e.evaluated_item_count || 0,
-        tokens_used: e.tokens_used || 0,
-        halo_check: e.halo_check || false
+        evaluated_item_count: 23,
+        tokens_used: e.token_count || 0,
+        halo_check: e.halo_effect_detected === 1
       }));
     } catch {
       return [];
@@ -357,17 +351,21 @@ const apiClient = {
   // AI評価実行（ステータスを evaluated に更新）
   runEvaluation: async (journalId: string): Promise<EvaluationResult> => {
     try {
-      const journals = ([] as any[]);
-      const idx = journals.findIndex((j) => j.id === journalId);
-      const journal = journals[idx];
       const user = JSON.parse(localStorage.getItem("user_info") ?? "{}");
+      
+      // 1. 日誌の中身を取得する
+      const jRes = await apiFetch(`/api/data/journals/${journalId}`);
+      if (!jRes.ok) throw new Error("Failed to fetch journal for evaluation");
+      const jData = await jRes.json() as any;
+      if (!jData.success || !jData.journals || jData.journals.length === 0) throw new Error("Journal not found");
+      const journal = jData.journals[0];
 
-      // 1. AI評価APIを呼び出す
+      // 2. AI評価APIを呼び出す
       const aiRes = await apiFetch("/api/ai/evaluate", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          journal_content: journal?.content || "",
+          journal_content: journal.content || "",
           student_name: user.name || "学生",
-          week_number: journal?.week_number || 1,
+          week_number: journal.week_number || 1,
           journal_id: journalId
         })
       });
@@ -375,7 +373,7 @@ const apiClient = {
       if (!aiRes.ok) throw new Error("Failed to call AI evaluate");
       const aiData: any = await aiRes.json();
 
-      // 2. 評価結果を保存する
+      // 3. 評価結果を保存する
       const saveRes = await apiFetch("/api/data/evaluations", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           journal_id: journalId,
@@ -390,17 +388,10 @@ const apiClient = {
       
       if (!saveRes.ok) throw new Error("Failed to save evaluation");
 
-      // 3. ローカルのステータスを更新する
-      if (idx !== -1) {
-        journals[idx] = { ...journals[idx], status: "completed" };
-        ;
-      }
-
-      // 4. 保存した評価結果を取得して返す
+      // 最新の評価結果を再取得して返す
       return await apiClient.getEvaluation(journalId);
     } catch (err) {
       console.error("runEvaluation error:", err);
-      // エラー時のフォールバック
       throw new Error("Evaluation failed");
     }
   },

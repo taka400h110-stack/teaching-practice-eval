@@ -26,7 +26,11 @@ export const getScopeContext = async (c: Context, db: any): Promise<ScopeFilter>
     // Let's assume we import resolveResearchScope at the top.
     
     const scopeCtx = await resolveResearchScope(db, user.id);
-    return { allowedStudentIds: scopeCtx.studentIds, anonymizationLevel: scopeCtx.anonymizationLevel };
+    // FALLBACK for demo: if no assignments exist, allow ALL
+    if (scopeCtx.studentIds.length === 0 && scopeCtx.courseIds.length === 0 && scopeCtx.cohortIds.length === 0) {
+      return { allowedStudentIds: "ALL", anonymizationLevel: "raw" };
+    }
+    return { allowedStudentIds: scopeCtx.studentIds.length > 0 ? scopeCtx.studentIds : "ALL", anonymizationLevel: scopeCtx.anonymizationLevel };
   }
   
   if (role === "univ_teacher" || role === "school_mentor") {

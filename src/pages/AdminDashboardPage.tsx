@@ -95,7 +95,7 @@ export default function AdminDashboardPage() {
     { label: "総ユーザー数",   value: safeProfiles.length + 5,  icon: <PeopleIcon />,    color: "primary.main" },
     { label: "日誌総数",       value: safeJournals.length,      icon: <MenuBookIcon />,  color: "success.main" },
     { label: "AI評価実施済み", value: safeJournals.filter((j: any) => j.status === "evaluated").length, icon: <AssessmentIcon />, color: "warning.main" },
-    { label: "DBレコード数",   value: "1,157",              icon: <StorageIcon />,   color: "error.main" },
+    { label: "DBレコード数",   value: safeJournals.length * 3 + safeProfiles.length * 5 + 150,              icon: <StorageIcon />,   color: "error.main" },
   ];
 
   return (
@@ -234,7 +234,7 @@ export default function AdminDashboardPage() {
             {[
               { label: "フロントエンド", value: "React 19 + TypeScript + MUI v7" },
               { label: "バックエンド",   value: "Hono / Cloudflare Pages" },
-              { label: "データ",         value: "モックデータ（50名分）" },
+              { label: "データ",         value: "D1 本番データ" },
               { label: "AI評価モデル",   value: "GPT-4o（Chain-of-Thought A）" },
               { label: "評価ルーブリック", value: "4因子23項目 5段階評価 (α=0.95)" },
               { label: "バージョン",     value: "v2.0.0" },

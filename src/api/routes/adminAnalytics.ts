@@ -7,8 +7,8 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get('/delivery', async (c) => {
   const user = c.get('user') as any;
-  if (!user || user.role !== 'admin') {
-    return c.json({ error: 'Forbidden' }, 403);
+  if (!user || (user.role !== 'admin' && user.role !== 'researcher')) {
+    return c.json({ error: 'アクセス権限がありません' }, 403);
   }
 
   const range = c.req.query('range') as AnalyticsRange || '7d';

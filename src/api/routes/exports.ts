@@ -91,7 +91,7 @@ exportsRouter.post("/requests/:id/approve", requireAuth, requireRoles(["admin"] 
   const body = await c.req.json();
   
   const { results } = await db.prepare("SELECT * FROM dataset_export_requests WHERE id = ?").bind(id).all();
-  if (results.length === 0) return c.json({ error: "Not found" }, 404);
+  if (results.length === 0) return c.json({ error: "見つかりません" }, 404);
   
   await db.prepare(`
     UPDATE dataset_export_requests
@@ -145,10 +145,10 @@ exportsRouter.post("/requests/:id/generate", requireAuth, requireRoles(["admin",
   const body = await c.req.json().catch(() => ({}));
   
   const reqRes = await db.prepare("SELECT * FROM dataset_export_requests WHERE id = ?").bind(id).first() as any;
-  if (!reqRes) return c.json({ error: "Not found" }, 404);
+  if (!reqRes) return c.json({ error: "見つかりません" }, 404);
   
   if (reqRes.requester_user_id !== user.id && user.role !== "admin") {
-    return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: "アクセス権限がありません" }, 403);
   }
   
   if (reqRes.status !== "approved") {
@@ -263,10 +263,10 @@ exportsRouter.post("/requests/:id/download-token", requireAuth, requireRoles(RES
   const user = c.get("user");
   
   const reqRes = await db.prepare("SELECT * FROM dataset_export_requests WHERE id = ?").bind(id).first() as any;
-  if (!reqRes) return c.json({ error: "Not found" }, 404);
+  if (!reqRes) return c.json({ error: "見つかりません" }, 404);
   
   if (reqRes.requester_user_id !== user.id) {
-    return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: "アクセス権限がありません" }, 403);
   }
   if (reqRes.status !== "completed" && reqRes.status !== "generated") {
     return c.json({ error: "Export not generated yet" }, 400);
@@ -334,7 +334,7 @@ exportsRouter.get("/download/:token", async (c) => {
   if (c.env.EXPORTS_BUCKET && objectKey && !objectKey.startsWith("data:")) {
     const object = await c.env.EXPORTS_BUCKET.get(objectKey);
     if (!object) {
-      return c.json({ error: "Object not found" }, 404);
+      return c.json({ error: "オブジェクトが見つかりません" }, 404);
     }
     
     const headers = new Headers();
