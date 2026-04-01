@@ -9,7 +9,6 @@ const ExportsPage             = lazy(() => import("./pages/ExportsPage"));
 const AdminExportsPage        = lazy(() => import("./pages/AdminExportsPage"));
 
 const LoginPage               = lazy(() => import("./pages/LoginPage"));
-const OnboardingPage          = lazy(() => import("./pages/OnboardingPage"));
 // 実習生
 const DashboardPage           = lazy(() => import("./pages/DashboardPage"));
 // 教員・メンター・評価者
@@ -44,6 +43,12 @@ const GoalHistoryPage         = lazy(() => import("./pages/GoalHistoryPage"));
 const ChatBotPage             = lazy(() => import("./pages/ChatBotPage"));
 // ユーザー登録
 const UserRegistrationPage    = lazy(() => import("./pages/UserRegistrationPage"));
+// Analysis Pages
+const JournalSCATPage         = lazy(() => import("./pages/analysis/JournalSCATPage"));
+const JournalISMPage          = lazy(() => import("./pages/analysis/JournalISMPage"));
+const JournalSPTablePage      = lazy(() => import("./pages/analysis/JournalSPTablePage"));
+const JournalTransmissionPage = lazy(() => import("./pages/analysis/JournalTransmissionPage"));
+
 // OCR
 const JournalOCRPage          = lazy(() => import("./pages/JournalOCRPage"));
 // 教員統計
@@ -59,8 +64,7 @@ const Spinner = () => (
 
 function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
   if (!apiClient.isAuthenticated()) return <Navigate to="/login" replace />;
-  if (apiClient.requiresOnboarding()) return <Navigate to="/onboarding" replace />;
-  
+    
   if (allowedRoles && allowedRoles.length > 0) {
     const user = apiClient.getCurrentUser();
     // 下位互換対応
@@ -79,8 +83,7 @@ export default function App() {
     <Suspense fallback={<Spinner />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route
+                <Route
           path="/"
           element={
             <PrivateRoute>
@@ -129,6 +132,13 @@ export default function App() {
           <Route path="exports"           element={<PrivateRoute allowedRoles={["researcher", "collaborator", "board_observer", "admin"]}><ExportsPage /></PrivateRoute>} />
           <Route path="admin/exports"     element={<PrivateRoute allowedRoles={["admin"]}><AdminExportsPage /></PrivateRoute>} />
 
+          
+          {/* Analysis Pages */}
+          <Route path="research/journals/:journalId/scat" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalSCATPage /></PrivateRoute>} />
+          <Route path="research/journals/:journalId/ism" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalISMPage /></PrivateRoute>} />
+          <Route path="research/journals/:journalId/sp-table" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalSPTablePage /></PrivateRoute>} />
+          <Route path="research/journals/:journalId/transmission" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalTransmissionPage /></PrivateRoute>} />
+
           {/* 個人 */}
           <Route path="self-evaluation"   element={<PrivateRoute allowedRoles={["student"]}><SelfEvaluationPage /></PrivateRoute>} />
           <Route path="goals"             element={<PrivateRoute allowedRoles={["student"]}><GoalHistoryPage /></PrivateRoute>} />
@@ -146,7 +156,7 @@ export default function App() {
           {/* 国際比較（RQ1） */}
           <Route path="international"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><InternationalComparisonPage /></PrivateRoute>} />
         </Route>
-        <Route path="unauthorized" element={<Box p={4}><Typography variant="h5" color="error">403 Forbidden</Typography><Typography>このページへのアクセス権限がありません。</Typography></Box>} />
+        <Route path="unauthorized" element={<Box p={4}><Typography variant="h5" color="error">アクセス権限がありません (403)</Typography><Typography>このページへのアクセス権限がありません。</Typography></Box>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>

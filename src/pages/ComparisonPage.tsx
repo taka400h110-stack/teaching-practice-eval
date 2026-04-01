@@ -136,7 +136,12 @@ export default function ComparisonPage() {
     return (
       <Box p={4}>
         <Typography variant="h5" gutterBottom>AI vs 人間比較</Typography>
-        <Alert severity="warning">比較対象データが存在しません。AI評価と人間評価の両方が完了したデータが必要です。</Alert>
+        <Card variant="outlined" sx={{ p: 3, textAlign: 'center', bgcolor: '#f9f9f9' }}>
+          <Typography variant="h6" color="text.secondary">データが存在しないため表示できません</Typography>
+          <Typography variant="body2" color="text.secondary">
+            AI評価と人間評価の両方が完了したペアデータが存在しないため、比較分析を実行できません。
+          </Typography>
+        </Card>
       </Box>
     );
   }

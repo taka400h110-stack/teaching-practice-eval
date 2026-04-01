@@ -363,8 +363,8 @@ export default function JournalWorkflowPage() {
   });
 
   const { data: chatSession } = useQuery({
-    queryKey: ["chat", savedJournalId ?? "journal-004"],
-    queryFn:  () => apiClient.getChatSession(savedJournalId ?? "journal-004"),
+    queryKey: ["chat", savedJournalId || ""],
+    queryFn:  () => savedJournalId ? apiClient.getChatSession(savedJournalId) : Promise.reject("No journal"),
   });
 
   // 既存データ復元（URLパラメータで日誌を開いた時）
@@ -404,10 +404,18 @@ export default function JournalWorkflowPage() {
     },
     onSuccess: (data, payload) => {
       void queryClient_.invalidateQueries({ queryKey: ["journals"] });
+      
       setSavedJournalId(data.id);
       const isDraft = payload.status === "draft";
       setSnackMsg(isDraft ? "下書きを保存しました" : "日誌を提出しました ✓");
       setSnackOpen(true);
+      
+      // SCAT分析を非同期でキックする
+      if (!isDraft) {
+        apiClient.post("/api/openai/scat-analysis/journal", { journal_id: data.id })
+          .catch(err => console.error("Auto SCAT analysis failed:", err));
+      }
+
       if (!isDraft) {
         setTimeout(() => setStep(1), 1000); // 提出後は自動的にAI評価タブへ
       }
@@ -485,7 +493,7 @@ export default function JournalWorkflowPage() {
   };
 
   // ── 評価データ ──
-  const targetJournalId = savedJournalId ?? "journal-004";
+  const targetJournalId = savedJournalId || "";
   // 過去日誌を選択してワークフローに読み込む
   const loadPastJournal = (j: JournalEntry) => {
     const { records: recs, reflection: ref } = contentToRecords(j.content);

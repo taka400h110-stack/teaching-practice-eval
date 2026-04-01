@@ -37,7 +37,7 @@ export const requireRoles = (allowedRoles: UserRole[]) => {
     const hasRole = userRoles.some(r => allowedRoles.includes(r as UserRole));
     
     if (!hasRole) {
-      return c.json({ success: false, error: "forbidden", message: "You do not have permission to access this resource." }, 403);
+      return c.json({ success: false, error: "forbidden", message: "このリソースにアクセスする権限がありません。" }, 403);
     }
     
     await next();

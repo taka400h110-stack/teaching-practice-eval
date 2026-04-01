@@ -87,7 +87,7 @@ function itemFactorIdx(itemNum: number): number {
 function parseHourRecords(content: string): HourRecord[] | null {
   try {
     const p = JSON.parse(content);
-    if (p.version === 2 && Array.isArray(p.records) && p.records.length > 0) {
+    if (p.version === 2 && Array.isArray(p.records)) {
       return [...p.records].sort((a: HourRecord, b: HourRecord) => a.order - b.order);
     }
   } catch {}
@@ -95,6 +95,7 @@ function parseHourRecords(content: string): HourRecord[] | null {
 }
 
 function blockAccent(label: string) {
+  if (!label) return "#455A64";
   if (label.includes("朝")) return "#FF9800";
   if (label.includes("休み")) return "#4CAF50";
   if (label.includes("給食") || label.includes("昼")) return "#E91E63";
@@ -103,6 +104,7 @@ function blockAccent(label: string) {
   return "#455A64";
 }
 function blockBg(label: string) {
+  if (!label) return "#F5F5F5";
   if (label.includes("朝")) return "#FFF3E0";
   if (label.includes("休み")) return "#E8F5E9";
   if (label.includes("給食") || label.includes("昼")) return "#FCE4EC";
@@ -114,11 +116,12 @@ function blockBg(label: string) {
 // ─────────────────────────────────────────────
 // スコアバー
 // ─────────────────────────────────────────────
-function ScoreBar({ value, color }: { value: number; color: string }) {
+function ScoreBar({ value, color }: { value: number | undefined; color: string }) {
+  const safeValue = typeof value === "number" ? value : 0;
   return (
     <LinearProgress
       variant="determinate"
-      value={(value / 5) * 100}
+      value={(safeValue / 5) * 100}
       sx={{
         height: 7, borderRadius: 4,
         bgcolor: "grey.200",
@@ -131,12 +134,19 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
 // ─────────────────────────────────────────────
 // スコアチップ
 // ─────────────────────────────────────────────
-function ScoreChip({ score }: { score: number }) {
+function ScoreChip({ score }: { score: number | undefined }) {
+  if (typeof score !== "number") {
+    return (
+      <Box sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", bgcolor: "#f5f5f5", border: "2px solid #bdbdbd", fontWeight: "bold", fontSize: 14, color: "#9e9e9e" }}>
+        —
+      </Box>
+    );
+  }
   const color = score >= 4 ? "#2e7d32" : score >= 3 ? "#1565c0" : score >= 2 ? "#e65100" : "#c62828";
   const bg    = score >= 4 ? "#e8f5e9" : score >= 3 ? "#e3f2fd" : score >= 2 ? "#fff3e0" : "#ffebee";
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", bgcolor: bg, border: `2px solid ${color}`, fontWeight: "bold", fontSize: 14, color }}>
-      {score.toFixed(1)}
+      {typeof score === "number" ? score.toFixed(1) : "—"}
     </Box>
   );
 }
@@ -215,6 +225,15 @@ interface EvalPanelProps {
 }
 
 const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekNumber, currentSelfEval }) => {
+  if (!evalData || !evalData.factor_scores || !evalData.evaluation_items || evalData.evaluation_items.length === 0 || evalData.total_score === 0) {
+    return (
+      <Box mt={4}>
+        <Alert severity="warning">
+          AI評価が正常に完了していません（項目数: {evalData?.evaluation_items?.length || 0} / 23）。再度評価を実行してください。
+        </Alert>
+      </Box>
+    );
+  }
   const fs = evalData.factor_scores;
 
   // レーダーチャート用データ
@@ -244,7 +263,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
             <AssessmentIcon sx={{ color: "#1976d2" }} />
             <Typography variant="subtitle1" fontWeight="bold" color="#1565c0">AI評価 — 因子別レーダーチャート</Typography>
             <Box ml="auto">
-              <Chip label={`総合: ${evalData.total_score.toFixed(2)} / 5.0`} size="small" color="primary" />
+              <Chip label={`総合: ${(typeof evalData.total_score === "number" ? evalData.total_score.toFixed(2) : "—")} / 5.0`} size="small" color="primary" />
             </Box>
           </Box>
           <Divider sx={{ mb: 2 }} />
@@ -282,7 +301,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
                         </Typography>
                       </Box>
                       <Typography variant="body2" fontWeight="bold" color={FACTOR_COLORS[i]}>
-                        {fs[key].toFixed(2)} / 5.0
+                        {typeof fs[key] === "number" ? fs[key].toFixed(2) : "—"} / 5.0
                       </Typography>
                     </Box>
                     <ScoreBar value={fs[key]} color={FACTOR_COLORS[i]} />
@@ -313,7 +332,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
                     <Typography variant="body2" fontWeight={700} color={FACTOR_COLORS[fi]}>
                       因子{["Ⅰ","Ⅱ","Ⅲ","Ⅳ"][fi]}　{FACTOR_LABELS[fi]}
                     </Typography>
-                    <Chip label={`平均 ${avg.toFixed(2)}`} size="small" sx={{ ml: "auto", mr: 1, bgcolor: `${FACTOR_COLORS[fi]}20`, color: FACTOR_COLORS[fi], fontWeight: "bold" }} />
+                    <Chip label={`平均 ${(typeof avg === "number" ? avg.toFixed(2) : "—")}`} size="small" sx={{ ml: "auto", mr: 1, bgcolor: `${FACTOR_COLORS[fi]}20`, color: FACTOR_COLORS[fi], fontWeight: "bold" }} />
                   </Box>
                 </AccordionSummary>
                 <AccordionDetails sx={{ p: 0 }}>
@@ -380,10 +399,10 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
             <Box display="flex" alignItems="center" gap={1} mb={1}>
               <ShowChartIcon sx={{ color: "#388e3c" }} />
               <Typography variant="subtitle1" fontWeight="bold" color="#2e7d32">
-                成長曲線（Week 1 〜 Week {weekNumber}）
+                成長曲線（Week 1 〜 Week {journal.week_number || "-"}）
               </Typography>
               <Chip
-                label={`今週 総合 ${growthUntilNow.slice(-1)[0]?.total.toFixed(2) ?? "—"}`}
+                label={`今週 総合 ${(typeof growthUntilNow.slice(-1)[0]?.total === "number" ? growthUntilNow.slice(-1)[0].total.toFixed(2) : "—") ?? "—"}`}
                 size="small"
                 sx={{ ml: "auto", bgcolor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold" }}
               />
@@ -395,7 +414,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
                 <XAxis dataKey="week" tickFormatter={(v: number) => `W${v}`} tick={{ fontSize: 11 }} />
                 <YAxis domain={[1, 5]} tickCount={5} tick={{ fontSize: 11 }} />
                 <Tooltip
-                  formatter={(val: number, name: string) => [val.toFixed(2), name]}
+                  formatter={(val: number, name: string) => [(typeof val === "number" ? val.toFixed(2) : String(val)), name]}
                   labelFormatter={(l: number) => `Week ${l}`}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -576,9 +595,9 @@ const JournalDetailPage: React.FC = () => {
     <Box p={3}><Alert severity="error">日誌の取得に失敗しました。</Alert></Box>
   );
   const statusConfig = STATUS_CONFIG[journal.status];
-  const formattedDate = new Date(journal.entry_date).toLocaleDateString("ja-JP", {
+  const formattedDate = journal.entry_date ? new Date(journal.entry_date).toLocaleDateString("ja-JP", {
     year: "numeric", month: "long", day: "numeric", weekday: "long",
-  });
+  }) : "日付未定";
   const hourRecords = parseHourRecords(journal.content);
   const isNewFormat = hourRecords !== null;
 
@@ -636,13 +655,22 @@ const JournalDetailPage: React.FC = () => {
         <CardContent>
           <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={2} mb={1.5}>
             <Typography variant="h5" fontWeight="bold" lineHeight={1.4}>{journal.title}</Typography>
-            <Chip label={statusConfig.label} color={statusConfig.color} />
+            <Chip label={STATUS_CONFIG[journal.status]?.label || "不明"} color={STATUS_CONFIG[journal.status]?.color || "default"} />
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Chip size="small" icon={<SchoolIcon />} label={`Week ${journal.week_number}`} color="primary" variant="outlined" />
+            <Chip size="small" icon={<SchoolIcon />} label={`Week ${journal.week_number || "-"}`} color="primary" variant="outlined" />
             {journal.subject && <Chip size="small" label={`📚 ${journal.subject}`} variant="outlined" />}
             <Chip size="small" label={`📅 ${formattedDate}`} variant="outlined" />
           </Stack>
+          {['admin', 'researcher', 'collaborator', 'board_observer'].includes(userRole || '') && (
+          <Box display="flex" flexWrap="wrap" gap={1} mt={3}>
+            <Button variant="outlined" size="small" onClick={() => navigate(`/research/journals/${journal.id}/scat`)}>SCAT分析結果</Button>
+            <Button variant="outlined" size="small" onClick={() => navigate(`/research/journals/${journal.id}/ism`)}>ISM構造化結果</Button>
+            <Button variant="outlined" size="small" onClick={() => navigate(`/research/journals/${journal.id}/sp-table`)}>SP表分析結果</Button>
+            <Button variant="outlined" size="small" onClick={() => navigate(`/research/journals/${journal.id}/transmission`)}>伝達係数</Button>
+          </Box>
+        )}
+
         </CardContent>
       </Card>
 

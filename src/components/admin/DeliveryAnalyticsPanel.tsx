@@ -23,7 +23,7 @@ export const DeliveryAnalyticsPanel = () => {
   return (
     <Box sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5">Alert Delivery & Escalation Analytics</Typography>
+        <Typography variant="h5">アラート配信とエスカレーション分析</Typography>
         <ToggleButtonGroup
           value={range}
           exclusive

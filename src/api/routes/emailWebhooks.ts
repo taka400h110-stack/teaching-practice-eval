@@ -19,7 +19,7 @@ app.post('/resend', async (c) => {
   if (env.RESEND_WEBHOOK_SECRET) {
     const authHeader = c.req.header('Authorization') || c.req.header('Webhook-Signature') || '';
     if (!authHeader.includes(env.RESEND_WEBHOOK_SECRET)) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      return c.json({ error: '認証されていません' }, 401);
     }
   }
 
@@ -55,7 +55,7 @@ app.post('/sendgrid', async (c) => {
         timestamp
       );
       if (!isValid) {
-        return c.json({ error: 'Unauthorized' }, 401);
+        return c.json({ error: '認証されていません' }, 401);
       }
     }
 

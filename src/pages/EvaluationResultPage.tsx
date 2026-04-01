@@ -307,10 +307,7 @@ export default function EvaluationResultPage() {
               : result?.evaluation_items;
             const fIdx = FACTOR_KEYS.indexOf(fk as typeof FACTOR_KEYS[number]);
 
-            if ((score||0) === null) return <Chip label="未評価" size="small" variant="outlined" />;
-  if (!score) return null;
-  if (isLoading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh"><CircularProgress /></Box>;
-  if (isError || !result) return <Box p={3}><Alert severity="error">評価結果の取得に失敗しました。</Alert></Box>;
+
 
   return (
               <TableContainer key={tabIdx} component={Paper} variant="outlined">

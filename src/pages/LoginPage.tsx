@@ -13,7 +13,7 @@ import ScienceIcon            from "@mui/icons-material/Science";
 import GroupsIcon             from "@mui/icons-material/Groups";
 import AccountBalanceIcon     from "@mui/icons-material/AccountBalance";
 import AssessmentIcon         from "@mui/icons-material/Assessment";
-import LoginIcon              from "@mui/icons-material/Login";
+import ログインIcon              from "@mui/icons-material/Login";
 import apiClient from "../api/client";
 
 // ── デモアカウント定義（全8役割・基本情報入り）──
@@ -132,7 +132,7 @@ const GROUP_COLS: Record<string, number> = {
   "システム": 1,
 };
 
-export default function LoginPage() {
+export default function ログインPage() {
   const navigate = useNavigate();
   const [email,    setEmail]    = useState("student@teaching-eval.jp");
   const [password, setPassword] = useState("password");
@@ -140,7 +140,7 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false);
   const [loggingIn, setLoggingIn] = useState<string | null>(null); // どのアカウントでログイン中か
 
-  const doLogin = async (loginEmail: string, loginPw: string) => {
+  const doログイン = async (loginEmail: string, loginPw: string) => {
     setLoading(true);
     setLoggingIn(loginEmail);
     setError("");
@@ -148,9 +148,9 @@ export default function LoginPage() {
       const result = await apiClient.login(loginEmail, loginPw) as any;
       const user = apiClient.getCurrentUser();
       console.log("LOGIN RESULT", result, "USER", user);
-      if (result.requiresOnboarding) {
-        navigate("/onboarding");
-      } else {
+      if (false) {
+          // navigate("/onboarding");
+        } else {
         const user = apiClient.getCurrentUser();
         const role = user?.role || user?.roles?.[0] || 'student';
         if (role === 'admin' || role === 'researcher') {
@@ -191,7 +191,7 @@ export default function LoginPage() {
             教育実習評価システム
           </Typography>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
-            AI-Supported Teaching Practice Evaluation System
+            AI-Supported 教育実習評価システム
           </Typography>
         </Box>
 
@@ -205,17 +205,17 @@ export default function LoginPage() {
                 label="メールアドレス" value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 size="small" sx={{ flex: "1 1 220px" }}
-                onKeyDown={(e) => e.key === "Enter" && doLogin(email, password)}
+                onKeyDown={(e) => e.key === "Enter" && doログイン(email, password)}
               />
               <TextField
                 label="パスワード" type="password" value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 size="small" sx={{ flex: "1 1 140px" }}
-                onKeyDown={(e) => e.key === "Enter" && doLogin(email, password)}
+                onKeyDown={(e) => e.key === "Enter" && doログイン(email, password)}
               />
               <Button
-                variant="contained" onClick={() => doLogin(email, password)}
-                disabled={loading} startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <LoginIcon />}
+                variant="contained" onClick={() => doログイン(email, password)}
+                disabled={loading} startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ログインIcon />}
                 sx={{ height: 40, fontWeight: "bold", minWidth: 120 }}
               >
                 ログイン
@@ -267,7 +267,7 @@ export default function LoginPage() {
                           }}
                         >
                           <CardActionArea
-                            onClick={() => { setEmail(acc.email); setPassword(acc.password); void doLogin(acc.email, acc.password); }}
+                            onClick={() => { setEmail(acc.email); setPassword(acc.password); void doログイン(acc.email, acc.password); }}
                             disabled={!!loggingIn}
                             sx={{ p: 1.5 }}
                           >
@@ -315,7 +315,7 @@ export default function LoginPage() {
         </Card>
 
         <Typography variant="caption" color="rgba(255,255,255,0.4)" display="block" textAlign="center" mt={2}>
-          © 2026 AI-Supported Teaching Practice Evaluation System v2.0 — Demo Environment
+          © 2026 AI-Supported 教育実習評価システム v2.0 — Demo Environment
         </Typography>
       </Box>
     </Box>

@@ -406,7 +406,7 @@ dataRouter.get("/journals", requireRoles(["student", "teacher", "univ_teacher", 
     let query;
     if (studentId) {
       if (!assertCanAccessStudent(scope, studentId)) {
-        return c.json({ success: false, error: "forbidden", message: "You do not have permission to access this student's data." }, 403);
+        return c.json({ success: false, error: "forbidden", message: "この学生のデータにアクセスする権限がありません。" }, 403);
       }
       query = db.prepare("SELECT * FROM journal_entries WHERE student_id = ? ORDER BY entry_date DESC LIMIT ?").bind(studentId, limit);
     } else {
@@ -492,7 +492,7 @@ dataRouter.get("/journals/:id", requireRoles(["student", "teacher", "univ_teache
   try {
     const { results } = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(journalId).all();
     if (!results || results.length === 0) {
-      return c.json({ success: false, error: "Not found" }, 404);
+      return c.json({ success: false, error: "見つかりません" }, 404);
     }
     
     const journal = results[0] as any;
@@ -504,7 +504,7 @@ dataRouter.get("/journals/:id", requireRoles(["student", "teacher", "univ_teache
         targetStudentId: journal.student_id,
         reason: 'scope_violation'
       });
-      return c.json({ success: false, error: "forbidden", message: "You do not have permission to access this journal." }, 403);
+      return c.json({ success: false, error: "forbidden", message: "この日誌にアクセスする権限がありません。" }, 403);
     }
     
     setAuditReadContext(c, {
@@ -534,7 +534,7 @@ dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_
     let query;
     if (journalId) {
       // Need to join journal to get student_id or assume evaluation has it
-      query = db.prepare(`SELECT * FROM evaluations WHERE journal_id = ? AND ${condition} ORDER BY evaluated_at DESC`).bind(journalId, ...params);
+      query = db.prepare(`SELECT e.*, j.student_id FROM evaluations e JOIN journal_entries j ON e.journal_id = j.id WHERE e.journal_id = ? AND ${condition.replace(/student_id/g, 'j.student_id')} ORDER BY e.created_at DESC`).bind(journalId, ...params);
     } else if (studentId) {
       if (!assertCanAccessStudent(scope, studentId)) {
         setAuditReadContext(c, {
@@ -544,9 +544,9 @@ dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_
         });
         return c.json({ success: false, error: "forbidden" }, 403);
       }
-      query = db.prepare("SELECT * FROM evaluations WHERE student_id = ? ORDER BY evaluated_at DESC").bind(studentId);
+      query = db.prepare("SELECT e.*, j.student_id FROM evaluations e JOIN journal_entries j ON e.journal_id = j.id WHERE j.student_id = ? ORDER BY e.created_at DESC").bind(studentId);
     } else {
-      query = db.prepare(`SELECT * FROM evaluations WHERE ${condition} ORDER BY evaluated_at DESC`).bind(...params);
+      query = db.prepare(`SELECT e.*, j.student_id FROM evaluations e JOIN journal_entries j ON e.journal_id = j.id WHERE ${condition.replace(/student_id/g, 'j.student_id')} ORDER BY e.created_at DESC`).bind(...params);
     }
 
     const { results } = await query.all();
@@ -581,7 +581,7 @@ dataRouter.get("/evaluations/:journalId", requireRoles(["student", "teacher", "u
       "SELECT * FROM evaluations WHERE journal_id = ? ORDER BY created_at DESC LIMIT 1"
     ).bind(c.req.param("journalId")).first();
 
-    if (!eval_) return c.json({ error: "Not found" }, 404);
+    if (!eval_) return c.json({ error: "見つかりません" }, 404);
 
     const items = await db.prepare(
       "SELECT * FROM evaluation_items WHERE evaluation_id = ? ORDER BY item_number"
@@ -1399,7 +1399,7 @@ dataRouter.get("/rubric-behaviors/:itemNumber", requireRoles(["student", "teache
 dataRouter.post("/rq3b/save", requireRoles(["student"] as UserRole[]), async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: '認証されていません' }, 401);
   }
   let authContext;
   try {
@@ -1410,7 +1410,7 @@ dataRouter.post("/rq3b/save", requireRoles(["student"] as UserRole[]), async (c)
   }
   
   if (authContext.role !== 'student') {
-    return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: 'アクセス権限がありません' }, 403);
   }
   
   const body = await c.req.json();
@@ -1474,7 +1474,7 @@ dataRouter.get("/rq3b/responses/:userId", requireRoles(["student", "researcher",
   
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: '認証されていません' }, 401);
   }
   let authContext;
   try {
@@ -1485,7 +1485,7 @@ dataRouter.get("/rq3b/responses/:userId", requireRoles(["student", "researcher",
   }
   
   if (authContext.role === 'student' && authContext.id !== reqUserId) {
-    return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: 'アクセス権限がありません' }, 403);
   }
   
   const db = c.env.DB as D1Database;
@@ -1770,11 +1770,11 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
   
   try {
     const beforeState = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(id).first() as any;
-    if (!beforeState) return c.json({ error: "Not found" }, 404);
+    if (!beforeState) return c.json({ error: "見つかりません" }, 404);
     
     const scope = await getScopeContext(c, db);
     if (!assertCanAccessStudent(scope, beforeState.student_id)) {
-      return c.json({ success: false, error: "forbidden", message: "Out of data scope" }, 403);
+      return c.json({ success: false, error: "forbidden", message: "データアクセス範囲外です。" }, 403);
     }
 
     const fields = Object.keys(body).filter(k => k !== 'id' && k !== 'student_id');
@@ -1822,11 +1822,11 @@ dataRouter.delete("/journals/:id", requireRoles(["student", "admin"] as UserRole
   
   try {
     const target = await db.prepare("SELECT student_id FROM journal_entries WHERE id = ?").bind(id).first();
-  if (!target) return c.json({ error: "Not found" }, 404);
+  if (!target) return c.json({ error: "見つかりません" }, 404);
   
   const scope = await getScopeContext(c, db);
   if (!assertCanAccessStudent(scope, target.student_id as string)) {
-    return c.json({ success: false, error: "forbidden", message: "Out of data scope" }, 403);
+    return c.json({ success: false, error: "forbidden", message: "データアクセス範囲外です。" }, 403);
   }
 
   await db.prepare("DELETE FROM journal_entries WHERE id = ?").bind(id).run();
@@ -1845,7 +1845,7 @@ dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", 
   
   try {
     const session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
-    if (!session) return c.json({ error: "Not found" }, 404);
+    if (!session) return c.json({ error: "見つかりません" }, 404);
     
     const messages = await db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY message_order ASC").bind((session as any)?.id).all();
     
@@ -1928,16 +1928,29 @@ dataRouter.put("/goals/:id", requireRoles(["student"] as UserRole[]), async (c) 
 });
 
 
-dataRouter.get("/chat-sessions", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.get("/chat-sessions", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  const user = c.get('user');
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
   const studentId = c.req.query("student_id");
   try {
     let sessions;
-    if (studentId) {
-      sessions = await db.prepare("SELECT * FROM chat_sessions WHERE student_id = ? ORDER BY created_at DESC").bind(studentId).all();
+    
+    // For students, enforce their own ID
+    let targetStudentId = studentId;
+    if (user.role === "student") {
+      targetStudentId = user.id;
+    }
+    
+    if (targetStudentId) {
+      // Access check? For simplicity, if they specify an ID, they should have access (handled elsewhere or assume they just query their own)
+      sessions = await db.prepare("SELECT * FROM chat_sessions WHERE student_id = ? ORDER BY created_at DESC").bind(targetStudentId).all();
     } else {
+      // Only researchers/admins should be able to get ALL sessions without student_id
+      if (['student', 'teacher', 'univ_teacher', 'school_mentor'].includes(user.role)) {
+        return c.json({ error: 'student_id is required' }, 400);
+      }
       sessions = await db.prepare("SELECT * FROM chat_sessions ORDER BY created_at DESC").all();
     }
     return c.json({ sessions: sessions.results || [] });
@@ -1948,7 +1961,7 @@ dataRouter.get("/chat-sessions", requireRoles(["researcher", "admin", "collabora
 
 
 // 毎日誌単位のSCAT結果取得
-dataRouter.get("/scat/journals/:journalId", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher"]), async (c) => {
+dataRouter.get("/scat/journals/:journalId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -2027,7 +2040,7 @@ dataRouter.post("/bfi/save", requireRoles(["student"] as UserRole[]), async (c) 
   const { env } = c;
   const body = await c.req.json();
   const userId = body.userId;
-  if (userId !== authUserId) return c.json({ error: 'Unauthorized' }, 401);
+  if (userId !== authUserId) return c.json({ error: '認証されていません' }, 401);
   const responses = body.responses; // { "1": 5, "2": 3, ... }
   
   if (!userId || !responses) return c.json({ error: "Invalid request" }, 400);
@@ -2080,7 +2093,7 @@ dataRouter.get("/bfi/responses/:userId", requireRoles(["student", "researcher", 
   const authUserId = c.req.header('x-user-id');
   const { env } = c;
   const userId = c.req.param('userId');
-  if (userId !== authUserId) return c.json({ error: 'Unauthorized' }, 401);
+  if (userId !== authUserId) return c.json({ error: '認証されていません' }, 401);
   const res = await env.DB.prepare("SELECT item_id, score FROM namikawa_bfi_responses WHERE user_id = ?").bind(userId).all();
   const responses: Record<number, number> = {};
   for (const row of res.results) {

@@ -8,7 +8,7 @@ import { Env } from "../../types/env";
 export const adminAlertsRouter = new Hono<{ Bindings: Env; Variables: any }>();
 
 adminAlertsRouter.use("*", requireAuth);
-adminAlertsRouter.use("*", requireRoles(["admin"]));
+adminAlertsRouter.use("*", requireRoles(["admin", "researcher"] as any));
 
 adminAlertsRouter.get("/cleanup-failure", async (c) => {
   const db = c.env.DB;
@@ -59,7 +59,7 @@ adminAlertsRouter.post("/cleanup-failure/dismiss", async (c) => {
 
 adminAlertsRouter.post("/cleanup-failure/acknowledge", async (c) => {
   const userId = c.get("user")?.id;
-  if (!userId) return c.json({ error: "Unauthorized" }, 401);
+  if (!userId) return c.json({ error: "認証されていません" }, 401);
 
   const { fingerprint, status, note } = await c.req.json().catch(() => ({ fingerprint: null, status: null, note: undefined }));
   if (!fingerprint || !status) {

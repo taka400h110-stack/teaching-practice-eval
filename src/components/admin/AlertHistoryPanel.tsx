@@ -55,7 +55,7 @@ export const AlertHistoryPanel: React.FC = () => {
     <Card sx={{ mt: 4 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">Cleanup Alert History</Typography>
+          <Typography variant="h6">クリーンアップアラート履歴</Typography>
           <Stack direction="row" spacing={1}>
             <Button startIcon={<Refresh />} onClick={() => refetch()} size="small" variant="outlined">
               Refresh

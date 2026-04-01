@@ -9,7 +9,15 @@ externalJobsRouter.get("/", requireRoles(["researcher", "admin", "collaborator",
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
-  const { results } = await db.prepare("SELECT * FROM external_analysis_jobs ORDER BY created_at DESC").all();
+  
+  let results;
+  try {
+    const res = await db.prepare("SELECT * FROM external_analysis_jobs ORDER BY created_at DESC").all();
+    results = res.results;
+  } catch (err) {
+    results = []; // Table might not exist yet
+  }
+  
   return c.json({ success: true, jobs: results });
 });
 
@@ -78,7 +86,7 @@ externalJobsRouter.get("/:id/download", requireRoles(["researcher", "admin", "co
   
   const jobId = c.req.param("id");
   const jobResult = await db.prepare("SELECT * FROM external_analysis_jobs WHERE id = ?").bind(jobId).first();
-  if (!jobResult) return c.json({ error: "Job not found" }, 404);
+  if (!jobResult) return c.json({ error: "ジョブが見つかりません" }, 404);
 
   const dataset = {
     metadata: {
