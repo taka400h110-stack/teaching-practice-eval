@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --mode client && vite build",
+    "build": "vite build --mode client && vite build && echo '{\"version\":1,\"include\":[\"/*\"],\"exclude\":[\"/assets/*\",\"/static/*\"]}' > dist/_routes.json",
     "db:migrate:local": "npx wrangler d1 migrations apply DB --local",
     "preview": "wrangler pages dev dist --ip 127.0.0.1 --port 8788",
     "deploy": "npm run build && wrangler pages deploy dist",

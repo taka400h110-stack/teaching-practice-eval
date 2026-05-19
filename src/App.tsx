@@ -97,8 +97,8 @@ export default function App() {
 
           {/* ダッシュボード */}
           <Route path="dashboard"         element={<PrivateRoute allowedRoles={["student"]}><DashboardPage /></PrivateRoute>} />
-          <Route path="teacher-dashboard" element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor"]}><TeacherDashboardPage /></PrivateRoute>} />
-          <Route path="admin"             element={<PrivateRoute allowedRoles={["admin", "researcher"]}><AdminDashboardPage /></PrivateRoute>} />
+          <Route path="teacher-dashboard" element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "admin", "researcher"]}><TeacherDashboardPage /></PrivateRoute>} />
+          <Route path="admin"             element={<PrivateRoute allowedRoles={["admin", "researcher", "collaborator", "board_observer"]}><AdminDashboardPage /></PrivateRoute>} />
 
           {/* 日誌 */}
           <Route path="journals"                    element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor"]}><JournalListPage /></PrivateRoute>} />
@@ -111,7 +111,7 @@ export default function App() {
           <Route path="journal-workflow/:journalId"   element={<PrivateRoute allowedRoles={["student"]}><JournalWorkflowPage /></PrivateRoute>} />
 
           {/* 評価 (RQ2) */}
-          <Route path="evaluations"                         element={<PrivateRoute allowedRoles={["admin", "researcher", "evaluator", "teacher", "univ_teacher", "school_mentor"]}><EvaluationsPage /></PrivateRoute>} />
+          <Route path="evaluations"                         element={<PrivateRoute allowedRoles={["admin", "researcher", "evaluator", "teacher", "univ_teacher", "school_mentor", "collaborator", "board_observer"]}><EvaluationsPage /></PrivateRoute>} />
           <Route path="evaluations/:journalId"              element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer", "student", "teacher", "univ_teacher", "school_mentor"]}><EvaluationResultPage /></PrivateRoute>} />
           <Route path="evaluations/:journalId/human"        element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><HumanEvaluationPage /></PrivateRoute>} />
           <Route path="comparison"                          element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><ComparisonPage /></PrivateRoute>} />
