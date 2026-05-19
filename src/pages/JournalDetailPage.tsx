@@ -230,6 +230,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
       <Box mt={4}>
         <Alert severity="warning">
           AI評価が正常に完了していません（項目数: {evalData?.evaluation_items?.length || 0} / 23）。再度評価を実行してください。
+          <Button variant="outlined" size="small" sx={{mt:1, display:"block"}} onClick={() => window.location.href = `/evaluations/${evalData.journal_id}`}>評価画面へ移動して再実行</Button>
         </Alert>
       </Box>
     );

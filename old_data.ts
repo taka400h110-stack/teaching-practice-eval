@@ -1,5 +1,3 @@
-import { UserRole } from "../../types";
-import { applyAnonymization } from "../services/anonymization";
 // @ts-nocheck
 
 /**
@@ -19,11 +17,8 @@ import { applyAnonymization } from "../services/anonymization";
  *   /api/data/export          - CSV/Excelエクスポート
  */
 import { Hono } from "hono";
-import exportsRouter from "./exports";
 import { cors } from "hono/cors";
 import { requireRoles } from "../middleware/auth";
-import { getScopeContext, buildScopeFilter, assertCanAccessStudent } from "../middleware/scope";
-import { setAuditReadContext, setAuditWriteContext } from "../middleware/audit";
 
 type Bindings = {
   DB: D1Database;
@@ -237,39 +232,10 @@ async function ensureSchema(db: D1Database): Promise<void> {
       subject_count INTEGER,
       calculated_at TEXT DEFAULT (datetime('now'))
     );`,
-    
-    `CREATE TABLE IF NOT EXISTS journal_scat_analyses (
-      id TEXT PRIMARY KEY,
-      journal_id TEXT NOT NULL,
-      user_id TEXT,
-      analysis_status TEXT DEFAULT 'pending',
-      storyline TEXT,
-      theoretical_description TEXT,
-      is_human_reviewed BOOLEAN DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );`,
-    `CREATE TABLE IF NOT EXISTS journal_scat_segments (
-      id TEXT PRIMARY KEY,
-      analysis_id TEXT NOT NULL,
-      journal_id TEXT NOT NULL,
-      segment_order INTEGER NOT NULL,
-      raw_text TEXT NOT NULL,
-      step1_focus_words TEXT,
-      step2_outside_words TEXT,
-      step3_explanatory_words TEXT,
-      step4_theme_construct TEXT,
-      step5_questions_issues TEXT,
-      memo TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );`,
-
     `CREATE TABLE IF NOT EXISTS scat_projects (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       description TEXT,
-      storyline TEXT,
-      theoretical_description TEXT,
       created_by TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -400,84 +366,49 @@ dataRouter.get("/journals", requireRoles(["student", "teacher", "univ_teacher", 
   const limit = parseInt(c.req.query("limit") ?? "50");
 
   try {
-    const scope = await getScopeContext(c, db);
-    const { condition, params } = buildScopeFilter(scope, "student_id");
-    
-    let query;
-    if (studentId) {
-      if (!assertCanAccessStudent(scope, studentId)) {
-        return c.json({ success: false, error: "forbidden", message: "この学生のデータにアクセスする権限がありません。" }, 403);
-      }
-      query = db.prepare("SELECT * FROM journal_entries WHERE student_id = ? ORDER BY entry_date DESC LIMIT ?").bind(studentId, limit);
-    } else {
-      query = db.prepare(`SELECT * FROM journal_entries WHERE ${condition} ORDER BY entry_date DESC LIMIT ?`).bind(...params, limit);
-    }
+    const query = studentId
+      ? db.prepare("SELECT * FROM journal_entries WHERE student_id = ? ORDER BY entry_date DESC LIMIT ?").bind(studentId, limit)
+      : db.prepare("SELECT * FROM journal_entries ORDER BY entry_date DESC LIMIT ?").bind(limit);
 
     const { results } = await query.all();
-    
-    // Audit log
-    const distinctStudentIds = Array.from(new Set(results.map((r: any) => r.student_id)));
-    setAuditReadContext(c, {
-      resourceType: 'journal',
-      targetStudentIds: distinctStudentIds as string[],
-      visibleRecordCount: results.length,
-      scopeBasis: scope.allowedStudentIds === "ALL" ? "all" : "assigned"
-    });
-
-    const role = ((c.get("user" as any) as any) as any)?.role;
-    const anonLevel = scope.anonymizationLevel;
-    let finalResults = results;
-    if (anonLevel && role !== "admin") {
-      finalResults = applyAnonymization(results, { role, anonymizationLevel: anonLevel, resourceType: "journal" });
-    }
-    
-    // Audit log
-    {
-      const distIds = Array.from(new Set(results.map((r: any) => r.student_id)));
-      setAuditReadContext(c, {
-        resourceType: 'journal',
-        targetStudentIds: distIds as string[],
-        visibleRecordCount: finalResults.length,
-        scopeBasis: scope.allowedStudentIds === "ALL" ? "all" : "assigned",
-        reason: anonLevel ? `anonymization:${anonLevel}` : undefined
-      });
-    }
-
-    return c.json({ success: true, journals: finalResults, count: finalResults.length });
+    return c.json({ success: true, journals: results, count: results.length });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
 });
 
-dataRouter.post("/journals", requireRoles(["student"] as UserRole[]), async (c) => {
+dataRouter.post("/journals", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
+  await ensureSchema(db);
+  const body = await c.req.json() as {
+    student_id: string;
+    entry_date: string;
+    week_number: number;
+    title?: string;
+    content: string;
+    status?: string;
+    ocr_source?: string;
+    ocr_confidence?: number;
+  };
+
   try {
-    const body = await c.req.json();
-    const user = (c.get("user" as any) as any) as any;
-    const studentId = (user as any).id; // Override with user id to prevent spoofing
-    
-    const id = body.id || crypto.randomUUID();
-    await ensureSchema(db);
+    const id = genId();
+    const wordCount = body.content.replace(/\s/g, "").length;
 
-    const result = await db.prepare(`
-      INSERT INTO journal_entries (id, student_id, entry_date, week_number, content)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(id, studentId, body.entry_date || new Date().toISOString(), body.week_number || 1, body.content || "").run();
+    await db.prepare(`
+      INSERT INTO journal_entries (id, student_id, entry_date, week_number, title, content, word_count, status, ocr_source, ocr_confidence, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id, body.student_id, body.entry_date, body.week_number,
+      body.title ?? null, body.content, wordCount,
+      body.status ?? "submitted",
+      body.ocr_source ?? null, body.ocr_confidence ?? null,
+      nowISO(), nowISO()
+    ).run();
 
-    setAuditWriteContext(c, {
-      resourceType: 'journal',
-      resourceId: id,
-      targetStudentId: studentId,
-      entityOwnerUserId: studentId,
-      action: 'create',
-      scopeBasis: 'self',
-      changedFields: ['created'],
-      afterState: { id, student_id: studentId, week_number: body.week_number },
-      changeSummary: { operation: 'create' }
-    });
-    return c.json({ success: result.success, id });
+    return c.json({ success: true, id, word_count: wordCount });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -487,50 +418,40 @@ dataRouter.get("/journals/:id", requireRoles(["student", "teacher", "univ_teache
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
-  const journalId = c.req.param("id");
-
-  try {
-    const { results } = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(journalId).all();
-    if (!results || results.length === 0) {
-      return c.json({ success: false, error: "見つかりません" }, 404);
-    }
-    
-    const journal = results[0] as any;
-    const scope = await getScopeContext(c, db);
-    if (!assertCanAccessStudent(scope, journal.student_id)) {
-      setAuditReadContext(c, {
-        resourceType: 'journal',
-        resourceId: journal.id,
-        targetStudentId: journal.student_id,
-        reason: 'scope_violation'
-      });
-      return c.json({ success: false, error: "forbidden", message: "この日誌にアクセスする権限がありません。" }, 403);
-    }
-    
-    setAuditReadContext(c, {
-      resourceType: 'journal',
-      resourceId: journal.id,
-      targetStudentId: journal.student_id,
-      visibleRecordCount: 1,
-      scopeBasis: scope.allowedStudentIds === "ALL" ? "all" : "assigned"
-    });
-    return c.json({ success: true, journal });
-  } catch (err) {
-    return c.json({ error: String(err) }, 500);
-  }
+  const journal = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(c.req.param("id")).first();
+  if (!journal) return c.json({ error: "Not found" }, 404);
+  return c.json({ success: true, journal });
 });
 
-
+// ────────────────────────────────────────────────────────────────
+// AI評価結果の保存・取得
+// ────────────────────────────────────────────────────────────────
 dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
   await ensureSchema(db);
-  const body = await c.req.json() as any;
+  const body = await c.req.json() as {
+    journal_id: string;
+    evaluation: {
+      items: Array<{ item_number: number; score: number; is_na?: boolean; evidence?: string; feedback?: string }>;
+      factor_scores: { factor1: number; factor2: number; factor3: number; factor4: number };
+      total_score: number;
+      overall_comment: string;
+      reasoning: string;
+      halo_effect_detected: boolean;
+    };
+    model_name?: string;
+    prompt_version?: string;
+    temperature?: number;
+    token_count?: number;
+    duration_ms?: number;
+  };
 
+  
   try {
     const scores = { f1: [] as number[], f2: [] as number[], f3: [] as number[], f4: [] as number[] };
-    body.evaluation.items.forEach((item: any) => {
+    body.evaluation.items.forEach((item) => {
       if (item.is_na || !item.score) return;
       if (item.item_number <= 7) scores.f1.push(item.score);
       else if (item.item_number <= 13) scores.f2.push(item.score);
@@ -542,8 +463,12 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
     const allScores = [...scores.f1, ...scores.f2, ...scores.f3, ...scores.f4];
     
     const computedTotal = avg(allScores);
-    const evalId = genId();
+    const f1Score = avg(scores.f1);
+    const f2Score = avg(scores.f2);
+    const f3Score = avg(scores.f3);
+    const f4Score = avg(scores.f4);
     
+    const evalId = genId();
     await db.prepare(`
       INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature,
         total_score, factor1_score, factor2_score, factor3_score, factor4_score,
@@ -555,13 +480,16 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
       body.prompt_version ?? "CoT-A-v1.0",
       body.temperature ?? 0.2,
       computedTotal,
-      avg(scores.f1), avg(scores.f2), avg(scores.f3), avg(scores.f4),
+      f1Score,
+      f2Score,
+      f3Score,
+      f4Score,
       body.evaluation.overall_comment,
       body.evaluation.reasoning,
       body.evaluation.halo_effect_detected ? 1 : 0,
       body.token_count ?? null,
       body.duration_ms ?? null,
-      new Date().toISOString()
+      nowISO()
     ).run();
 
     // 23項目を保存
@@ -575,17 +503,8 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
         item.is_na ? 1 : 0,
         item.evidence ?? null,
         item.feedback ?? null,
-        new Date().toISOString()
+        nowISO()
       ).run();
-    }
-
-    // Update journal status to evaluated if complete
-    const isComplete = body.evaluation && body.evaluation.items && body.evaluation.items.length >= 23;
-    if (isComplete) {
-      await db.prepare("UPDATE journal_entries SET status = 'evaluated' WHERE id = ?").bind(body.journal_id).run();
-    } else {
-      // It remains submitted or whatever it was
-      await db.prepare("UPDATE journal_entries SET status = 'submitted' WHERE id = ? AND status = 'evaluated'").bind(body.journal_id).run();
     }
 
     return c.json({ success: true, evaluation_id: evalId });
@@ -597,50 +516,9 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
 dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
-
-  const studentId = c.req.query("student_id");
-  const journalId = c.req.query("journal_id");
-
   try {
-    const scope = await getScopeContext(c, db);
-    const { condition, params } = buildScopeFilter(scope, "student_id");
-    
-    let query;
-    if (journalId) {
-      // Need to join journal to get student_id or assume evaluation has it
-      query = db.prepare(`SELECT e.*, j.student_id FROM evaluations e JOIN journal_entries j ON e.journal_id = j.id WHERE e.journal_id = ? AND ${condition.replace(/student_id/g, 'j.student_id')} ORDER BY e.created_at DESC`).bind(journalId, ...params);
-    } else if (studentId) {
-      if (!assertCanAccessStudent(scope, studentId)) {
-        setAuditReadContext(c, {
-          resourceType: 'evaluation',
-          targetStudentId: studentId,
-          reason: 'scope_violation'
-        });
-        return c.json({ success: false, error: "forbidden" }, 403);
-      }
-      query = db.prepare("SELECT e.*, j.student_id FROM evaluations e JOIN journal_entries j ON e.journal_id = j.id WHERE j.student_id = ? ORDER BY e.created_at DESC").bind(studentId);
-    } else {
-      query = db.prepare(`SELECT e.*, j.student_id FROM evaluations e JOIN journal_entries j ON e.journal_id = j.id WHERE ${condition.replace(/student_id/g, 'j.student_id')} ORDER BY e.created_at DESC`).bind(...params);
-    }
-
-    const { results } = await query.all();
-    
-    const distinctStudentIds = Array.from(new Set(results.map((r: any) => r.student_id).filter(Boolean)));
-    setAuditReadContext(c, {
-      resourceType: 'evaluation',
-      targetStudentIds: distinctStudentIds as string[],
-      visibleRecordCount: results.length,
-      scopeBasis: scope.allowedStudentIds === "ALL" ? "all" : "assigned"
-    });
-
-    const role = ((c.get("user" as any) as any) as any)?.role;
-    const anonLevel = scope.anonymizationLevel;
-    let finalResults = results;
-    if (anonLevel && role !== "admin") {
-      finalResults = applyAnonymization(results, { role, anonymizationLevel: anonLevel, resourceType: "evaluation" });
-    }
-
-    return c.json({ success: true, evaluations: finalResults });
+    const evals = await db.prepare("SELECT * FROM evaluations ORDER BY created_at DESC").all();
+    return c.json({ success: true, evaluations: evals.results });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -655,7 +533,7 @@ dataRouter.get("/evaluations/:journalId", requireRoles(["student", "teacher", "u
       "SELECT * FROM evaluations WHERE journal_id = ? ORDER BY created_at DESC LIMIT 1"
     ).bind(c.req.param("journalId")).first();
 
-    if (!eval_) return c.json({ error: "見つかりません" }, 404);
+    if (!eval_) return c.json({ error: "Not found" }, 404);
 
     const items = await db.prepare(
       "SELECT * FROM evaluation_items WHERE evaluation_id = ? ORDER BY item_number"
@@ -722,14 +600,6 @@ dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin"
       `).bind(genId(), id, item.item_number, item.score ?? null, item.is_na ? 1 : 0, item.comment ?? null).run();
     }
 
-    setAuditWriteContext(c, {
-      resourceType: 'human_evaluation',
-      resourceId: id,
-      action: 'create',
-      scopeBasis: 'assigned',
-      changedFields: ['created'],
-      changeSummary: { operation: 'create' }
-    });
     return c.json({ success: true, human_eval_id: id });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -777,7 +647,7 @@ dataRouter.get("/human-evals/:journalId", requireRoles(["evaluator", "researcher
 // ────────────────────────────────────────────────────────────────
 // 自己評価（週次）
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c) => {
+dataRouter.post("/self-evals", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -816,50 +686,6 @@ dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c
   }
 });
 
-
-dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer", "evaluator"]), async (c) => {
-  const db = c.env?.DB;
-  if (!db) return c.json({ error: "DB not configured" }, 503);
-
-  const studentId = c.req.param("studentId");
-
-  try {
-    const { results } = await db.prepare(`
-      SELECT 
-        j.week_number,
-        AVG(e.factor1_score) as factor1,
-        AVG(e.factor2_score) as factor2,
-        AVG(e.factor3_score) as factor3,
-        AVG(e.factor4_score) as factor4,
-        AVG(e.total_score) as total,
-        AVG(e.total_score) as ai_total,
-        MAX(j.id) as journal_id
-      FROM journal_entries j
-      JOIN evaluations e ON j.id = e.journal_id
-      WHERE j.student_id = ?
-      GROUP BY j.week_number
-      ORDER BY j.week_number ASC
-    `).bind(studentId).all();
-
-    return c.json({
-      success: true,
-      student_id: studentId,
-      weekly_scores: results.map((row) => ({
-        week_number: row.week_number,
-        factor1: row.factor1 || 0,
-        factor2: row.factor2 || 0,
-        factor3: row.factor3 || 0,
-        factor4: row.factor4 || 0,
-        total: row.total || 0,
-        ai_total: row.ai_total || 0,
-        journal_id: row.journal_id || ""
-      }))
-    });
-  } catch (err) {
-    return c.json({ error: String(err) }, 500);
-  }
-});
-
 dataRouter.get("/self-evals/:studentId", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -874,7 +700,7 @@ dataRouter.get("/self-evals/:studentId", requireRoles(["student", "teacher", "un
 // ────────────────────────────────────────────────────────────────
 // SMART目標
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/goals", requireRoles(["student"] as UserRole[]), async (c) => {
+dataRouter.post("/goals", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -984,104 +810,104 @@ dataRouter.get("/students", requireRoles(["teacher", "univ_teacher", "school_men
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
-  try {
-    const scope = await getScopeContext(c, db);
-    const { condition, params } = buildScopeFilter(scope, "id");
-    
-    const { results } = await db.prepare(`SELECT * FROM users WHERE role = 'student' AND ${condition} ORDER BY created_at DESC`).bind(...params).all();
-    
-    const distinctStudentIds = results.map((r: any) => r.id);
-    setAuditReadContext(c, {
-      resourceType: 'student',
-      targetStudentIds: distinctStudentIds as string[],
-      visibleRecordCount: results.length,
-      scopeBasis: scope.allowedStudentIds === "ALL" ? "all" : "assigned"
-    });
+  await ensureSchema(db);
+  const { results } = await db.prepare(
+    "SELECT * FROM users WHERE role = 'student' ORDER BY student_number"
+  ).all();
 
-    const role = ((c.get("user" as any) as any) as any)?.role;
-    const anonLevel = scope.anonymizationLevel;
-    let finalResults = results;
-    if (anonLevel && role !== "admin") {
-      finalResults = applyAnonymization(results, { role, anonymizationLevel: anonLevel, resourceType: "student" });
-    }
-
-    return c.json({ success: true, students: finalResults });
-  } catch (err) {
-    return c.json({ error: String(err) }, 500);
-  }
+  return c.json({ success: true, students: results });
 });
 
-// ────────────────────────────────────────────────────────────────
-// TEACHERダッシュボード用 コーホートプロファイル一覧
-// GET /api/data/teacher/profiles
-// ────────────────────────────────────────────────────────────────
-dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+
+dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
+  // GET all self evaluations and group by student
+  const { results: evals } = await db.prepare(
+    "SELECT student_id, week_number, factor1_score, factor2_score, factor3_score, factor4_score, total_score FROM self_evaluations ORDER BY student_id, week_number"
+  ).all();
+
+  const studentsMap = {};
+  for (const row of evals) {
+    if (!studentsMap[row.student_id]) {
+      studentsMap[row.student_id] = { id: row.student_id, name: row.student_id, weekly_scores: [] };
+    }
+    studentsMap[row.student_id].weekly_scores.push({
+      week: row.week_number,
+      factor1: row.factor1_score,
+      factor2: row.factor2_score,
+      factor3: row.factor3_score,
+      factor4: row.factor4_score,
+      total: row.total_score
+    });
+  }
+
+  let finalCohorts = Object.values(studentsMap);
+
+  return c.json({ success: true, cohorts: finalCohorts });
+});
+
+dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+
+  const studentId = c.req.param("studentId");
+
+  const [selfEvals, goals, chatLogs] = await Promise.all([
+    db.prepare("SELECT * FROM self_evaluations WHERE student_id = ? ORDER BY week_number").bind(studentId).all(),
+    db.prepare("SELECT * FROM goals WHERE student_id = ? ORDER BY week_number").bind(studentId).all(),
+    db.prepare("SELECT * FROM chat_sessions WHERE student_id = ? ORDER BY created_at").bind(studentId).all(),
+  ]);
+
+  return c.json({
+    success: true,
+    student_id: studentId,
+    weekly_scores: selfEvals.results,
+    goals: goals.results,
+    chat_sessions: chatLogs.results,
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// CSV エクスポート
+// ────────────────────────────────────────────────────────────────
+
+
+// ────────────────────────────────────────────────────────────────
+// Bland-Altman結果保存
+// ────────────────────────────────────────────────────────────────
+dataRouter.post("/bland-altman-results", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+
+  await ensureSchema(db);
+  const body = await c.req.json() as {
+    run_id?: string;
+    factor?: string;
+    mean_diff: number;
+    sd_diff: number;
+    loa_upper: number;
+    loa_lower: number;
+    ci_mean_upper?: number;
+    ci_mean_lower?: number;
+    outlier_ratio?: number;
+    bias_p_value?: number;
+    subject_count?: number;
+  };
+
   try {
-    const scope = await getScopeContext(c, db);
-    const { condition, params } = buildScopeFilter(scope, "u.id");
-
-    // 学生一覧＋週次スコア集計を一括取得
-    const studentsResult = await db.prepare(`
-      SELECT u.id, u.name, u.grade, u.student_number
-      FROM users u
-      WHERE u.role = 'student' AND ${condition}
-      ORDER BY u.name ASC
-    `).bind(...params).all();
-
-    const students = studentsResult.results as any[];
-
-    // 各学生の週次スコアを取得
-    const profiles = await Promise.all(students.map(async (s: any) => {
-      const scoresResult = await db.prepare(`
-        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, total_score
-        FROM learning_progress_scores
-        WHERE student_id = ?
-        ORDER BY week_number ASC
-      `).bind(s.id).all();
-      const scores = scoresResult.results as any[];
-
-      const weeklyScores = scores.map((r: any) => r.total_score);
-      const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
-      const firstScore = scores.length > 0 ? scores[0] : null;
-      const finalTotal = lastScore ? lastScore.total_score : 0;
-      const finalFactor1 = lastScore ? lastScore.factor1_score : 0;
-      const finalFactor2 = lastScore ? lastScore.factor2_score : 0;
-      const finalFactor3 = lastScore ? lastScore.factor3_score : 0;
-      const finalFactor4 = lastScore ? lastScore.factor4_score : 0;
-      const growthDelta = (lastScore && firstScore)
-        ? parseFloat((lastScore.total_score - firstScore.total_score).toFixed(2))
-        : 0;
-
-      // 日誌数（実習週数として使用）
-      const journalResult = await db.prepare(`
-        SELECT COUNT(*) as cnt FROM journal_entries WHERE student_id = ?
-      `).bind(s.id).first() as any;
-      const weeks = journalResult?.cnt || 0;
-
-      return {
-        id: s.id,
-        name: s.name || "—",
-        grade: s.grade || 3,
-        student_number: s.student_number || "",
-        school_name: "〇〇大学",
-        gender: "unknown",
-        school_type: "elementary",
-        internship_type: "intensive",
-        weeks: Math.max(weeks, weeklyScores.length),
-        weekly_scores: weeklyScores,
-        final_total: finalTotal,
-        final_factor1: finalFactor1,
-        final_factor2: finalFactor2,
-        final_factor3: finalFactor3,
-        final_factor4: finalFactor4,
-        growth_delta: growthDelta,
-      };
-    }));
-
-    return c.json({ success: true, cohorts: profiles });
+    await db.prepare(`
+      INSERT INTO bland_altman_results (id, run_id, factor, mean_diff, sd_diff, loa_upper, loa_lower, 
+        ci_mean_upper, ci_mean_lower, outlier_ratio, bias_p_value, subject_count, calculated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      genId(), body.run_id ?? null, body.factor ?? "total",
+      body.mean_diff, body.sd_diff, body.loa_upper, body.loa_lower,
+      body.ci_mean_upper ?? null, body.ci_mean_lower ?? null, body.outlier_ratio ?? null, body.bias_p_value ?? null, body.subject_count ?? null,
+      nowISO()
+    ).run();
+    return c.json({ success: true });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -1274,7 +1100,7 @@ dataRouter.get("/rubric-behaviors", requireRoles(["student", "teacher", "univ_te
 // POST /api/data/rubric-behaviors/seed
 // 全23項目×5段階のRD水準行動指標をDBに投入（初期化）
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/rubric-behaviors/seed", requireRoles(["admin", "researcher"] as UserRole[]), async (c) => {
+dataRouter.post("/rubric-behaviors/seed", requireRoles(["admin", "researcher"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 500);
 
@@ -1573,7 +1399,7 @@ dataRouter.get("/rubric-behaviors/:itemNumber", requireRoles(["student", "teache
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 500);
 
-  const itemNum = parseInt(c.req.param("itemNumber") || "");
+  const itemNum = parseInt(c.req.param("itemNumber"));
   if (isNaN(itemNum) || itemNum < 1 || itemNum > 23) {
     return c.json({ error: "Invalid item number (1-23)" }, 400);
   }
@@ -1590,10 +1416,10 @@ dataRouter.get("/rubric-behaviors/:itemNumber", requireRoles(["student", "teache
 
 
 // POST /api/data/rq3b/save
-dataRouter.post("/rq3b/save", requireRoles(["student"] as UserRole[]), async (c) => {
+dataRouter.post("/rq3b/save", requireRoles(["student"]), async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ error: '認証されていません' }, 401);
+    return c.json({ error: 'Unauthorized' }, 401);
   }
   let authContext;
   try {
@@ -1604,7 +1430,7 @@ dataRouter.post("/rq3b/save", requireRoles(["student"] as UserRole[]), async (c)
   }
   
   if (authContext.role !== 'student') {
-    return c.json({ error: 'アクセス権限がありません' }, 403);
+    return c.json({ error: 'Forbidden' }, 403);
   }
   
   const body = await c.req.json();
@@ -1668,7 +1494,7 @@ dataRouter.get("/rq3b/responses/:userId", requireRoles(["student", "researcher",
   
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ error: '認証されていません' }, 401);
+    return c.json({ error: 'Unauthorized' }, 401);
   }
   let authContext;
   try {
@@ -1679,7 +1505,7 @@ dataRouter.get("/rq3b/responses/:userId", requireRoles(["student", "researcher",
   }
   
   if (authContext.role === 'student' && authContext.id !== reqUserId) {
-    return c.json({ error: 'アクセス権限がありません' }, 403);
+    return c.json({ error: 'Forbidden' }, 403);
   }
   
   const db = c.env.DB as D1Database;
@@ -1869,29 +1695,6 @@ dataRouter.post("/scat/projects", requireRoles(["researcher", "admin", "collabor
   }
 });
 
-
-dataRouter.put("/scat/projects/:projectId/theorization", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const db = c.env?.DB;
-  if (!db) return c.json({ error: "DB not configured" }, 503);
-  try {
-    const { storyline, theoretical_description } = await c.req.json();
-    const projectId = c.req.param("projectId");
-    
-    // Attempt to add columns if they don't exist (SQLite doesn't support ADD COLUMN IF NOT EXISTS easily without PRAGMA, so we catch errors)
-    try {
-      await db.prepare("ALTER TABLE scat_projects ADD COLUMN storyline TEXT").run();
-      await db.prepare("ALTER TABLE scat_projects ADD COLUMN theoretical_description TEXT").run();
-    } catch(e) {} // Ignore if already exists
-
-    await db.prepare("UPDATE scat_projects SET storyline = ?, theoretical_description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .bind(storyline || "", theoretical_description || "", projectId).run();
-    return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: String(err) }, 500);
-  }
-});
-
-
 dataRouter.get("/scat/segments/:projectId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -1955,7 +1758,7 @@ dataRouter.post("/scat/codes", requireRoles(["researcher", "admin", "collaborato
 });
 
 
-dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (c) => {
+dataRouter.put("/journals/:id", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -1963,67 +1766,31 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
   const body = await c.req.json();
   
   try {
-    const beforeState = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(id).first() as any;
-    if (!beforeState) return c.json({ error: "見つかりません" }, 404);
-    
-    const scope = await getScopeContext(c, db);
-    if (!assertCanAccessStudent(scope, beforeState.student_id)) {
-      return c.json({ success: false, error: "forbidden", message: "データアクセス範囲外です。" }, 403);
-    }
-
-    const fields = Object.keys(body).filter(k => k !== 'id' && k !== 'student_id');
+    const fields = Object.keys(body).filter(k => k !== 'id');
     if (fields.length === 0) return c.json({ success: true });
     
     const setClause = fields.map(k => `${k} = ?`).join(", ");
-    const values = fields.map(k => (body as any)[k as keyof typeof body]);
+    const values = fields.map(k => body[k]);
     
     await db.prepare(`UPDATE journal_entries SET ${setClause} WHERE id = ?`)
       .bind(...values, id)
       .run();
       
-    const updated = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(id).first() as any;
-    
-    // Do not log full text content in audit
-    const safeBefore = { ...beforeState };
-    const safeAfter = { ...updated };
-    delete safeBefore.content;
-    delete safeAfter.content;
-
-    setAuditWriteContext(c, {
-      resourceType: 'journal',
-      resourceId: id,
-      targetStudentId: updated.student_id,
-      entityOwnerUserId: updated.student_id,
-      action: 'update',
-      scopeBasis: 'self',
-      changedFields: fields,
-      beforeState: safeBefore,
-      afterState: safeAfter,
-      changeSummary: { operation: 'update' }
-    });
-
+    const updated = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(id).first();
     return c.json(updated);
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
 });
 
-dataRouter.delete("/journals/:id", requireRoles(["student", "admin"] as UserRole[]), async (c) => {
+dataRouter.delete("/journals/:id", requireRoles(["student", "admin"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
   const id = c.req.param("id");
   
   try {
-    const target = await db.prepare("SELECT student_id FROM journal_entries WHERE id = ?").bind(id).first();
-  if (!target) return c.json({ error: "見つかりません" }, 404);
-  
-  const scope = await getScopeContext(c, db);
-  if (!assertCanAccessStudent(scope, target.student_id as string)) {
-    return c.json({ success: false, error: "forbidden", message: "データアクセス範囲外です。" }, 403);
-  }
-
-  await db.prepare("DELETE FROM journal_entries WHERE id = ?").bind(id).run();
+    await db.prepare("DELETE FROM journal_entries WHERE id = ?").bind(id).run();
     return c.json({ success: true });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -2039,7 +1806,7 @@ dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", 
   
   try {
     const session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
-    if (!session) return c.json({ error: "見つかりません" }, 404);
+    if (!session) return c.json({ error: "Not found" }, 404);
     
     const messages = await db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY message_order ASC").bind((session as any)?.id).all();
     
@@ -2055,7 +1822,7 @@ dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", 
   }
 });
 
-dataRouter.post("/chat-sessions/:journalId/messages", requireRoles(["student"] as UserRole[]), async (c) => {
+dataRouter.post("/chat-sessions/:journalId/messages", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -2081,7 +1848,7 @@ dataRouter.post("/chat-sessions/:journalId/messages", requireRoles(["student"] a
       INSERT INTO chat_messages (id, session_id, role, content, message_order, phase, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      msgId, (session as any)?.id, body.role, body.content, ((order as any)?.c || 0) + 1, (session as any)?.phase, new Date().toISOString()
+      msgId, (session as any)?.id, body.role, body.content, (order?.c || 0) + 1, (session as any)?.phase, new Date().toISOString()
     ).run();
     
     // セッション更新（必要なら）
@@ -2096,7 +1863,7 @@ dataRouter.post("/chat-sessions/:journalId/messages", requireRoles(["student"] a
 });
 
 
-dataRouter.put("/goals/:id", requireRoles(["student"] as UserRole[]), async (c) => {
+dataRouter.put("/goals/:id", requireRoles(["student"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -2108,7 +1875,7 @@ dataRouter.put("/goals/:id", requireRoles(["student"] as UserRole[]), async (c) 
     if (fields.length === 0) return c.json({ success: true });
     
     const setClause = fields.map(k => `${k} = ?`).join(", ");
-    const values = fields.map(k => (body as any)[k as keyof typeof body]);
+    const values = fields.map(k => body[k]);
     
     await db.prepare(`UPDATE goals SET ${setClause} WHERE id = ?`)
       .bind(...values, id)
@@ -2122,29 +1889,16 @@ dataRouter.put("/goals/:id", requireRoles(["student"] as UserRole[]), async (c) 
 });
 
 
-dataRouter.get("/chat-sessions", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const user = c.get('user');
+dataRouter.get("/chat-sessions", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
   const studentId = c.req.query("student_id");
   try {
     let sessions;
-    
-    // For students, enforce their own ID
-    let targetStudentId = studentId;
-    if (user.role === "student") {
-      targetStudentId = user.id;
-    }
-    
-    if (targetStudentId) {
-      // Access check? For simplicity, if they specify an ID, they should have access (handled elsewhere or assume they just query their own)
-      sessions = await db.prepare("SELECT * FROM chat_sessions WHERE student_id = ? ORDER BY created_at DESC").bind(targetStudentId).all();
+    if (studentId) {
+      sessions = await db.prepare("SELECT * FROM chat_sessions WHERE student_id = ? ORDER BY created_at DESC").bind(studentId).all();
     } else {
-      // Only researchers/admins should be able to get ALL sessions without student_id
-      if (['student', 'teacher', 'univ_teacher', 'school_mentor'].includes(user.role)) {
-        return c.json({ error: 'student_id is required' }, 400);
-      }
       sessions = await db.prepare("SELECT * FROM chat_sessions ORDER BY created_at DESC").all();
     }
     return c.json({ sessions: sessions.results || [] });
@@ -2153,89 +1907,15 @@ dataRouter.get("/chat-sessions", requireRoles(["student", "teacher", "univ_teach
   }
 });
 
-
-// 毎日誌単位のSCAT結果取得
-dataRouter.get("/scat/journals/:journalId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const db = c.env?.DB;
-  if (!db) return c.json({ error: "DB not configured" }, 503);
-  try {
-    const journalId = c.req.param("journalId");
-    const { results: analyses } = await db.prepare("SELECT * FROM journal_scat_analyses WHERE journal_id = ? ORDER BY created_at DESC LIMIT 1").bind(journalId).all();
-    if (!analyses || analyses.length === 0) return c.json({ analysis: null, segments: [] });
-    
-    const analysis = analyses[0];
-    const { results: segments } = await db.prepare("SELECT * FROM journal_scat_segments WHERE analysis_id = ? ORDER BY segment_order ASC").bind(analysis.id).all();
-    
-    return c.json({ analysis, segments });
-  } catch (err: any) {
-    return c.json({ error: String(err) }, 500);
-  }
-});
-
-// SCATネットワーク分析用データ取得
-dataRouter.get("/scat/network", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher"]), async (c) => {
-  const db = c.env?.DB;
-  if (!db) return c.json({ error: "DB not configured" }, 503);
-  try {
-    // 全ジャーナルのセグメントを取得し、共起ネットワークを構築
-    // ※大規模になる場合はDB内で集計すべきだが、小規模前提としてJS上で集計する
-    const { results: segments } = await db.prepare(`
-      SELECT jsa.journal_id, jss.step4_theme_construct 
-      FROM journal_scat_segments jss
-      JOIN journal_scat_analyses jsa ON jss.analysis_id = jsa.id
-      WHERE jsa.analysis_status = 'completed' AND jss.step4_theme_construct != '' AND jss.step4_theme_construct IS NOT NULL
-    `).all();
-
-    const nodesMap = new Map<string, number>();
-    const edgesMap = new Map<string, number>();
-    
-    // Journalごとにテーマをグループ化
-    const journalThemes: Record<string, Set<string>> = {};
-    for (const seg of segments as any[]) {
-      const themes = String(seg.step4_theme_construct).split(/[,、・]/).map(t => t.trim()).filter(t => t);
-      if (!journalThemes[seg.journal_id]) journalThemes[seg.journal_id] = new Set();
-      themes.forEach(t => journalThemes[seg.journal_id].add(t));
-      
-      themes.forEach(t => {
-        nodesMap.set(t, (nodesMap.get(t) || 0) + 1);
-      });
-    }
-
-    // エッジ生成（同一日誌内で共起するテーマのペア）
-    Object.values(journalThemes).forEach(themeSet => {
-      const themes = Array.from(themeSet);
-      for (let i = 0; i < themes.length; i++) {
-        for (let j = i + 1; j < themes.length; j++) {
-          const t1 = themes[i];
-          const t2 = themes[j];
-          const edgeKey = t1 < t2 ? `${t1}||${t2}` : `${t2}||${t1}`;
-          edgesMap.set(edgeKey, (edgesMap.get(edgeKey) || 0) + 1);
-        }
-      }
-    });
-
-    const nodes = Array.from(nodesMap.entries()).map(([id, val]) => ({ id, val }));
-    const edges = Array.from(edgesMap.entries()).map(([key, weight]) => {
-      const [source, target] = key.split("||");
-      return { source, target, weight };
-    });
-
-    return c.json({ nodes, edges });
-  } catch (err: any) {
-    return c.json({ error: String(err) }, 500);
-  }
-});
-
 export default dataRouter;
 
 // --- BFI Endpoints ---
-dataRouter.post("/bfi/save", requireRoles(["student"] as UserRole[]), async (c) => {
-  const jwtUser = c.get("user") as any;
-  const authUserId = jwtUser?.id;
+dataRouter.post("/bfi/save", requireRoles(["student"]), async (c) => {
+  const authUserId = c.req.header('x-user-id');
   const { env } = c;
   const body = await c.req.json();
   const userId = body.userId;
-  if (userId !== authUserId) return c.json({ error: '認証されていません' }, 401);
+  if (userId !== authUserId) return c.json({ error: 'Unauthorized' }, 401);
   const responses = body.responses; // { "1": 5, "2": 3, ... }
   
   if (!userId || !responses) return c.json({ error: "Invalid request" }, 400);
@@ -2285,32 +1965,28 @@ dataRouter.post("/bfi/save", requireRoles(["student"] as UserRole[]), async (c) 
 });
 
 dataRouter.get("/bfi/responses/:userId", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const jwtUser = c.get("user") as any;
-  const authUserId = jwtUser?.id;
-  const jwtRole = jwtUser?.role as string;
+  const authUserId = c.req.header('x-user-id');
   const { env } = c;
   const userId = c.req.param('userId');
-  // student は自分のデータのみ、researcher/admin/collaborator/board_observer は全員分参照可
-  const canViewAll = ["researcher", "admin", "collaborator", "board_observer"].includes(jwtRole);
-  if (!canViewAll && userId !== authUserId) return c.json({ error: '認証されていません' }, 401);
+  if (userId !== authUserId) return c.json({ error: 'Unauthorized' }, 401);
   const res = await env.DB.prepare("SELECT item_id, score FROM namikawa_bfi_responses WHERE user_id = ?").bind(userId).all();
   const responses: Record<number, number> = {};
   for (const row of res.results) {
-    responses[row.item_id as number] = row.score as number;
+    responses[row.item_id] = row.score;
   }
   return c.json({ responses });
 });
 
 
 // ユーザー管理
-dataRouter.get("/users", requireRoles(["admin", "researcher"] as UserRole[]), async (c) => {
+dataRouter.get("/users", requireRoles(["admin", "researcher"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const { results } = await db.prepare("SELECT * FROM users ORDER BY created_at DESC").all();
   return c.json({ success: true, users: results });
 });
 
-dataRouter.post("/users", requireRoles(["admin"] as UserRole[]), async (c) => {
+dataRouter.post("/users", requireRoles(["admin"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const body = await c.req.json();
@@ -2326,7 +2002,7 @@ dataRouter.post("/users", requireRoles(["admin"] as UserRole[]), async (c) => {
   }
 });
 
-dataRouter.put("/users/:id", requireRoles(["admin"] as UserRole[]), async (c) => {
+dataRouter.put("/users/:id", requireRoles(["admin"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const id = c.req.param("id");
@@ -2342,7 +2018,7 @@ dataRouter.put("/users/:id", requireRoles(["admin"] as UserRole[]), async (c) =>
   }
 });
 
-dataRouter.delete("/users/:id", requireRoles(["admin"] as UserRole[]), async (c) => {
+dataRouter.delete("/users/:id", requireRoles(["admin"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const id = c.req.param("id");
@@ -2378,7 +2054,7 @@ dataRouter.post("/auth/login", async (c) => {
     
     // Check password
     if (user.password_hash) {
-      const isValid = await bcrypt.compare(password as string, (user as any).password_hash as string);
+      const isValid = await bcrypt.compare(password, user.password_hash);
       if (!isValid) {
         return c.json({ error: "Invalid credentials" }, 401);
       }
@@ -2393,7 +2069,7 @@ dataRouter.post("/auth/login", async (c) => {
     
     // Generate actual JWT
     const payload = {
-      id: (user as any).id,
+      id: user.id,
       email: user.email,
       role: (user as any).role,
       name: user.name,
@@ -2405,7 +2081,7 @@ dataRouter.post("/auth/login", async (c) => {
     return c.json({ 
       success: true, 
       user: {
-        id: (user as any).id,
+        id: user.id,
         email: user.email,
         name: user.name,
         role: (user as any).role,
@@ -2419,6 +2095,3 @@ dataRouter.post("/auth/login", async (c) => {
     return c.json({ error: String(err) }, 500);
   }
 });
-
-
-dataRouter.route("/exports", exportsRouter);

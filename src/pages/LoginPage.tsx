@@ -153,10 +153,12 @@ export default function ログインPage() {
         } else {
         const user = apiClient.getCurrentUser();
         const role = user?.role || user?.roles?.[0] || 'student';
-        if (role === 'admin' || role === 'researcher') {
+        if (role === 'admin' || role === 'researcher' || role === 'collaborator' || role === 'board_observer') {
           navigate("/admin");
         } else if (role === 'teacher' || role === 'univ_teacher' || role === 'school_mentor') {
           navigate("/teacher-dashboard");
+        } else if (role === 'evaluator') {
+          navigate("/evaluations");
         } else {
           navigate("/dashboard");
         }

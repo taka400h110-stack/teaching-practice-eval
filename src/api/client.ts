@@ -357,8 +357,8 @@ const apiClient = {
       const jRes = await apiFetch(`/api/data/journals/${journalId}`);
       if (!jRes.ok) throw new Error("Failed to fetch journal for evaluation");
       const jData = await jRes.json() as any;
-      if (!jData.success || !jData.journals || jData.journals.length === 0) throw new Error("Journal not found");
-      const journal = jData.journals[0];
+      if (!jData.success || !jData.journal) throw new Error("Journal not found");
+      const journal = jData.journal;
 
       // 2. AI評価APIを呼び出す
       const aiRes = await apiFetch("/api/ai/evaluate", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -529,12 +529,10 @@ throw new Error("Failed to save self evaluation");
     return { session: { id: "new", journal_id: journalId, phase: "phase1", messages: [], created_at: new Date().toISOString() }, reply: { id: "r", role: "assistant", content: "dummy", timestamp: new Date().toISOString() } };
   },
 
-  // ── コーホート ──
+  // ── コーホート（教員ダッシュボード用学生プロファイル） ──
   getCohortProfiles: async (): Promise<any[]> => {
-    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
-    const role = user.role || "researcher";
     try {
-      const res = await apiFetch('/api/data/cohorts', { headers: {  } });
+      const res = await apiFetch('/api/data/teacher/profiles', { headers: {} });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json() as any;
       return data.cohorts || [];

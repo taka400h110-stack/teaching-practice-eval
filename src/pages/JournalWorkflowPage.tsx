@@ -397,6 +397,19 @@ export default function JournalWorkflowPage() {
   }, [messages]);
 
   // ── ① 日誌：保存 ──
+  
+  const evalMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiClient.runEvaluation(id);
+    },
+    onSuccess: () => {
+      void queryClient_.invalidateQueries({ queryKey: ["journals"] });
+      void queryClient_.invalidateQueries({ queryKey: ["allEvaluations"] });
+      setSnackMsg("AI評価が完了しました ✓");
+      setSnackOpen(true);
+    }
+  });
+  
   const saveMutation = useMutation<JournalEntry, Error, JournalCreateRequest>({
     mutationFn: async (payload) => {
       if (isEditMode) return apiClient.updateJournal(journalId!, payload as unknown as Record<string, unknown>) as Promise<JournalEntry>;
@@ -417,6 +430,7 @@ export default function JournalWorkflowPage() {
       }
 
       if (!isDraft) {
+        evalMutation.mutate(data.id);
         setTimeout(() => setStep(1), 1000); // 提出後は自動的にAI評価タブへ
       }
     },
@@ -942,9 +956,16 @@ export default function JournalWorkflowPage() {
             </Card>
 
             {!evalData ? (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                日誌を提出するとAI評価が生成されます。まず「① 日誌記入」タブで日誌を提出してください。
-              </Alert>
+              evalMutation.isPending ? (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <CircularProgress size={16} sx={{mr:1, verticalAlign:"middle"}}/> AI評価を実行中...
+                </Alert>
+              ) : (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  日誌を提出するとAI評価が生成されます。まず「① 日誌記入」タブで日誌を提出してください。
+                  <Button variant="outlined" size="small" sx={{mt:1, display:"block"}} onClick={() => evalMutation.mutate(targetJournalId)}>AI評価を手動で実行</Button>
+                </Alert>
+              )
             ) : (
               <>
                 {/* スコアサマリ */}

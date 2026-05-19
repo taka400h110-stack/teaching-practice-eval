@@ -24,7 +24,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ReferenceLine,
 } from "recharts";
-import { useQuery }       from "@tanstack/react-query";
+import { useQuery, useMutation }       from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { EvaluationItem } from "../types";
 import {
@@ -156,6 +156,15 @@ export default function EvaluationResultPage() {
     enabled:  !!journalId,
   });
 
+  const evalMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiClient.runEvaluation(id);
+    },
+    onSuccess: () => {
+      window.location.reload();
+    }
+  });
+
   const toggleItem = (n: number) => {
     setExpandedItems((prev) => {
       const next = new Set(prev);
@@ -175,8 +184,17 @@ export default function EvaluationResultPage() {
   if (isError || !result) {
     return (
       <Box maxWidth={1000} mx="auto" p={3}>
-        <Alert severity="error">評価結果の取得に失敗しました。一覧に戻って再度お試しください。</Alert>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mt: 2 }}>戻る</Button>
+        {evalMutation.isPending ? (
+          <Alert severity="info"><CircularProgress size={16} sx={{mr:1, verticalAlign:"middle"}}/> AI評価を実行中...</Alert>
+        ) : (
+          <Alert severity="error">評価結果が見つかりません。未評価か、取得に失敗しました。</Alert>
+        )}
+        <Box display="flex" gap={2} mt={2}>
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} variant="outlined">戻る</Button>
+          {!evalMutation.isPending && (
+            <Button variant="contained" color="primary" onClick={() => evalMutation.mutate(journalId!)}>AI評価を実行する</Button>
+          )}
+        </Box>
       </Box>
     );
   }

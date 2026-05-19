@@ -9,6 +9,7 @@ const ExportsPage             = lazy(() => import("./pages/ExportsPage"));
 const AdminExportsPage        = lazy(() => import("./pages/AdminExportsPage"));
 
 const LoginPage               = lazy(() => import("./pages/LoginPage"));
+const OnboardingPage          = lazy(() => import("./pages/OnboardingPage"));
 // 実習生
 const DashboardPage           = lazy(() => import("./pages/DashboardPage"));
 // 教員・メンター・評価者
@@ -83,6 +84,7 @@ export default function App() {
     <Suspense fallback={<Spinner />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route
           path="/"
           element={
