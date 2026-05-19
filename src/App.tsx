@@ -63,6 +63,28 @@ const Spinner = () => (
   </Box>
 );
 
+// 役割に応じたホームパスを返す
+function getRoleHomePath(): string {
+  if (!apiClient.isAuthenticated()) return "/login";
+  const user = apiClient.getCurrentUser() as any;
+  const role = user?.role || user?.roles?.[0] || "student";
+  if (role === "admin" || role === "researcher" || role === "collaborator" || role === "board_observer") {
+    return "/admin";
+  }
+  if (role === "teacher" || role === "univ_teacher" || role === "school_mentor") {
+    return "/teacher-dashboard";
+  }
+  if (role === "evaluator") {
+    return "/evaluations";
+  }
+  return "/dashboard";
+}
+
+// ルートパスへアクセスした際に役割に応じたホームへリダイレクト
+function RoleBasedHomeRedirect() {
+  return <Navigate to={getRoleHomePath()} replace />;
+}
+
 function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
   if (!apiClient.isAuthenticated()) return <Navigate to="/login" replace />;
     
@@ -93,7 +115,7 @@ export default function App() {
             </PrivateRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<RoleBasedHomeRedirect />} />
 
           {/* ダッシュボード */}
           <Route path="dashboard"         element={<PrivateRoute allowedRoles={["student"]}><DashboardPage /></PrivateRoute>} />
@@ -159,7 +181,7 @@ export default function App() {
           <Route path="international"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><InternationalComparisonPage /></PrivateRoute>} />
         </Route>
         <Route path="unauthorized" element={<Box p={4}><Typography variant="h5" color="error">アクセス権限がありません (403)</Typography><Typography>このページへのアクセス権限がありません。</Typography></Box>} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<RoleBasedHomeRedirect />} />
       </Routes>
     </Suspense>
   );
