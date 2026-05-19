@@ -120,7 +120,7 @@ export const DEMO_ACCOUNT_LIST = [
     group: "研究・行政",
   },
   {
-    email: "board@teaching-eval.jp",        password: "password",
+    email: "observer@teaching-eval.jp",     password: "password",
     label: "教育委員会",   name: "中村 委員",
     detail: "〇〇市教育委員会 / 指導主事",
     group: "研究・行政",
@@ -174,15 +174,33 @@ const apiClient = {
     const token = localStorage.getItem("auth_token");
     if (!token) return false;
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      // JWT は base64url エンコードのため、atob で扱える形式に変換
+      // - "-" -> "+", "_" -> "/"
+      // - padding "=" を補完
+      // - UTF-8 マルチバイト文字 (例: 日本語の name) を正しくデコードするため
+      //   decodeURIComponent(escape(...)) で UTF-8 として復号
+      const parts = token.split(".");
+      if (parts.length < 2) return false;
+      let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64.length % 4;
+      if (pad) b64 += "=".repeat(4 - pad);
+      const decoded = decodeURIComponent(
+        Array.prototype.map
+          .call(atob(b64), (c: string) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      const payload = JSON.parse(decoded);
       if (payload.exp && payload.exp * 1000 < Date.now()) {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("user_info");
         return false;
       }
       return true;
-    } catch(e) {
-      return false;
+    } catch (e) {
+      // パース失敗時もログアウト状態にせず、user_info があればフォールバックで認証済みとみなす
+      // (トークンは API リクエスト時にサーバ側で検証される)
+      const userInfo = localStorage.getItem("user_info");
+      return !!userInfo;
     }
   },
 

@@ -97,7 +97,7 @@ const DEMO_ACCOUNTS = [
     desc:     "データ閲覧 / 基本統計の参照",
   },
   {
-    email:    "board@teaching-eval.jp",
+    email:    "observer@teaching-eval.jp",
     password: "password",
     label:    "教育委員会",
     name:     "中村 委員",
