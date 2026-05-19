@@ -23,7 +23,19 @@ function getAuthContext(c: any) {
   if (!auth || !auth.startsWith('Bearer ')) return null;
   try {
     const token = auth.split(' ')[1];
-    return JSON.parse(atob(token));
+    // JWT: header.payload.signature の payload 部分を base64url + UTF-8 でデコード
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4;
+    if (pad) b64 += '='.repeat(4 - pad);
+    // UTF-8 マルチバイト文字 (日本語名等) を正しくデコード
+    const decoded = decodeURIComponent(
+      Array.prototype.map
+        .call(atob(b64), (ch: string) => '%' + ('00' + ch.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(decoded);
   } catch (e) {
     return null;
   }
@@ -428,7 +440,8 @@ async function callOpenAI(
       messages,
       temperature,
       response_format: { type: "json_object" },
-      max_tokens: 2000,
+      // 23項目評価のJSONは長くなるため4096に拡張 (gpt-4o 上限内)
+      max_tokens: 4096,
     }),
   });
 
@@ -449,9 +462,9 @@ async function callOpenAI(
 // POST /api/ai/evaluate  (CoT-A)
 // ────────────────────────────────────────────────────────────────
 openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
+    return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
   }
 
   const body = await c.req.json() as {
@@ -515,9 +528,9 @@ openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher
 // POST /api/ai/reflection-depth  (CoT-B)
 // ────────────────────────────────────────────────────────────────
 openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
+    return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
   }
 
   const body = await c.req.json() as {
@@ -552,9 +565,9 @@ openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ
 // POST /api/ai/generate-goal  (CoT-C)
 // ────────────────────────────────────────────────────────────────
 openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
+    return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
   }
 
   const body = await c.req.json() as {
@@ -628,9 +641,9 @@ openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_te
 // CoT-B判定後に適切な問いかけを生成
 // ────────────────────────────────────────────────────────────────
 openaiRouter.post("/chat", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = (c.env as any)?.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "process.env.OPENAI_API_KEY not configured" }, 500);
+    return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
   }
 
   const body = await c.req.json() as {
@@ -799,7 +812,7 @@ openaiRouter.post("/analyze", requireRoles(["student", "teacher", "univ_teacher"
 
 // POST /api/ai/check-evidence (RQ3b GA-Evidence)
 openaiRouter.post("/check-evidence", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = process.env.OPENAI_API_KEY || c.env.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
 
   const authContext = getAuthContext(c);
@@ -852,7 +865,7 @@ JSON形式で出力してください:
 
 // POST /api/ai/evaluate-session-rd (RQ3b RD-Chat Session-level holistic judgement)
 openaiRouter.post("/evaluate-session-rd", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
-  const apiKey = process.env.OPENAI_API_KEY || c.env.process.env.OPENAI_API_KEY;
+  const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
 
   const authContext = getAuthContext(c);
