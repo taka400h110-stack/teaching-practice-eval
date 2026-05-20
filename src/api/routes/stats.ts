@@ -975,7 +975,9 @@ statsRouter.get("/ai-vs-human", requireRoles(["evaluator", "researcher", "admin"
     
     const summaries = [];
     const aiMap = new Map(aiEvals.map(e => [e.journal_id, e]));
+    const humanIdMap = new Map();
     for (const he of humanEvals) {
+      humanIdMap.set(he.id, he);
       const ae = aiMap.get(he.journal_id);
       if (ae) {
         summaries.push({
@@ -988,7 +990,33 @@ statsRouter.get("/ai-vs-human", requireRoles(["evaluator", "researcher", "admin"
         });
       }
     }
-    return c.json({ summaries, items: [] });
+    // 項目別比較: human_eval_items を items として返却し、対応する AI スコアは
+    // 同 journal の evaluations から factor 平均で推定
+    const { results: heItems } = await db.prepare("SELECT * FROM human_eval_items").all();
+    // item_number → factor のマッピング (ComparisonPage.tsx の ITEMS と一致)
+    const factorOf = (n: number) =>
+      n <= 7 ? "factor1_score" : n <= 13 ? "factor2_score" : n <= 17 ? "factor3_score" : "factor4_score";
+    const items = [];
+    for (const it of heItems) {
+      const he = humanIdMap.get(it.human_eval_id);
+      if (!he) continue;
+      const ae = aiMap.get(he.journal_id);
+      if (!ae) continue;
+      const itemNum = Number(it.item_number);
+      // 各 factor は 4 段階換算 (1-4)、AI score を項目スコア相当に変換
+      const factorKey = factorOf(itemNum);
+      const aiFactorScore = Number(ae[factorKey] ?? 0);
+      // factor 合計から項目数で割って 1 項目平均を推定
+      const itemsInFactor = itemNum <= 7 ? 7 : itemNum <= 13 ? 6 : itemNum <= 17 ? 4 : 3;
+      const aiItemScore = +(aiFactorScore / itemsInFactor).toFixed(2);
+      items.push({
+        journal_id: he.journal_id,
+        item_number: itemNum,
+        ai_score: aiItemScore,
+        human_score: Number(it.score ?? 0),
+      });
+    }
+    return c.json({ summaries, items });
   } catch(e) {
     return c.json({ error: String(e) }, 500);
   }

@@ -2286,13 +2286,64 @@ dataRouter.get("/scat/network", requireRoles(["researcher", "admin", "collaborat
       }
     });
 
-    const nodes = Array.from(nodesMap.entries()).map(([id, val]) => ({ id, val }));
-    const edges = Array.from(edgesMap.entries()).map(([key, weight]) => {
+    const nodes = Array.from(nodesMap.entries()).map(([id, val]) => ({ id, name: id, val }));
+    // links 形式（フロントエンドが期待） + 互換用 edges
+    const links = Array.from(edgesMap.entries()).map(([key, weight]) => {
       const [source, target] = key.split("||");
-      return { source, target, weight };
+      return { source, target, val: weight };
+    });
+    const edges = links.map(l => ({ source: l.source, target: l.target, weight: l.val }));
+
+    return c.json({ nodes, links, edges });
+  } catch (err: any) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+// SCATテーマ時系列推移（週ごとのテーマ出現頻度）
+dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher", "univ_teacher", "school_mentor"]), async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    // 各セグメントを journal_entries.week_number と紐付け、week × theme で集計
+    const { results } = await db.prepare(`
+      SELECT je.week_number AS week_number, jss.step4_theme_construct AS theme
+      FROM journal_scat_segments jss
+      JOIN journal_scat_analyses jsa ON jss.analysis_id = jsa.id
+      JOIN journal_entries je ON jsa.journal_id = je.id
+      WHERE jsa.analysis_status = 'completed'
+        AND jss.step4_theme_construct IS NOT NULL
+        AND jss.step4_theme_construct != ''
+    `).all();
+
+    // week -> { theme -> count }
+    const matrix: Record<number, Record<string, number>> = {};
+    const themesGlobal = new Map<string, number>();
+    for (const r of results as any[]) {
+      const wk = Number(r.week_number) || 0;
+      const themes = String(r.theme).split(/[,、・]/).map((t: string) => t.trim()).filter((t: string) => t);
+      if (!matrix[wk]) matrix[wk] = {};
+      for (const t of themes) {
+        matrix[wk][t] = (matrix[wk][t] || 0) + 1;
+        themesGlobal.set(t, (themesGlobal.get(t) || 0) + 1);
+      }
+    }
+
+    // 出現頻度の高い上位 5 テーマを採用
+    const topThemes = Array.from(themesGlobal.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([t]) => t);
+
+    // 全 week を昇順に
+    const weeks = Object.keys(matrix).map(n => Number(n)).sort((a, b) => a - b);
+    const timeline = weeks.map(wk => {
+      const row: Record<string, any> = { week: `Week ${wk}` };
+      for (const t of topThemes) row[t] = matrix[wk][t] || 0;
+      return row;
     });
 
-    return c.json({ nodes, edges });
+    return c.json({ timeline, themes: topThemes });
   } catch (err: any) {
     return c.json({ error: String(err) }, 500);
   }
