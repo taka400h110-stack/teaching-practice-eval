@@ -20,17 +20,33 @@ import { apiFetch } from '../api/client';
 
 export const SCATBatchAnalysisPage: React.FC = () => {
   const [selectedJournals, setSelectedJournals] = useState<string[]>([]);
-  
-  // Mock data for now since we don't have the full journal fetching in place
-  const mockJournals = [
-    { id: '1', title: '第1回 教育実習日誌', student: '山田 太郎', date: '2023-05-10', status: 'unprocessed' },
-    { id: '2', title: '第2回 教育実習日誌', student: '山田 太郎', date: '2023-05-17', status: 'processed' },
-    { id: '3', title: '第1回 教育実習日誌', student: '佐藤 花子', date: '2023-05-10', status: 'error' },
-  ];
+
+  // 実データ取得: /api/data/journals + /api/data/scat/batch-status で分析状態を結合
+  const { data: journalsList = [], refetch } = useQuery<any[]>({
+    queryKey: ['scat-batch-journals'],
+    queryFn: async () => {
+      const [jRes, sRes] = await Promise.all([
+        apiFetch('/api/data/journals'),
+        apiFetch('/api/data/scat/batch-status'),
+      ]);
+      const jData: any = await jRes.json().catch(() => ({}));
+      const sData: any = await sRes.json().catch(() => ({}));
+      const statusMap: Record<string, string> = sData.statusMap || {};
+      const journals = jData.journals || [];
+      return journals.map((j: any) => ({
+        id: j.id,
+        title: j.title || `第${j.week_number}週 教育実習日誌`,
+        student: j.student_name || j.student_id,
+        date: j.entry_date,
+        status: statusMap[j.id] || 'unprocessed',
+      }));
+    },
+    refetchInterval: 0,
+  });
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedJournals(mockJournals.map(j => j.id));
+      setSelectedJournals(journalsList.map((j: any) => j.id));
     } else {
       setSelectedJournals([]);
     }
@@ -44,14 +60,20 @@ export const SCATBatchAnalysisPage: React.FC = () => {
 
   const batchMutation = useMutation({
     mutationFn: async () => {
-      return apiFetch('/api/openai/scat-analysis/batch', {
+      const res = await apiFetch('/api/data/scat/batch-run', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ journal_ids: selectedJournals })
       });
+      return res.json();
     },
-    onSuccess: () => {
-      alert('バッチ分析ジョブを開始しました');
+    onSuccess: (data: any) => {
+      alert(`バッチ分析を実行しました: 成功 ${data.created || 0}件 / 既存 ${data.skipped || 0}件`);
       setSelectedJournals([]);
+      refetch();
+    },
+    onError: () => {
+      alert('バッチ分析に失敗しました');
     }
   });
 
@@ -79,7 +101,7 @@ export const SCATBatchAnalysisPage: React.FC = () => {
         >
           選択した日誌を分析 ({selectedJournals.length}件)
         </Button>
-        <Button variant="outlined" startIcon={<Refresh />}>
+        <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()}>
           更新
         </Button>
       </Box>
@@ -90,8 +112,8 @@ export const SCATBatchAnalysisPage: React.FC = () => {
             <TableRow>
               <TableCell padding="checkbox">
                 <Checkbox 
-                  checked={selectedJournals.length === mockJournals.length && mockJournals.length > 0}
-                  indeterminate={selectedJournals.length > 0 && selectedJournals.length < mockJournals.length}
+                  checked={selectedJournals.length === journalsList.length && journalsList.length > 0}
+                  indeterminate={selectedJournals.length > 0 && selectedJournals.length < journalsList.length}
                   onChange={handleSelectAll}
                 />
               </TableCell>
@@ -102,7 +124,7 @@ export const SCATBatchAnalysisPage: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {mockJournals.map((journal) => (
+            {journalsList.map((journal: any) => (
               <TableRow key={journal.id} hover onClick={() => handleSelect(journal.id)} sx={{ cursor: 'pointer' }}>
                 <TableCell padding="checkbox">
                   <Checkbox checked={selectedJournals.includes(journal.id)} />

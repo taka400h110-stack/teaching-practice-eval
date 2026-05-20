@@ -2032,16 +2032,16 @@ dataRouter.post("/scat/codes", requireRoles(["researcher", "admin", "collaborato
     const body = await c.req.json();
     const id = body.id || ("code_" + Date.now());
     await db.prepare(`
-      INSERT INTO scat_codes (id, segment_id, researcher_id, step1_words, step2_words, step3_concepts, step4_themes, memo, created_at, updated_at)
+      INSERT INTO scat_codes (id, segment_id, researcher_id, step1_keywords, step2_thesaurus, step3_concept, step4_theme, memo, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
-        step1_words = excluded.step1_words,
-        step2_words = excluded.step2_words,
-        step3_concepts = excluded.step3_concepts,
-        step4_themes = excluded.step4_themes,
+        step1_keywords = excluded.step1_keywords,
+        step2_thesaurus = excluded.step2_thesaurus,
+        step3_concept = excluded.step3_concept,
+        step4_theme = excluded.step4_theme,
         memo = excluded.memo,
         updated_at = CURRENT_TIMESTAMP
-    `).bind(id, body.segment_id, body.researcher_id, body.step1_words || "", body.step2_words || "", body.step3_concepts || "", body.step4_themes || "", body.memo || "").run();
+    `).bind(id, body.segment_id, body.researcher_id, body.step1_words || body.step1_keywords || "", body.step2_words || body.step2_thesaurus || "", body.step3_concepts || body.step3_concept || "", body.step4_themes || body.step4_theme || "", body.memo || "").run();
     return c.json({ success: true, id });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -2266,37 +2266,132 @@ dataRouter.get("/scat/journals/:journalId", requireRoles(["researcher", "admin",
   }
 });
 
+// SCATバッチ分析: 各日誌の分析状態 (analysis_status) をmap で返す
+dataRouter.get("/scat/batch-status", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher", "univ_teacher", "school_mentor"]), async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const { results } = await db.prepare(`
+      SELECT journal_id, analysis_status FROM journal_scat_analyses
+    `).all();
+    const statusMap: Record<string, string> = {};
+    for (const r of results as any[]) {
+      // analysis_status: 'pending' | 'in_progress' | 'completed' | 'failed' を
+      // フロント表示用 (processed/unprocessed/error) にマップ
+      const s = String(r.analysis_status || "");
+      statusMap[r.journal_id] = s === "completed" ? "processed" : s === "failed" ? "error" : "unprocessed";
+    }
+    return c.json({ success: true, statusMap });
+  } catch (err: any) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+// SCATバッチ実行: 選択日誌に対して journal_scat_analyses を作成 (デモ用即時 completed)
+dataRouter.post("/scat/batch-run", requireRoles(["researcher", "admin", "collaborator", "teacher", "univ_teacher"]), async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const journalIds: string[] = Array.isArray((body as any).journal_ids) ? (body as any).journal_ids : [];
+    if (journalIds.length === 0) return c.json({ created: 0, skipped: 0 });
+
+    // 既存の分析を取得
+    const placeholders = journalIds.map(() => "?").join(",");
+    const { results: existing } = await db.prepare(
+      `SELECT journal_id FROM journal_scat_analyses WHERE journal_id IN (${placeholders})`
+    ).bind(...journalIds).all();
+    const existingSet = new Set((existing as any[]).map(r => r.journal_id));
+
+    let created = 0;
+    const skipped = existingSet.size;
+    const userId = (c.get("user") as any)?.id || "user-005";
+
+    // デモテーマ集合 (実プロダクトでは LLM 呼び出し結果に置換)
+    const demoThemes = [
+      ["授業準備", "教材研究"],
+      ["生徒指導", "個別支援"],
+      ["振り返り", "省察"],
+      ["時間管理", "学級経営"],
+      ["教師観察", "教師の判断"],
+    ];
+
+    for (const jid of journalIds) {
+      if (existingSet.has(jid)) continue;
+      const analysisId = `jsa-batch-${jid}-${Date.now()}`;
+      await db.prepare(`
+        INSERT INTO journal_scat_analyses (id, journal_id, user_id, analysis_status, created_at, updated_at)
+        VALUES (?, ?, ?, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `).bind(analysisId, jid, userId).run();
+
+      // 2 セグメントを作成 (ネットワーク図に共起ペアを発生させる)
+      const pair = demoThemes[created % demoThemes.length];
+      for (let i = 0; i < 2; i++) {
+        const segId = `${analysisId}-seg-${i}`;
+        await db.prepare(`
+          INSERT INTO journal_scat_segments (id, analysis_id, journal_id, segment_order, raw_text, step1_focus_words, step2_outside_words, step3_explanatory_words, step4_theme_construct, step5_questions_issues, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).bind(
+          segId, analysisId, jid, i + 1,
+          `(バッチ生成サンプルテキスト ${i + 1})`,
+          "観察、記録", "授業の流れ、児童の反応",
+          `${pair[i]}に関わる教育的判断`,
+          pair[i],
+          "次回の改善点を検討する"
+        ).run();
+      }
+      created++;
+    }
+
+    return c.json({ success: true, created, skipped });
+  } catch (err: any) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 // SCATネットワーク分析用データ取得
 dataRouter.get("/scat/network", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
-    // 全ジャーナルのセグメントを取得し、共起ネットワークを構築
-    // ※大規模になる場合はDB内で集計すべきだが、小規模前提としてJS上で集計する
-    const { results: segments } = await db.prepare(`
-      SELECT jsa.journal_id, jss.step4_theme_construct 
+    // SCAT の2系統 (journal_scat_segments / scat_codes) を両方統合する
+    //  - journal_scat_segments: 日誌ベースの SCAT 分析結果
+    //  - scat_codes: プロジェクトベース (SCATAnalysisPage) の手動コーディング結果
+    // どちらの分析結果もネットワーク図に反映する (連動性確保)
+    const { results: journalSegs } = await db.prepare(`
+      SELECT jsa.journal_id AS group_id, jss.step4_theme_construct AS themes
       FROM journal_scat_segments jss
       JOIN journal_scat_analyses jsa ON jss.analysis_id = jsa.id
       WHERE jsa.analysis_status = 'completed' AND jss.step4_theme_construct != '' AND jss.step4_theme_construct IS NOT NULL
     `).all();
 
+    const { results: projectSegs } = await db.prepare(`
+      SELECT sc.segment_id AS group_id, sc.step4_theme AS themes
+      FROM scat_codes sc
+      WHERE sc.step4_theme IS NOT NULL AND sc.step4_theme != ''
+    `).all();
+
+    const segments = [...(journalSegs as any[]), ...(projectSegs as any[])];
+
     const nodesMap = new Map<string, number>();
     const edgesMap = new Map<string, number>();
-    
-    // Journalごとにテーマをグループ化
-    const journalThemes: Record<string, Set<string>> = {};
-    for (const seg of segments as any[]) {
-      const themes = String(seg.step4_theme_construct).split(/[,、・]/).map(t => t.trim()).filter(t => t);
-      if (!journalThemes[seg.journal_id]) journalThemes[seg.journal_id] = new Set();
-      themes.forEach(t => journalThemes[seg.journal_id].add(t));
-      
-      themes.forEach(t => {
+
+    // group (journal or scat segment) ごとにテーマをグループ化して共起検出
+    const groupThemes: Record<string, Set<string>> = {};
+    for (const seg of segments) {
+      const themeStr = String(seg.themes || "");
+      const themes = themeStr.split(/[,、・\/／]/).map((t: string) => t.trim()).filter((t: string) => t);
+      const gid = String(seg.group_id);
+      if (!groupThemes[gid]) groupThemes[gid] = new Set();
+      themes.forEach((t: string) => groupThemes[gid].add(t));
+
+      themes.forEach((t: string) => {
         nodesMap.set(t, (nodesMap.get(t) || 0) + 1);
       });
     }
 
-    // エッジ生成（同一日誌内で共起するテーマのペア）
-    Object.values(journalThemes).forEach(themeSet => {
+    // エッジ生成 (同一グループ内で共起するテーマのペア)
+    Object.values(groupThemes).forEach(themeSet => {
       const themes = Array.from(themeSet);
       for (let i = 0; i < themes.length; i++) {
         for (let j = i + 1; j < themes.length; j++) {
@@ -2327,8 +2422,10 @@ dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "c
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
-    // 各セグメントを journal_entries.week_number と紐付け、week × theme で集計
-    const { results } = await db.prepare(`
+    // SCAT 2系統 (journal_scat_segments / scat_codes) を両方含めて週次集計
+    //  - journal_scat_segments: 日誌ベース
+    //  - scat_codes: scat_segments.journal_id 経由で週番号を取得
+    const { results: journalRows } = await db.prepare(`
       SELECT je.week_number AS week_number, jss.step4_theme_construct AS theme
       FROM journal_scat_segments jss
       JOIN journal_scat_analyses jsa ON jss.analysis_id = jsa.id
@@ -2337,6 +2434,17 @@ dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "c
         AND jss.step4_theme_construct IS NOT NULL
         AND jss.step4_theme_construct != ''
     `).all();
+
+    const { results: projectRows } = await db.prepare(`
+      SELECT je.week_number AS week_number, sc.step4_theme AS theme
+      FROM scat_codes sc
+      JOIN scat_segments ss ON sc.segment_id = ss.id
+      JOIN journal_entries je ON ss.source_journal_id = je.id
+      WHERE sc.step4_theme IS NOT NULL AND sc.step4_theme != ''
+        AND ss.source_journal_id IS NOT NULL
+    `).all();
+
+    const results = [...(journalRows as any[]), ...(projectRows as any[])];
 
     // week -> { theme -> count }
     const matrix: Record<number, Record<string, number>> = {};
