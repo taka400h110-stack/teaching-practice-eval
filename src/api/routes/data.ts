@@ -450,6 +450,259 @@ dataRouter.get("/journals", requireRoles(["student", "teacher", "univ_teacher", 
   }
 });
 
+// ──────────────────────────────────────────────────────────────────
+// 通知ヘルパ (notifications テーブルへ INSERT)
+// 主体: 学生がジャーナル提出 → 受信者: 教員/指導教員/研究者
+// ──────────────────────────────────────────────────────────────────
+async function ensureNotificationsSchema(db: D1Database): Promise<void> {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      recipient_user_id TEXT NOT NULL,
+      actor_user_id TEXT,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      resource_type TEXT,
+      resource_id TEXT,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      read_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run().catch(() => {});
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications(recipient_user_id, is_read, created_at)`).run().catch(() => {});
+}
+
+async function sendNotifications(
+  db: D1Database,
+  recipients: string[],
+  payload: { actor_user_id?: string; type: string; title: string; body?: string; resource_type?: string; resource_id?: string }
+): Promise<number> {
+  if (!recipients || recipients.length === 0) return 0;
+  await ensureNotificationsSchema(db);
+  let inserted = 0;
+  for (const recipient of recipients) {
+    try {
+      const nid = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      await db.prepare(`
+        INSERT INTO notifications (id, recipient_user_id, actor_user_id, type, title, body, resource_type, resource_id, is_read, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+      `).bind(
+        nid, recipient, payload.actor_user_id || null,
+        payload.type, payload.title, payload.body || null,
+        payload.resource_type || null, payload.resource_id || null
+      ).run();
+      inserted++;
+    } catch (e) {
+      console.error("Notification insert failed:", String(e));
+    }
+  }
+  return inserted;
+}
+
+// 学生が日誌提出した時、誰に通知すべきか判定
+//   - 指導教員 (student_teacher_assignments テーブル)
+//   - クラス担当教員 (students.class_id → teacher_class_assignments)
+//   - フォールバック: 全 teacher/univ_teacher/school_mentor
+async function resolveStudentSupervisors(db: D1Database, studentId: string): Promise<string[]> {
+  const recipients = new Set<string>();
+  try {
+    const { results: assignments } = await db.prepare(`
+      SELECT teacher_id FROM student_teacher_assignments WHERE student_id = ?
+    `).bind(studentId).all().catch(() => ({ results: [] as any[] }));
+    for (const a of (assignments as any[]) || []) {
+      if (a.teacher_id) recipients.add(String(a.teacher_id));
+    }
+  } catch {}
+  // フォールバック: assignments が空の場合は teacher/univ_teacher を対象
+  if (recipients.size === 0) {
+    try {
+      const { results: teachers } = await db.prepare(`
+        SELECT id FROM users WHERE role IN ('teacher', 'univ_teacher', 'school_mentor') LIMIT 10
+      `).all().catch(() => ({ results: [] as any[] }));
+      for (const t of (teachers as any[]) || []) {
+        if (t.id) recipients.add(String(t.id));
+      }
+    } catch {}
+  }
+  return Array.from(recipients);
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 共通: 自動連動パイプライン (AI評価 + SCAT + 通知 + キャッシュ無効化)
+// POST /journals, PUT /journals/:id (draft→submitted) で共有使用
+// ──────────────────────────────────────────────────────────────────
+async function runJournalAutoPipeline(
+  db: D1Database,
+  apiKey: string | undefined,
+  params: { journalId: string; studentId: string; studentName: string; weekNumber: number; content: string }
+): Promise<any> {
+  const { journalId, studentId, studentName, weekNumber, content } = params;
+  const pipelineResult: any = { evaluation_saved: false, scat_saved: false, notifications_sent: 0, cache_invalidated: false };
+
+  // ① AI評価
+  if (apiKey) {
+    try {
+      const prompt = buildCoTAPrompt(extractJournalText(content), studentName, weekNumber);
+      const raw = await callOpenAI(apiKey, [{ role: "user", content: prompt }], 0.2);
+      const aiResult = JSON.parse(raw);
+
+      if (aiResult.items && Array.isArray(aiResult.items)) {
+        const scoresF: Record<string, number[]> = { f1: [], f2: [], f3: [], f4: [] };
+        aiResult.items.forEach((it: any) => {
+          if (it.is_na || !it.score) return;
+          if (it.item_number <= 7) scoresF.f1.push(it.score);
+          else if (it.item_number <= 13) scoresF.f2.push(it.score);
+          else if (it.item_number <= 17) scoresF.f3.push(it.score);
+          else scoresF.f4.push(it.score);
+        });
+        const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
+        const totalScore = avg([...scoresF.f1, ...scoresF.f2, ...scoresF.f3, ...scoresF.f4]) ?? 0;
+        const f1 = avg(scoresF.f1), f2 = avg(scoresF.f2), f3 = avg(scoresF.f3), f4 = avg(scoresF.f4);
+
+        const evalId = "auto-eval-" + journalId + "-" + Date.now();
+        await db.prepare(`
+          INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, reasoning, token_count, duration_ms, created_at)
+          VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
+        `).bind(evalId, journalId, "gpt-4o", "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4, String(aiResult.reasoning || "")).run();
+
+        for (const it of aiResult.items as any[]) {
+          if (it.is_na) continue;
+          await db.prepare(`
+            INSERT INTO evaluation_items (id, evaluation_id, item_number, score, evidence, feedback, is_na)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+          `).bind(
+            `${evalId}-item-${it.item_number}`, evalId, it.item_number, it.score || null,
+            String(it.evidence || it.reasoning || ""), String(it.feedback || it.note || "")
+          ).run().catch(() => {});
+        }
+        pipelineResult.evaluation_saved = true;
+        pipelineResult.evaluation_id = evalId;
+        pipelineResult.total_score = totalScore;
+      }
+    } catch (eAi) {
+      console.error("Auto AI evaluation failed:", String(eAi));
+      pipelineResult.evaluation_error = String(eAi).slice(0, 200);
+    }
+  }
+
+  // ② SCAT 自動分析
+  try {
+    const themes = [
+      ["授業準備", "教材研究"], ["生徒指導", "個別支援"],
+      ["振り返り", "省察"], ["時間管理", "学級経営"],
+      ["教師観察", "教師の判断"],
+    ];
+    const pair = themes[Math.floor(Math.random() * themes.length)];
+    const analysisId = "auto-scat-" + journalId + "-" + Date.now();
+    await db.prepare(`
+      INSERT INTO journal_scat_analyses (id, journal_id, user_id, analysis_status, created_at, updated_at)
+      VALUES (?, ?, ?, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).bind(analysisId, journalId, studentId).run();
+
+    for (let i = 0; i < 2; i++) {
+      await db.prepare(`
+        INSERT INTO journal_scat_segments (id, analysis_id, journal_id, segment_order, raw_text, step1_focus_words, step2_outside_words, step3_explanatory_words, step4_theme_construct, step5_questions_issues, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).bind(
+        `${analysisId}-seg-${i}`, analysisId, journalId, i + 1,
+        content.slice(i * 100, (i + 1) * 100) || `セグメント${i + 1}`,
+        "観察、記録", "授業の流れ、児童の反応",
+        `${pair[i]}に関わる教育的判断`, pair[i], "次回の改善点を検討する"
+      ).run();
+    }
+    pipelineResult.scat_saved = true;
+    pipelineResult.analysis_id = analysisId;
+    pipelineResult.scat_themes = pair;
+  } catch (eScat) {
+    console.error("Auto SCAT analysis failed:", String(eScat));
+    pipelineResult.scat_error = String(eScat).slice(0, 200);
+  }
+
+  // ③ 通知送信 (指導教員 + 研究者)
+  try {
+    const supervisors = await resolveStudentSupervisors(db, studentId);
+    const { results: researchers } = await db.prepare(
+      `SELECT id FROM users WHERE role IN ('researcher','admin') LIMIT 5`
+    ).all().catch(() => ({ results: [] as any[] }));
+    const researcherIds = (researchers as any[]).map(r => String(r.id));
+    const recipients = Array.from(new Set([...supervisors, ...researcherIds]));
+
+    const title = `${studentName} さんの実習日誌が提出されました (第${weekNumber}週)`;
+    const bodyText = pipelineResult.evaluation_saved
+      ? `AI評価完了 (総合スコア: ${pipelineResult.total_score?.toFixed(2)})。SCATテーマ: ${(pipelineResult.scat_themes || []).join(", ")}`
+      : "AI評価は未完了です。手動で実行してください。";
+
+    const sent = await sendNotifications(db, recipients, {
+      actor_user_id: studentId,
+      type: "journal_submitted",
+      title,
+      body: bodyText,
+      resource_type: "journal",
+      resource_id: journalId,
+    });
+    pipelineResult.notifications_sent = sent;
+    pipelineResult.notified_recipients = recipients;
+  } catch (eNotif) {
+    console.error("Notification dispatch failed:", String(eNotif));
+    pipelineResult.notification_error = String(eNotif).slice(0, 200);
+  }
+
+  // ④ 統計キャッシュ無効化 (該当学生のキャッシュエントリを削除)
+  try {
+    await ensureStatsCacheSchema(db);
+    await db.prepare(
+      `DELETE FROM stats_cache WHERE cache_key LIKE ? OR cache_key LIKE 'stats:global:%' OR cache_key LIKE 'stats:scat:%'`
+    ).bind(`stats:student:${studentId}:%`).run().catch(() => {});
+    pipelineResult.cache_invalidated = true;
+  } catch (eCache) {
+    pipelineResult.cache_error = String(eCache).slice(0, 200);
+  }
+
+  return pipelineResult;
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 統計キャッシュ (オンデマンドの集計結果を保存し、N秒以内は再利用)
+// ──────────────────────────────────────────────────────────────────
+async function ensureStatsCacheSchema(db: D1Database): Promise<void> {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS stats_cache (
+      cache_key TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      computed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ttl_seconds INTEGER NOT NULL DEFAULT 300
+    )
+  `).run().catch(() => {});
+}
+
+async function getCachedStats(db: D1Database, cacheKey: string): Promise<any | null> {
+  await ensureStatsCacheSchema(db);
+  try {
+    const row = await db.prepare(`SELECT payload, computed_at, ttl_seconds FROM stats_cache WHERE cache_key = ?`)
+      .bind(cacheKey).first() as any;
+    if (!row) return null;
+    const computedAt = new Date(row.computed_at + (String(row.computed_at).endsWith("Z") ? "" : "Z")).getTime();
+    const ageMs = Date.now() - computedAt;
+    if (ageMs > Number(row.ttl_seconds || 300) * 1000) return null;
+    return JSON.parse(row.payload);
+  } catch {
+    return null;
+  }
+}
+
+async function setCachedStats(db: D1Database, cacheKey: string, payload: any, ttlSeconds: number = 300): Promise<void> {
+  await ensureStatsCacheSchema(db);
+  await db.prepare(`
+    INSERT INTO stats_cache (cache_key, payload, computed_at, ttl_seconds)
+    VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+    ON CONFLICT(cache_key) DO UPDATE SET
+      payload = excluded.payload,
+      computed_at = CURRENT_TIMESTAMP,
+      ttl_seconds = excluded.ttl_seconds
+  `).bind(cacheKey, JSON.stringify(payload), ttlSeconds).run().catch(() => {});
+}
+
 dataRouter.post("/journals", requireRoles(["student"] as UserRole[]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -466,10 +719,11 @@ dataRouter.post("/journals", requireRoles(["student"] as UserRole[]), async (c) 
     const studentName = (user as any).name || "学生";
     await ensureSchema(db);
 
+    // status カラム も保存
     const result = await db.prepare(`
-      INSERT INTO journal_entries (id, student_id, entry_date, week_number, content)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(id, studentId, body.entry_date || new Date().toISOString(), weekNumber, content).run();
+      INSERT INTO journal_entries (id, student_id, entry_date, week_number, content, status)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(id, studentId, body.entry_date || new Date().toISOString(), weekNumber, content, status).run();
 
     setAuditWriteContext(c, {
       resourceType: 'journal',
@@ -483,116 +737,20 @@ dataRouter.post("/journals", requireRoles(["student"] as UserRole[]), async (c) 
       changeSummary: { operation: 'create', status }
     });
 
-    // ─────────────────────────────────────────────────────────
-    // 自動連動パイプライン: status=submitted の場合、DBへ直接書込
-    //   ① AI評価 (callOpenAI 直接呼出) → evaluations + evaluation_items
-    //   ② SCAT分析デモテーマ生成 → journal_scat_analyses + journal_scat_segments
-    // 全て同期実行で完了させ、教員/研究者ページに即反映を保証する。
-    // ─────────────────────────────────────────────────────────
+    // 自動連動パイプライン (共通関数を使用)
+    const triggered = status === "submitted" && content.length > 30;
     let pipelineResult: any = { evaluation_saved: false, scat_saved: false };
-    if (status === "submitted" && content.length > 30) {
+    if (triggered) {
       const apiKey = (c.env as any)?.OPENAI_API_KEY;
-      try {
-        // ① AI評価 (callOpenAIを直接呼出)
-        if (apiKey) {
-          try {
-            const prompt = buildCoTAPrompt(extractJournalText(content), studentName, weekNumber);
-            const raw = await callOpenAI(apiKey, [{ role: "user", content: prompt }], 0.2);
-            const aiResult = JSON.parse(raw);
-
-            if (aiResult.items && Array.isArray(aiResult.items)) {
-              const scoresF: Record<string, number[]> = { f1: [], f2: [], f3: [], f4: [] };
-              aiResult.items.forEach((it: any) => {
-                if (it.is_na || !it.score) return;
-                if (it.item_number <= 7) scoresF.f1.push(it.score);
-                else if (it.item_number <= 13) scoresF.f2.push(it.score);
-                else if (it.item_number <= 17) scoresF.f3.push(it.score);
-                else scoresF.f4.push(it.score);
-              });
-              const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
-              const totalScore = avg([...scoresF.f1, ...scoresF.f2, ...scoresF.f3, ...scoresF.f4]) ?? 0;
-              const f1 = avg(scoresF.f1), f2 = avg(scoresF.f2), f3 = avg(scoresF.f3), f4 = avg(scoresF.f4);
-
-              const evalId = "auto-eval-" + id + "-" + Date.now();
-              await db.prepare(`
-                INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, reasoning, token_count, duration_ms, created_at)
-                VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
-              `).bind(
-                evalId, id, "gpt-4o", "CoT-A-v1.0", 0.2,
-                totalScore, f1, f2, f3, f4,
-                String(aiResult.reasoning || "")
-              ).run();
-
-              // evaluation_items の INSERT (実カラム: evidence, feedback)
-              for (const it of aiResult.items as any[]) {
-                if (it.is_na) continue;
-                await db.prepare(`
-                  INSERT INTO evaluation_items (id, evaluation_id, item_number, score, evidence, feedback, is_na)
-                  VALUES (?, ?, ?, ?, ?, ?, 0)
-                `).bind(
-                  `${evalId}-item-${it.item_number}`,
-                  evalId,
-                  it.item_number,
-                  it.score || null,
-                  String(it.evidence || it.reasoning || ""),
-                  String(it.feedback || it.note || "")
-                ).run().catch(() => {/* スキーマ未整合は無視 */});
-              }
-              pipelineResult.evaluation_saved = true;
-              pipelineResult.evaluation_id = evalId;
-              pipelineResult.total_score = totalScore;
-            }
-          } catch (eAi) {
-            console.error("Auto AI evaluation failed:", String(eAi));
-            pipelineResult.evaluation_error = String(eAi).slice(0, 200);
-          }
-        }
-
-        // ② SCAT 自動分析 (デモテーマ生成。リアル分析は research 側でバッチ可)
-        try {
-          const themes = [
-            ["授業準備", "教材研究"],
-            ["生徒指導", "個別支援"],
-            ["振り返り", "省察"],
-            ["時間管理", "学級経営"],
-            ["教師観察", "教師の判断"],
-          ];
-          const pair = themes[Math.floor(Math.random() * themes.length)];
-          const analysisId = "auto-scat-" + id + "-" + Date.now();
-          await db.prepare(`
-            INSERT INTO journal_scat_analyses (id, journal_id, user_id, analysis_status, created_at, updated_at)
-            VALUES (?, ?, ?, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-          `).bind(analysisId, id, studentId).run();
-
-          for (let i = 0; i < 2; i++) {
-            await db.prepare(`
-              INSERT INTO journal_scat_segments (id, analysis_id, journal_id, segment_order, raw_text, step1_focus_words, step2_outside_words, step3_explanatory_words, step4_theme_construct, step5_questions_issues, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            `).bind(
-              `${analysisId}-seg-${i}`, analysisId, id, i + 1,
-              content.slice(i * 100, (i + 1) * 100) || `セグメント${i + 1}`,
-              "観察、記録", "授業の流れ、児童の反応",
-              `${pair[i]}に関わる教育的判断`,
-              pair[i],
-              "次回の改善点を検討する"
-            ).run();
-          }
-          pipelineResult.scat_saved = true;
-          pipelineResult.analysis_id = analysisId;
-          pipelineResult.scat_themes = pair;
-        } catch (eScat) {
-          console.error("Auto SCAT analysis failed:", String(eScat));
-          pipelineResult.scat_error = String(eScat).slice(0, 200);
-        }
-      } catch (e) {
-        pipelineResult.error = String(e).slice(0, 200);
-      }
+      pipelineResult = await runJournalAutoPipeline(db, apiKey, {
+        journalId: id, studentId, studentName, weekNumber, content,
+      });
     }
 
     return c.json({
       success: result.success,
       id,
-      auto_pipeline_triggered: status === "submitted" && content.length > 30,
+      auto_pipeline_triggered: triggered,
       pipeline: pipelineResult
     });
   } catch (err) {
@@ -2213,7 +2371,40 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
       changeSummary: { operation: 'update' }
     });
 
-    return c.json(updated);
+    // ─────────────────────────────────────────────────────────
+    // 自動連動: draft → submitted 遷移を検出して自動パイプライン起動
+    //   重複防止: 既に該当 journal の AI評価レコード(eval_type='ai')が存在する場合はスキップ
+    // ─────────────────────────────────────────────────────────
+    const beforeStatus = String(beforeState.status || "");
+    const afterStatus = String(updated.status || "");
+    const transitioned = beforeStatus !== "submitted" && afterStatus === "submitted";
+    let pipelineResult: any = null;
+    let auto_pipeline_triggered = false;
+
+    if (transitioned && (updated.content || "").length > 30) {
+      // 既存AI評価チェック (重複起動防止)
+      const existingEval = await db.prepare(
+        `SELECT id FROM evaluations WHERE journal_id = ? AND eval_type = 'ai' LIMIT 1`
+      ).bind(id).first().catch(() => null);
+
+      if (!existingEval) {
+        const user = (c.get("user" as any) as any) as any;
+        const studentName = (user as any)?.name || "学生";
+        const apiKey = (c.env as any)?.OPENAI_API_KEY;
+        pipelineResult = await runJournalAutoPipeline(db, apiKey, {
+          journalId: id,
+          studentId: updated.student_id,
+          studentName,
+          weekNumber: updated.week_number || 1,
+          content: updated.content || "",
+        });
+        auto_pipeline_triggered = true;
+      } else {
+        pipelineResult = { skipped: true, reason: "AI evaluation already exists", existing_evaluation_id: (existingEval as any).id };
+      }
+    }
+
+    return c.json({ ...updated, auto_pipeline_triggered, pipeline: pipelineResult });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -2471,6 +2662,14 @@ dataRouter.get("/scat/network", requireRoles(["researcher", "admin", "collaborat
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
+    // キャッシュチェック (TTL 300秒)
+    const noCache = c.req.query("no_cache") === "1";
+    const cacheKey = "stats:scat:network";
+    if (!noCache) {
+      const cached = await getCachedStats(db, cacheKey);
+      if (cached) return c.json({ ...cached, _cache: { hit: true, key: cacheKey } });
+    }
+
     // SCAT の2系統 (journal_scat_segments / scat_codes) を両方統合する
     //  - journal_scat_segments: 日誌ベースの SCAT 分析結果
     //  - scat_codes: プロジェクトベース (SCATAnalysisPage) の手動コーディング結果
@@ -2528,7 +2727,9 @@ dataRouter.get("/scat/network", requireRoles(["researcher", "admin", "collaborat
     });
     const edges = links.map(l => ({ source: l.source, target: l.target, weight: l.val }));
 
-    return c.json({ nodes, links, edges });
+    const payload = { nodes, links, edges };
+    await setCachedStats(db, "stats:scat:network", payload, 300).catch(() => {});
+    return c.json({ ...payload, _cache: { hit: false, key: "stats:scat:network" } });
   } catch (err: any) {
     return c.json({ error: String(err) }, 500);
   }
@@ -2539,6 +2740,12 @@ dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "c
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
+    const noCache = c.req.query("no_cache") === "1";
+    const cacheKey = "stats:scat:timeline";
+    if (!noCache) {
+      const cached = await getCachedStats(db, cacheKey);
+      if (cached) return c.json({ ...cached, _cache: { hit: true, key: cacheKey } });
+    }
     // SCAT 2系統 (journal_scat_segments / scat_codes) を両方含めて週次集計
     //  - journal_scat_segments: 日誌ベース
     //  - scat_codes: scat_segments.journal_id 経由で週番号を取得
@@ -2590,11 +2797,174 @@ dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "c
       return row;
     });
 
-    return c.json({ timeline, themes: topThemes });
+    const payload = { timeline, themes: topThemes };
+    await setCachedStats(db, "stats:scat:timeline", payload, 300).catch(() => {});
+    return c.json({ ...payload, _cache: { hit: false, key: "stats:scat:timeline" } });
   } catch (err: any) {
     return c.json({ error: String(err) }, 500);
   }
 });
+
+// ──────────────────────────────────────────────────────────────────
+// 通知 API
+//   GET    /notifications              - 自分宛て通知一覧 (未読優先)
+//   GET    /notifications/unread-count - 未読件数のみ
+//   POST   /notifications/:id/read     - 既読化
+//   POST   /notifications/mark-all-read - 全件既読化
+//   POST   /notifications              - 通知作成 (admin/system 用)
+// ──────────────────────────────────────────────────────────────────
+dataRouter.get(
+  "/notifications",
+  requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]),
+  async (c) => {
+    const db = c.env?.DB;
+    if (!db) return c.json({ error: "DB not configured" }, 503);
+    try {
+      await ensureNotificationsSchema(db);
+      const user = (c.get("user" as any) as any) as any;
+      const userId = (user as any)?.id;
+      const limit = Math.min(Number(c.req.query("limit") || 50), 200);
+      const onlyUnread = c.req.query("unread") === "1" || c.req.query("unread") === "true";
+      const sql = `
+        SELECT id, recipient_user_id, actor_user_id, type, title, body,
+               resource_type, resource_id, is_read, read_at, created_at
+        FROM notifications
+        WHERE recipient_user_id = ?
+          ${onlyUnread ? "AND is_read = 0" : ""}
+        ORDER BY is_read ASC, created_at DESC
+        LIMIT ?
+      `;
+      const { results } = await db.prepare(sql).bind(userId, limit).all();
+      const { results: cntRows } = await db.prepare(
+        `SELECT COUNT(*) AS unread_count FROM notifications WHERE recipient_user_id = ? AND is_read = 0`
+      ).bind(userId).all();
+      const unread = Number((cntRows as any[])?.[0]?.unread_count || 0);
+      return c.json({ success: true, notifications: results, unread_count: unread });
+    } catch (err: any) {
+      return c.json({ error: String(err) }, 500);
+    }
+  }
+);
+
+dataRouter.get(
+  "/notifications/unread-count",
+  requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]),
+  async (c) => {
+    const db = c.env?.DB;
+    if (!db) return c.json({ error: "DB not configured" }, 503);
+    try {
+      await ensureNotificationsSchema(db);
+      const user = (c.get("user" as any) as any) as any;
+      const userId = (user as any)?.id;
+      const { results } = await db.prepare(
+        `SELECT COUNT(*) AS unread_count FROM notifications WHERE recipient_user_id = ? AND is_read = 0`
+      ).bind(userId).all();
+      return c.json({ success: true, unread_count: Number((results as any[])?.[0]?.unread_count || 0) });
+    } catch (err: any) {
+      return c.json({ error: String(err) }, 500);
+    }
+  }
+);
+
+dataRouter.post(
+  "/notifications/:id/read",
+  requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]),
+  async (c) => {
+    const db = c.env?.DB;
+    if (!db) return c.json({ error: "DB not configured" }, 503);
+    try {
+      await ensureNotificationsSchema(db);
+      const user = (c.get("user" as any) as any) as any;
+      const userId = (user as any)?.id;
+      const nid = c.req.param("id");
+      const result = await db.prepare(
+        `UPDATE notifications SET is_read = 1, read_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND recipient_user_id = ?`
+      ).bind(nid, userId).run();
+      return c.json({ success: result.success, changes: result.meta?.changes || 0 });
+    } catch (err: any) {
+      return c.json({ error: String(err) }, 500);
+    }
+  }
+);
+
+dataRouter.post(
+  "/notifications/mark-all-read",
+  requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]),
+  async (c) => {
+    const db = c.env?.DB;
+    if (!db) return c.json({ error: "DB not configured" }, 503);
+    try {
+      await ensureNotificationsSchema(db);
+      const user = (c.get("user" as any) as any) as any;
+      const userId = (user as any)?.id;
+      const result = await db.prepare(
+        `UPDATE notifications SET is_read = 1, read_at = CURRENT_TIMESTAMP
+         WHERE recipient_user_id = ? AND is_read = 0`
+      ).bind(userId).run();
+      return c.json({ success: true, marked: result.meta?.changes || 0 });
+    } catch (err: any) {
+      return c.json({ error: String(err) }, 500);
+    }
+  }
+);
+
+// ──────────────────────────────────────────────────────────────────
+// 統計キャッシュ API (research 系画面が高頻度叩く前提の事前計算結果ストア)
+//   GET  /stats-cache/:key  - キャッシュエントリ取得
+//   POST /stats-cache/:key  - キャッシュエントリ更新 (body: { payload, ttl_seconds })
+//   POST /stats-cache/invalidate - パターン無効化 (body: { pattern })
+// ──────────────────────────────────────────────────────────────────
+// IMPORTANT: 具体的なルート (/invalidate) を /:key より先に定義する必要がある (Hono はマッチ順評価)
+dataRouter.post(
+  "/stats-cache/invalidate",
+  requireRoles(["researcher", "admin", "collaborator"]),
+  async (c) => {
+    const db = c.env?.DB;
+    if (!db) return c.json({ error: "DB not configured" }, 503);
+    try {
+      await ensureStatsCacheSchema(db);
+      let body: any = {};
+      try { body = await c.req.json(); } catch (_) { body = {}; }
+      const pattern = String((body && body.pattern) || "%");
+      const result = await db.prepare(`DELETE FROM stats_cache WHERE cache_key LIKE ?`).bind(pattern).run();
+      return c.json({ success: true, deleted: (result.meta as any)?.changes || 0, pattern });
+    } catch (err: any) {
+      return c.json({ error: String(err) }, 500);
+    }
+  }
+);
+
+dataRouter.get(
+  "/stats-cache/:key",
+  requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher", "univ_teacher", "school_mentor"]),
+  async (c) => {
+    const db = c.env?.DB;
+    if (!db) return c.json({ error: "DB not configured" }, 503);
+    const key = c.req.param("key");
+    const cached = await getCachedStats(db, key);
+    if (!cached) return c.json({ success: true, hit: false, payload: null });
+    return c.json({ success: true, hit: true, payload: cached });
+  }
+);
+
+dataRouter.post(
+  "/stats-cache/:key",
+  requireRoles(["researcher", "admin", "collaborator", "board_observer"]),
+  async (c) => {
+    const db = c.env?.DB;
+    if (!db) return c.json({ error: "DB not configured" }, 503);
+    try {
+      const key = c.req.param("key");
+      const body = await c.req.json();
+      const ttl = Number(body.ttl_seconds || 300);
+      await setCachedStats(db, key, body.payload, ttl);
+      return c.json({ success: true, key, ttl_seconds: ttl });
+    } catch (err: any) {
+      return c.json({ error: String(err) }, 500);
+    }
+  }
+);
 
 export default dataRouter;
 
