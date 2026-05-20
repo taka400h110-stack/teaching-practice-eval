@@ -32,11 +32,12 @@ externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator"
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'job-' + Date.now() + '-' + Math.floor(Math.random()*1000);
 
     const stmt = db.prepare(`
-      INSERT INTO external_analysis_jobs (id, job_type, created_by, role, dataset_type, parameters_json, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'queued')
+      INSERT INTO external_analysis_jobs (id, job_type, analysis_family, created_by_user_id, created_by_role, source_dataset_type, parameters_json, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'queued')
     `).bind(
       id,
       body.job_type || "UNKNOWN",
+      body.analysis_family || body.job_type || null,
       c.get("user")?.id || "unknown_user",
       c.get("user")?.role || "unknown_role",
       body.dataset_type || "default",

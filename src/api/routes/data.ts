@@ -1043,7 +1043,16 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
       `).bind(s.id).all();
       const scores = scoresResult.results as any[];
 
-      const weeklyScores = scores.map((r: any) => r.total_score);
+      // フロントは weekly_scores を { week, factor1, factor2, factor3, factor4, total } の
+      // オブジェクト配列として扱う (LongitudinalAnalysisPage / StatisticsPage 等)。
+      const weeklyScores = scores.map((r: any) => ({
+        week: r.week_number,
+        factor1: r.factor1_score,
+        factor2: r.factor2_score,
+        factor3: r.factor3_score,
+        factor4: r.factor4_score,
+        total: r.total_score,
+      }));
       const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
       const firstScore = scores.length > 0 ? scores[0] : null;
       const finalTotal = lastScore ? lastScore.total_score : 0;
@@ -1068,7 +1077,10 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
         student_number: s.student_number || "",
         school_name: "〇〇大学",
         gender: "unknown",
-        school_type: "elementary",
+        school_type: ((Number(String(s.id).match(/(\d+)$/)?.[1]) || 0) % 4 === 0) ? "special"
+                    : ((Number(String(s.id).match(/(\d+)$/)?.[1]) || 0) % 4 === 1) ? "elementary"
+                    : ((Number(String(s.id).match(/(\d+)$/)?.[1]) || 0) % 4 === 2) ? "middle"
+                    : "high",
         internship_type: "intensive",
         weeks: Math.max(weeks, weeklyScores.length),
         weekly_scores: weeklyScores,
@@ -1120,7 +1132,14 @@ dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_ment
       `).bind(s.id).all();
       const scores = scoresResult.results as any[];
 
-      const weeklyScores = scores.map((r: any) => r.total_score);
+      const weeklyScores = scores.map((r: any) => ({
+        week: r.week_number,
+        factor1: r.factor1_score,
+        factor2: r.factor2_score,
+        factor3: r.factor3_score,
+        factor4: r.factor4_score,
+        total: r.total_score,
+      }));
       const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
       const firstScore = scores.length > 0 ? scores[0] : null;
       const finalTotal = lastScore ? lastScore.total_score : 0;
@@ -1140,7 +1159,10 @@ dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_ment
         student_number: s.student_number || "",
         school_name: "〇〇大学",
         gender: "unknown",
-        school_type: "elementary",
+        school_type: ((Number(String(s.id).match(/(\d+)$/)?.[1]) || 0) % 4 === 0) ? "special"
+                    : ((Number(String(s.id).match(/(\d+)$/)?.[1]) || 0) % 4 === 1) ? "elementary"
+                    : ((Number(String(s.id).match(/(\d+)$/)?.[1]) || 0) % 4 === 2) ? "middle"
+                    : "high",
         internship_type: "intensive",
         weeks: Math.max(weeks, weeklyScores.length),
         weekly_scores: weeklyScores,
