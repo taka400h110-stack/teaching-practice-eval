@@ -594,7 +594,7 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
   }
 });
 
-dataRouter.get("/evaluations", requireRoles(["teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.get("/evaluations", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 

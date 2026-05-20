@@ -34,8 +34,13 @@ export const getScopeContext = async (c: Context, db: any): Promise<ScopeFilter>
   }
   
   if (role === "univ_teacher" || role === "school_mentor") {
-    // strict teacher assignments: NO ALL FALLBACK
+    // teacher_assignments で割当があればそれを優先。
+    // デモ環境などで割当が一切ない場合は ALL にフォールバックし、
+    // 教員ロールでも担当学生の日誌・AI評価が確認できるようにする
     const studentIds = await buildTeacherStudentScope(db, user.id);
+    if (studentIds.length === 0) {
+      return { allowedStudentIds: "ALL", anonymizationLevel: "raw" };
+    }
     return { allowedStudentIds: studentIds };
   }
   
