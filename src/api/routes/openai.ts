@@ -49,7 +49,7 @@ openaiRouter.use("*", cors());
 // 論文 4.4.2: temperature=0.2、JSON出力
 // ────────────────────────────────────────────────────────────────
 
-function extractJournalText(contentStr: string): string {
+export function extractJournalText(contentStr: string): string {
   if (!contentStr) return "";
   try {
     const p = JSON.parse(contentStr);
@@ -69,7 +69,7 @@ function extractJournalText(contentStr: string): string {
   }
 }
 
-function buildCoTAPrompt(journalContent: string, studentName: string, weekNumber: number): string {
+export function buildCoTAPrompt(journalContent: string, studentName: string, weekNumber: number): string {
   return `あなたは教育実習評価の専門家AIです。以下の実習日誌を4因子23項目のルーブリックで評価してください。
 
 ## 評価対象
@@ -423,7 +423,7 @@ ${bfiRules}
 // ────────────────────────────────────────────────────────────────
 // OpenAI API 呼び出し共通関数
 // ────────────────────────────────────────────────────────────────
-async function callOpenAI(
+export async function callOpenAI(
   apiKey: string,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   temperature: number,
@@ -997,13 +997,23 @@ openaiRouter.post("/scat-analysis", requireRoles(["researcher", "admin", "collab
 
 
 // 毎日誌単位のSCAT個別実行
-openaiRouter.post("/scat-analysis/journal", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher"]), async (c) => {
+openaiRouter.post("/scat-analysis/journal", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer", "teacher", "univ_teacher", "school_mentor"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
   try {
-    const { journal_id, text, force_reanalyze, apiKey } = await c.req.json();
-    if (!journal_id || !text) return c.json({ error: "journal_id and text are required" }, 400);
+    const { journal_id, text: textInput, force_reanalyze, apiKey } = await c.req.json();
+    if (!journal_id) return c.json({ error: "journal_id is required" }, 400);
+
+    // text が未指定の場合は journal_id から本文を自動取得 (連動性確保)
+    let text = textInput;
+    if (!text) {
+      const journalRow = await db.prepare("SELECT content FROM journal_entries WHERE id = ?").bind(journal_id).first() as any;
+      if (!journalRow || !journalRow.content) {
+        return c.json({ error: "Journal not found or empty content" }, 404);
+      }
+      text = String(journalRow.content);
+    }
 
     const token = apiKey || c.env?.OPENAI_API_KEY;
     if (!token) return c.json({ error: "API Key is required" }, 401);
