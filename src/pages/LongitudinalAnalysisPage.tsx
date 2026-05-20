@@ -172,7 +172,7 @@ export default function LongitudinalAnalysisPage() {
 
   const weeks = React.useMemo(() => {
     if (!cohorts || cohorts.length === 0) return 10;
-    return Math.max(...(cohorts || []).flatMap((c: CohortProfile) => (c.weekly_scores || []).map((ws: WeeklyScore) => ws.week)), 10);
+    return Math.max(...(cohorts || []).flatMap((c: any) => (c?.weekly_scores || []).map((ws: any) => (typeof ws === "object" && ws?.week) ? ws.week : 0)), 10);
   }, [cohorts]);
 
   const lcgaTrajectories = React.useMemo(() => genLCGATrajectories(weeks, lcgaResult, isSampleMode), [weeks, lcgaResult, isSampleMode]);

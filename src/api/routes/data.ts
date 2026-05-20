@@ -1088,9 +1088,81 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
 });
 
 // ────────────────────────────────────────────────────────────────
+// /api/data/cohorts エイリアス
+// StatisticsPage / LongitudinalAnalysisPage 等が直接 /api/data/cohorts を
+// 呼んでいるため、/teacher/profiles と同じレスポンス形式で返すエイリアス
+// を提供する (これがないと SPA fallback で HTML が返り useQuery が永久に
+// isLoading のままになり、画面が真っ白になる)。
+// ────────────────────────────────────────────────────────────────
+dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer", "evaluator"]), async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+
+  try {
+    const scope = await getScopeContext(c, db);
+    const { condition, params } = buildScopeFilter(scope, "u.id");
+
+    const studentsResult = await db.prepare(`
+      SELECT u.id, u.name, u.grade, u.student_number
+      FROM users u
+      WHERE u.role = 'student' AND ${condition}
+      ORDER BY u.name ASC
+    `).bind(...params).all();
+
+    const students = studentsResult.results as any[];
+
+    const profiles = await Promise.all(students.map(async (s: any) => {
+      const scoresResult = await db.prepare(`
+        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, total_score
+        FROM learning_progress_scores
+        WHERE student_id = ?
+        ORDER BY week_number ASC
+      `).bind(s.id).all();
+      const scores = scoresResult.results as any[];
+
+      const weeklyScores = scores.map((r: any) => r.total_score);
+      const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
+      const firstScore = scores.length > 0 ? scores[0] : null;
+      const finalTotal = lastScore ? lastScore.total_score : 0;
+      const growthDelta = (lastScore && firstScore)
+        ? parseFloat((lastScore.total_score - firstScore.total_score).toFixed(2))
+        : 0;
+
+      const journalResult = await db.prepare(`
+        SELECT COUNT(*) as cnt FROM journal_entries WHERE student_id = ?
+      `).bind(s.id).first() as any;
+      const weeks = journalResult?.cnt || 0;
+
+      return {
+        id: s.id,
+        name: s.name || "—",
+        grade: s.grade || 3,
+        student_number: s.student_number || "",
+        school_name: "〇〇大学",
+        gender: "unknown",
+        school_type: "elementary",
+        internship_type: "intensive",
+        weeks: Math.max(weeks, weeklyScores.length),
+        weekly_scores: weeklyScores,
+        final_total: finalTotal,
+        final_factor1: lastScore ? lastScore.factor1_score : 0,
+        final_factor2: lastScore ? lastScore.factor2_score : 0,
+        final_factor3: lastScore ? lastScore.factor3_score : 0,
+        final_factor4: lastScore ? lastScore.factor4_score : 0,
+        growth_delta: growthDelta,
+      };
+    }));
+
+    return c.json({ success: true, cohorts: profiles });
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+// ────────────────────────────────────────────────────────────────
 // 保存済み信頼性分析結果の一覧取得
 // ────────────────────────────────────────────────────────────────
-dataRouter.get("/reliability-results", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.get("/reliability-results", requireRoles(["researcher", "admin", "collaborator", "board_observer", "evaluator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -1120,7 +1192,7 @@ dataRouter.get("/reliability-results", requireRoles(["researcher", "admin", "col
 // ────────────────────────────────────────────────────────────────
 // 保存済み信頼性分析結果の詳細取得 (run_id)
 // ────────────────────────────────────────────────────────────────
-dataRouter.get("/reliability-results/:runId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.get("/reliability-results/:runId", requireRoles(["researcher", "admin", "collaborator", "board_observer", "evaluator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   const runId = c.req.param("runId");

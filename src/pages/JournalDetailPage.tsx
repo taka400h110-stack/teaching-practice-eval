@@ -688,12 +688,17 @@ const JournalDetailPage: React.FC = () => {
         </Box>
       ) : (
         <Section icon={<MenuBookIcon />} title="授業記録">
-          {/* contentがJSON形式の場合は内部のreflectionを表示、それ以外はそのまま */}
+          {/* contentがJSON形式の場合は適切なフィールドを取り出して表示、
+              それ以外は生テキストをそのまま表示 */}
           <BodyText text={(() => {
             try {
               const p = JSON.parse(journal.content);
-              // version:2形式だがrecordsが空の場合
-              if (p.version === 2) return p.reflection || journal.reflection_text || null;
+              // version:2 形式だが records が空の場合は reflection を表示
+              if (p?.version === 2) return p.reflection || journal.reflection_text || "（記録なし）";
+              // version:1 等の旧フォーマットは text プロパティ優先
+              if (p && typeof p === "object" && typeof p.text === "string") return p.text;
+              // それ以外のオブジェクトは記録なし扱い (JSON の生表示を避ける)
+              if (p && typeof p === "object") return journal.reflection_text || "（記録なし）";
               return journal.content;
             } catch {
               return journal.content;

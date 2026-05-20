@@ -7,7 +7,8 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get('/delivery', async (c) => {
   const user = c.get('user') as any;
-  if (!user || (user.role !== 'admin' && user.role !== 'researcher')) {
+  const allowedRoles = ['admin', 'researcher', 'collaborator', 'board_observer'];
+  if (!user || !allowedRoles.includes(user.role)) {
     return c.json({ error: 'アクセス権限がありません' }, 403);
   }
 

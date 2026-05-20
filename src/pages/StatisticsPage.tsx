@@ -92,19 +92,19 @@ export default function StatisticsPage() {
       schoolTypeMap[p.school_type] ?? p.school_type,
       p.internship_type === "intensive" ? "集中実習" : "分散実習",
       String(p.weeks),
-      p.final_factor1.toFixed(3),
-      p.final_factor2.toFixed(3),
-      p.final_factor3.toFixed(3),
-      p.final_factor4.toFixed(3),
-      p.final_total.toFixed(3),
-      p.growth_delta.toFixed(3),
+      (p?.final_factor1 ?? 0).toFixed(3),
+      (p?.final_factor2 ?? 0).toFixed(3),
+      (p?.final_factor3 ?? 0).toFixed(3),
+      (p?.final_factor4 ?? 0).toFixed(3),
+      (p?.final_total ?? 0).toFixed(3),
+      (p?.growth_delta ?? 0).toFixed(3),
       (p.self_eval_gap ?? 0).toFixed(3),
       (p.lps ?? 0).toFixed(3),
-      p.big_five.extraversion.toFixed(2),
-      p.big_five.agreeableness.toFixed(2),
-      p.big_five.conscientiousness.toFixed(2),
-      p.big_five.neuroticism.toFixed(2),
-      p.big_five.openness.toFixed(2),
+      (p?.big_five?.extraversion ?? 0).toFixed(2),
+      (p?.big_five?.agreeableness ?? 0).toFixed(2),
+      (p?.big_five?.conscientiousness ?? 0).toFixed(2),
+      (p?.big_five?.neuroticism ?? 0).toFixed(2),
+      (p?.big_five?.openness ?? 0).toFixed(2),
       p.school_name,
       p.supervisor,
     ]);
@@ -116,16 +116,17 @@ export default function StatisticsPage() {
     const headers = ["学籍番号", "氏名", "週", "因子1", "因子2", "因子3", "因子4", "総合"];
     const rows: string[][] = [];
     cohorts.forEach((p: any) => {
-      p.weekly_scores.forEach((ws: any) => {
+      (p?.weekly_scores ?? []).forEach((ws: any) => {
+        if (!ws || typeof ws !== "object") return;
         rows.push([
-          anonymize ? `ID-${p.id.slice(0, 4)}` : (p.student_number ?? p.id),
-          anonymize ? "匿名ユーザー" : p.name,
-          String(ws.week),
-          ws.factor1.toFixed(3),
-          ws.factor2.toFixed(3),
-          ws.factor3.toFixed(3),
-          ws.factor4.toFixed(3),
-          ws.total.toFixed(3),
+          anonymize ? `ID-${String(p?.id ?? "").slice(0, 4)}` : String(p?.student_number ?? p?.id ?? ""),
+          anonymize ? "匿名ユーザー" : String(p?.name ?? ""),
+          String(ws?.week ?? ""),
+          Number(ws?.factor1 ?? 0).toFixed(3),
+          Number(ws?.factor2 ?? 0).toFixed(3),
+          Number(ws?.factor3 ?? 0).toFixed(3),
+          Number(ws?.factor4 ?? 0).toFixed(3),
+          Number(ws?.total ?? 0).toFixed(3),
         ]);
       });
     });
@@ -200,11 +201,23 @@ export default function StatisticsPage() {
   ];
 
   // 週別平均
-  const maxWeeks = Math.max(...cohorts.map((p: any) => p.weekly_scores.length));
+  const maxWeeks = cohorts.length > 0
+    ? Math.max(1, ...cohorts.map((p: any) => (p?.weekly_scores?.length ?? 0)))
+    : 0;
   const weeklyAvgData = Array.from({ length: Math.min(maxWeeks, 10) }, (_, i) => {
     const weekNum   = i + 1;
     const weekScores = cohorts
-      .map((p: any) => p.weekly_scores.find((ws: any) => ws.week === weekNum))
+      .map((p: any) => {
+        const ws = p?.weekly_scores;
+        if (!Array.isArray(ws)) return null;
+        // weekly_scores が { week, total, ... } 形式の場合
+        const found = ws.find((x: any) => x && typeof x === "object" && x.week === weekNum);
+        if (found) return found;
+        // weekly_scores が数値配列の場合は index で代用
+        const num = ws[i];
+        if (typeof num === "number") return { week: weekNum, total: num, factor1: num, factor2: num, factor3: num, factor4: num };
+        return null;
+      })
       .filter(Boolean);
     return {
       week: weekNum,
