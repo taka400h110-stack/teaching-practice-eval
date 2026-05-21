@@ -328,8 +328,16 @@ const JournalEditorPage: React.FC = () => {
       
       // SCAT分析を非同期でキックする
       if (payload.status === "submitted") {
-        apiClient.post("/api/openai/scat-analysis/journal", { journal_id: data.id })
-          .catch(err => console.error("Auto SCAT analysis failed:", err));
+        fetch("/api/openai/scat-analysis/journal", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(localStorage.getItem("auth_token")
+              ? { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
+              : {}),
+          },
+          body: JSON.stringify({ journal_id: data.id }),
+        }).catch((err: any) => console.error("Auto SCAT analysis failed:", err));
       }
 
       if (payload.status === "submitted") {

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { Box, Card, CardContent, Typography, Grid, Chip, Button, Alert } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';

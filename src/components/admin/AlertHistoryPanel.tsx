@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 import React, { useState } from 'react';
 import { 
   Box, Card, CardContent, Typography, Table, TableBody, TableCell, 

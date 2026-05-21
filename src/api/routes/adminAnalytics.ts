@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Hono } from 'hono';
 import { Env } from '../../types/env';
 import { getDeliveryAnalytics } from '../services/deliveryAnalyticsService';

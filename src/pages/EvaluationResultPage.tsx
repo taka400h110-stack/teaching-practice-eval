@@ -301,7 +301,11 @@ export default function EvaluationResultPage() {
             <Typography variant="subtitle1" fontWeight="bold">総合コメント</Typography>
           </Box>
           <Paper variant="outlined" sx={{ p: 2, bgcolor: "#E3F2FD", borderRadius: 2 }}>
-            <Typography variant="body1" sx={{ lineHeight: 1.9 }}>{result?.overall_comment}</Typography>
+            <Typography variant="body1" sx={{ lineHeight: 1.9, whiteSpace: "pre-wrap" }}>
+              {result?.overall_comment && String(result.overall_comment).trim().length > 0
+                ? result.overall_comment
+                : <em style={{ color: "#777" }}>総合コメントが生成されていません (AI評価未実行または保存失敗)</em>}
+            </Typography>
           </Paper>
         </CardContent>
       </Card>

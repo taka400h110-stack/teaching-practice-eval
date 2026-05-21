@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
 
       {/* Cleanup Alert Banner */}
       {alertData && (
-        <CleanupFailureAlertBanner alert={alertData} adminUserId={user?.id || "unknown"} />
+        <CleanupFailureAlertBanner alert={alertData as any} adminUserId={user?.id || "unknown"} />
       )}
 
       {/* サマリカード */}

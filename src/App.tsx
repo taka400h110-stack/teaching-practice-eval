@@ -56,6 +56,8 @@ const JournalOCRPage          = lazy(() => import("./pages/JournalOCRPage"));
 const TeacherStatisticsPage   = lazy(() => import("./pages/TeacherStatisticsPage"));
 // 国際比較
 const InternationalComparisonPage = lazy(() => import("./pages/InternationalComparisonPage"));
+// BFI パーソナリティ診断
+const BFIPage = lazy(() => import("./pages/BFIPage"));
 
 const Spinner = () => (
   <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
@@ -179,6 +181,9 @@ export default function App() {
 
           {/* 国際比較（RQ1） */}
           <Route path="international"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><InternationalComparisonPage /></PrivateRoute>} />
+
+          {/* BFI パーソナリティ診断 */}
+          <Route path="bfi"               element={<PrivateRoute allowedRoles={["student"]}><BFIPage /></PrivateRoute>} />
         </Route>
         <Route path="unauthorized" element={<Box p={4}><Typography variant="h5" color="error">アクセス権限がありません (403)</Typography><Typography>このページへのアクセス権限がありません。</Typography></Box>} />
         <Route path="*" element={<RoleBasedHomeRedirect />} />

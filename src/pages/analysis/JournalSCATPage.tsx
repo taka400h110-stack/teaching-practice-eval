@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Typography, Button, Card, CardContent, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '../../api/client';
+import { apiFetch } from '../../api/client';
 
 export default function JournalSCATPage() {
   const { journalId } = useParams();
@@ -11,7 +11,13 @@ export default function JournalSCATPage() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['scat', journalId],
-    queryFn: () => apiClient.get(`/api/data/scat/journals/${journalId}`)
+    queryFn: async () => {
+      const res = await apiFetch(`/api/data/scat/journals/${journalId}`);
+      if (res && typeof res.json === 'function') {
+        try { return await res.json(); } catch { return res; }
+      }
+      return res;
+    }
   });
 
   if (isLoading) return <Box p={3}><CircularProgress /></Box>;

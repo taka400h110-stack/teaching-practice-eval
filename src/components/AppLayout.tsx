@@ -90,6 +90,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "自己評価入力", path: "/self-evaluation", icon: <SelfImprovementIcon /> },
           { label: "成長グラフ", path: "/growth", icon: <TimelineIcon /> },
           { label: "目標履歴（SMART）", path: "/goals", icon: <TrackChangesIcon /> },
+          { label: "BFI パーソナリティ診断", path: "/bfi", icon: <PsychologyIcon /> },
         ],
       },
     ];

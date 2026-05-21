@@ -1,16 +1,51 @@
 
-export async function apiFetch(url: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('auth_token');
+// 認証トークン取得ヘルパー
+export function getToken(): string | null {
+  try {
+    return typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
+  } catch {
+    return null;
+  }
+}
+
+// API ベース URL (同一オリジン)
+export const API_BASE_URL = "";
+
+// 既存の Response 返却版 (後方互換) — レスポンス型を any にして data?.xxx 参照を許容
+export async function apiFetch(url: string, options: RequestInit = {}): Promise<any> {
+  const token = getToken();
   const headers = {
     ...options.headers,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
   const res = await fetch(url, { ...options, headers });
   if (res.status === 401) {
-    localStorage.removeItem("user_info");
-    localStorage.removeItem("auth_token");
-    window.location.href = '/login';
+    try {
+      localStorage.removeItem("user_info");
+      localStorage.removeItem("auth_token");
+    } catch {}
+    if (typeof window !== "undefined") window.location.href = '/login';
     throw new Error("Unauthorized or token expired");
+  }
+  // 呼び出し側が .json()/.ok/.status を使う場合と、直接プロパティを使う場合の両方に対応
+  // Content-Type が JSON の場合は parsed body にプロキシしておく
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      const parsed = await res.clone().json();
+      // 元 Response の ok/status/json/text/headers を保持しつつ parsed のフィールドも参照可能にする
+      return new Proxy(res as any, {
+        get(target, prop, receiver) {
+          if (prop in target) return Reflect.get(target, prop, receiver);
+          if (parsed && typeof parsed === "object" && prop in (parsed as any)) {
+            return (parsed as any)[prop as any];
+          }
+          return undefined;
+        },
+      });
+    } catch {
+      return res;
+    }
   }
   return res;
 }

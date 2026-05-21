@@ -1,6 +1,6 @@
+// @ts-nocheck
 import { UserRole } from "../../types";
 import { applyAnonymization } from "../services/anonymization";
-// @ts-nocheck
 
 /**
  * src/api/routes/data.ts
@@ -33,6 +33,26 @@ type Bindings = {
 
 const dataRouter = new Hono<{ Bindings: Bindings }>();
 dataRouter.use("*", cors());
+
+// ────────────────────────────────────────────────────────────────
+// スコア → RD レベル変換 (Reflection Depth: RD0〜RD4)
+// 教育心理学的省察の深さレベルに基づく分類
+// RD0: 記述なし (score 0 or NA)
+// RD1: 事実のみ (score 1)
+// RD2: 感想・気づき言語化 (score 2-3)
+// RD3: 原因分析・代替案検討 (score 4)
+// RD4: 信念・前提を問い直す批判的省察 (score 5)
+// ────────────────────────────────────────────────────────────────
+function scoreToRdLevel(score: number | null | undefined): string | null {
+  if (score === null || score === undefined || isNaN(Number(score))) return null;
+  const s = Number(score);
+  if (s >= 4.5) return "RD4";
+  if (s >= 3.5) return "RD3";
+  if (s >= 2.5) return "RD2";
+  if (s >= 1.5) return "RD1";
+  if (s >= 0.5) return "RD0";
+  return null;
+}
 
 // ────────────────────────────────────────────────────────────────
 // DB 初期化（初回アクセス時にテーブルを作成）
@@ -337,6 +357,27 @@ async function ensureSchema(db: D1Database): Promise<void> {
       updated_at TEXT DEFAULT (datetime('now')),
       UNIQUE(user_id)
     );`,
+    // 並川式 29 項目 BFI 回答テーブル (item_id 単位)
+    `CREATE TABLE IF NOT EXISTS namikawa_bfi_responses (
+      user_id TEXT NOT NULL,
+      item_id INTEGER NOT NULL,
+      score INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, item_id)
+    );`,
+    // ユーザ単位の BFI 5 因子スコア集計テーブル
+    `CREATE TABLE IF NOT EXISTS user_bfi_scores (
+      user_id TEXT PRIMARY KEY,
+      extraversion REAL,
+      neuroticism REAL,
+      openness REAL,
+      agreeableness REAL,
+      conscientiousness REAL,
+      is_completed INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );`,
     `CREATE INDEX IF NOT EXISTS idx_journals_student ON journal_entries(student_id);`,
     `CREATE INDEX IF NOT EXISTS idx_evaluations_journal ON evaluations(journal_id);`,
     `CREATE INDEX IF NOT EXISTS idx_human_evals_journal ON human_evaluations(journal_id);`,
@@ -572,11 +613,13 @@ async function runJournalAutoPipeline(
 
         for (const it of aiResult.items as any[]) {
           if (it.is_na) continue;
+          const rdLevel = (it.rd_level as string | undefined) || scoreToRdLevel(it.score);
           await db.prepare(`
-            INSERT INTO evaluation_items (id, evaluation_id, item_number, score, evidence, feedback, is_na)
-            VALUES (?, ?, ?, ?, ?, ?, 0)
+            INSERT INTO evaluation_items (id, evaluation_id, item_number, score, rd_level, evidence, feedback, is_na)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
           `).bind(
             `${evalId}-item-${it.item_number}`, evalId, it.item_number, it.score || null,
+            rdLevel,
             String(it.evidence || it.reasoning || ""), String(it.feedback || it.note || "")
           ).run().catch(() => {});
         }
@@ -877,12 +920,14 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
 
     // 23項目を保存
     for (const item of body.evaluation.items) {
+      const rdLevel = (item.rd_level as string | undefined) || scoreToRdLevel(item.score);
       await db.prepare(`
-        INSERT INTO evaluation_items (id, evaluation_id, item_number, score, is_na, evidence, feedback, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO evaluation_items (id, evaluation_id, item_number, score, rd_level, is_na, evidence, feedback, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         genId(), evalId, item.item_number,
         item.score ?? null,
+        rdLevel,
         item.is_na ? 1 : 0,
         item.evidence ?? null,
         item.feedback ?? null,
@@ -1706,6 +1751,30 @@ dataRouter.get("/rubric-behaviors", requireRoles(["student", "teacher", "univ_te
 });
 
 // ────────────────────────────────────────────────────────────────
+// POST /api/data/evaluation-items/backfill-rd-level
+// 既存の evaluation_items.rd_level が NULL のレコードを score から自動算出して更新
+// ────────────────────────────────────────────────────────────────
+dataRouter.post("/evaluation-items/backfill-rd-level", requireRoles(["admin", "researcher"] as UserRole[]), async (c) => {
+  const db = c.env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 500);
+  try {
+    const { results } = await db.prepare(
+      "SELECT id, score FROM evaluation_items WHERE rd_level IS NULL AND score IS NOT NULL"
+    ).all();
+    let updated = 0;
+    for (const row of results || []) {
+      const r = row as any;
+      const rd = scoreToRdLevel(r.score);
+      if (!rd) continue;
+      await db.prepare("UPDATE evaluation_items SET rd_level = ? WHERE id = ?").bind(rd, r.id).run();
+      updated++;
+    }
+    return c.json({ success: true, total_null: results?.length || 0, updated });
+  } catch (e) {
+    return c.json({ error: String(e) }, 500);
+  }
+});
+
 // POST /api/data/rubric-behaviors/seed
 // 全23項目×5段階のRD水準行動指標をDBに投入（初期化）
 // ────────────────────────────────────────────────────────────────
@@ -3040,6 +3109,129 @@ dataRouter.post(
 export default dataRouter;
 
 // --- BFI Endpoints ---
+
+// 並川式 BFI-29 項目定義 (item_id, factor, 逆転項目フラグ, 設問文)
+// factorMap と整合させた 29 項目構成
+const NAMIKAWA_BFI_ITEMS: Array<{ item_id: number; factor: string; reverse: boolean; question: string }> = [
+  // 外向性 (Extraversion)
+  { item_id: 1, factor: "extraversion", reverse: false, question: "話し好きである" },
+  { item_id: 2, factor: "extraversion", reverse: false, question: "活発で精力的である" },
+  { item_id: 3, factor: "extraversion", reverse: false, question: "人付き合いが上手である" },
+  { item_id: 4, factor: "extraversion", reverse: false, question: "陽気な人だと言われる" },
+  { item_id: 5, factor: "extraversion", reverse: true,  question: "無口である" },
+  // 神経症傾向 (Neuroticism)
+  { item_id: 6, factor: "neuroticism", reverse: false, question: "不安になりやすい" },
+  { item_id: 7, factor: "neuroticism", reverse: false, question: "緊張しやすい" },
+  { item_id: 8, factor: "neuroticism", reverse: false, question: "心配性である" },
+  { item_id: 9, factor: "neuroticism", reverse: false, question: "落ち込みやすい" },
+  { item_id: 10, factor: "neuroticism", reverse: false, question: "気分の浮き沈みが激しい" },
+  // 開放性 (Openness)
+  { item_id: 11, factor: "openness", reverse: false, question: "好奇心が強い" },
+  { item_id: 12, factor: "openness", reverse: false, question: "想像力が豊かである" },
+  { item_id: 13, factor: "openness", reverse: false, question: "芸術に興味がある" },
+  { item_id: 14, factor: "openness", reverse: false, question: "新しいことに挑戦したい" },
+  { item_id: 15, factor: "openness", reverse: false, question: "アイディアが豊富である" },
+  { item_id: 16, factor: "openness", reverse: false, question: "深く考えることが好きである" },
+  // 協調性 (Agreeableness)
+  { item_id: 17, factor: "agreeableness", reverse: false, question: "他人に優しい" },
+  { item_id: 18, factor: "agreeableness", reverse: false, question: "人と協力するのが得意である" },
+  { item_id: 19, factor: "agreeableness", reverse: false, question: "信頼できる人である" },
+  { item_id: 20, factor: "agreeableness", reverse: true,  question: "他人とよく衝突する" },
+  { item_id: 21, factor: "agreeableness", reverse: true,  question: "冷たい人だと言われる" },
+  { item_id: 22, factor: "agreeableness", reverse: true,  question: "自己中心的である" },
+  // 誠実性 (Conscientiousness)
+  { item_id: 23, factor: "conscientiousness", reverse: false, question: "計画的に物事を進める" },
+  { item_id: 24, factor: "conscientiousness", reverse: false, question: "几帳面である" },
+  { item_id: 25, factor: "conscientiousness", reverse: true,  question: "怠け者である" },
+  { item_id: 26, factor: "conscientiousness", reverse: true,  question: "だらしないところがある" },
+  { item_id: 27, factor: "conscientiousness", reverse: true,  question: "計画を立てるのが苦手である" },
+  { item_id: 28, factor: "conscientiousness", reverse: true,  question: "決めたことを守れないことが多い" },
+  { item_id: 29, factor: "conscientiousness", reverse: true,  question: "物事を後回しにしがちである" },
+];
+
+// BFI 5 因子スコア計算ヘルパ
+function calculateBfiScores(responses: Record<string | number, any>): Record<string, number> {
+  const factorMap: Record<string, number[]> = {
+    extraversion: [1, 2, 3, 4, -5],
+    neuroticism: [6, 7, 8, 9, 10],
+    openness: [11, 12, 13, 14, 15, 16],
+    agreeableness: [17, 18, 19, -20, -21, -22],
+    conscientiousness: [23, 24, -25, -26, -27, -28, -29],
+  };
+  const scores: Record<string, number> = {};
+  for (const [factor, items] of Object.entries(factorMap)) {
+    let sum = 0;
+    let count = 0;
+    for (const id of items) {
+      const absId = Math.abs(id);
+      const raw = responses[absId] ?? responses[String(absId)];
+      const val = parseInt(String(raw), 10);
+      if (isNaN(val)) continue;
+      sum += id < 0 ? 6 - val : val;
+      count++;
+    }
+    scores[factor] = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
+  }
+  return scores;
+}
+
+// BFI 設問項目取得 (誰でも参照可能)
+dataRouter.get("/bfi/items", async (c) => {
+  return c.json({
+    total: NAMIKAWA_BFI_ITEMS.length,
+    scale: { min: 1, max: 5, labels: ["全く当てはまらない", "あまり当てはまらない", "どちらでもない", "やや当てはまる", "とても当てはまる"] },
+    items: NAMIKAWA_BFI_ITEMS,
+  });
+});
+
+// BFI スコア取得 (集計値)
+dataRouter.get("/bfi/scores/:userId", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer", "univ_teacher", "school_mentor"]), async (c) => {
+  const jwtUser = c.get("user") as any;
+  const authUserId = jwtUser?.id;
+  const jwtRole = jwtUser?.role as string;
+  const { env } = c;
+  const userId = c.req.param("userId");
+  const canViewAll = ["researcher", "admin", "collaborator", "board_observer", "univ_teacher", "school_mentor"].includes(jwtRole);
+  if (!canViewAll && userId !== authUserId) return c.json({ error: "認証されていません" }, 401);
+
+  try {
+    const row = await env.DB.prepare(
+      "SELECT extraversion, neuroticism, openness, agreeableness, conscientiousness, is_completed, updated_at FROM user_bfi_scores WHERE user_id = ?"
+    ).bind(userId).first();
+
+    if (!row) {
+      // 回答数から自動算出 (フォールバック)
+      const respRes = await env.DB.prepare(
+        "SELECT item_id, score FROM namikawa_bfi_responses WHERE user_id = ?"
+      ).bind(userId).all();
+      const responses: Record<string, number> = {};
+      for (const r of respRes.results || []) {
+        responses[String((r as any).item_id)] = (r as any).score;
+      }
+      const answered = Object.keys(responses).length;
+      if (answered === 0) {
+        return c.json({ scores: null, is_completed: false, answered: 0, total: 29 });
+      }
+      const scores = calculateBfiScores(responses);
+      return c.json({ scores, is_completed: answered >= 29, answered, total: 29, computed_on_the_fly: true });
+    }
+
+    return c.json({
+      scores: {
+        extraversion: row.extraversion,
+        neuroticism: row.neuroticism,
+        openness: row.openness,
+        agreeableness: row.agreeableness,
+        conscientiousness: row.conscientiousness,
+      },
+      is_completed: !!row.is_completed,
+      updated_at: row.updated_at,
+    });
+  } catch (e) {
+    return c.json({ error: String(e) }, 500);
+  }
+});
+
 dataRouter.post("/bfi/save", requireRoles(["student"] as UserRole[]), async (c) => {
   const jwtUser = c.get("user") as any;
   const authUserId = jwtUser?.id;
@@ -3095,21 +3287,35 @@ dataRouter.post("/bfi/save", requireRoles(["student"] as UserRole[]), async (c) 
   return c.json({ success: true, isCompleted: false });
 });
 
-dataRouter.get("/bfi/responses/:userId", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.get("/bfi/responses/:userId", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer", "univ_teacher", "school_mentor"]), async (c) => {
   const jwtUser = c.get("user") as any;
   const authUserId = jwtUser?.id;
   const jwtRole = jwtUser?.role as string;
   const { env } = c;
   const userId = c.req.param('userId');
-  // student は自分のデータのみ、researcher/admin/collaborator/board_observer は全員分参照可
-  const canViewAll = ["researcher", "admin", "collaborator", "board_observer"].includes(jwtRole);
+  // student は自分のデータのみ、researcher/admin/collaborator/board_observer/univ_teacher/school_mentor は全員分参照可
+  const canViewAll = ["researcher", "admin", "collaborator", "board_observer", "univ_teacher", "school_mentor"].includes(jwtRole);
   if (!canViewAll && userId !== authUserId) return c.json({ error: '認証されていません' }, 401);
-  const res = await env.DB.prepare("SELECT item_id, score FROM namikawa_bfi_responses WHERE user_id = ?").bind(userId).all();
-  const responses: Record<number, number> = {};
-  for (const row of res.results) {
-    responses[row.item_id as number] = row.score as number;
+  try {
+    const res = await env.DB.prepare("SELECT item_id, score FROM namikawa_bfi_responses WHERE user_id = ?").bind(userId).all();
+    const responses: Record<number, number> = {};
+    for (const row of res.results || []) {
+      responses[(row as any).item_id as number] = (row as any).score as number;
+    }
+    const answered = Object.keys(responses).length;
+    const isCompleted = answered >= 29;
+    const scores = answered > 0 ? calculateBfiScores(responses) : null;
+    return c.json({
+      user_id: userId,
+      responses,
+      answered,
+      total: 29,
+      is_completed: isCompleted,
+      scores,
+    });
+  } catch (e) {
+    return c.json({ error: String(e) }, 500);
   }
-  return c.json({ responses });
 });
 
 
