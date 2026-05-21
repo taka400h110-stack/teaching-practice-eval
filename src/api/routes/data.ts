@@ -24,7 +24,7 @@ import { cors } from "hono/cors";
 import { requireRoles } from "../middleware/auth";
 import { getScopeContext, buildScopeFilter, assertCanAccessStudent } from "../middleware/scope";
 import { setAuditReadContext, setAuditWriteContext } from "../middleware/audit";
-import { callOpenAI, buildCoTAPrompt, extractJournalText } from "./openai";
+import { callOpenAI, buildCoTAPrompt, buildSCATPrompt, buildBfiIntegratedPrompt, extractJournalText } from "./openai";
 
 type Bindings = {
   DB: D1Database;
@@ -633,57 +633,125 @@ async function runJournalAutoPipeline(
     }
   }
 
-  // ② SCAT 自動分析 (内容ベースのテーマ抽出 + ストーリーライン生成)
+  // ② SCAT 自動分析
+  //   - 第1選択: LLM (gpt-4o) による本格的な4ステップコーディング (Otani 2008/2011)
+  //   - フォールバック: APIキー無 or LLM失敗時はキーワード辞書ベースの簡易版
   try {
-    // 内容からテーマを推定 (キーワード辞書ベース)
-    const themeDict: Array<{ keys: string[]; pair: [string, string] }> = [
-      { keys: ["教材", "準備", "指導案", "プラン"], pair: ["授業準備", "教材研究"] },
-      { keys: ["個別", "支援", "つまずき", "苦手", "得意"], pair: ["生徒指導", "個別支援"] },
-      { keys: ["振り返", "反省", "気づ", "省察", "改善"], pair: ["振り返り", "省察"] },
-      { keys: ["時間", "進度", "テンポ", "管理", "規律"], pair: ["時間管理", "学級経営"] },
-      { keys: ["観察", "発問", "問いかけ", "判断", "反応"], pair: ["教師観察", "教師の判断"] },
-      { keys: ["協働", "話し合い", "グループ", "対話"], pair: ["協働学習", "対話的学び"] },
-      { keys: ["評価", "ルーブリック", "フィードバック"], pair: ["学習評価", "教育的判断"] },
-    ];
-    const scored = themeDict.map(t => ({
-      pair: t.pair,
-      score: t.keys.reduce((s, k) => s + (content.includes(k) ? 1 : 0), 0),
-    }));
-    scored.sort((a, b) => b.score - a.score);
-    const pair: [string, string] = scored[0].score > 0
-      ? scored[0].pair
-      : themeDict[Math.floor(Math.random() * themeDict.length)].pair;
+    const journalText = extractJournalText(content);
+    let scatSource: "llm" | "fallback" = "fallback";
+    let llmResult: any = null;
 
-    // ストーリーライン: 内容の冒頭120字 + テーマで構成
-    const storyline = `第${weekNumber}週、${studentName}は「${pair[0]}」「${pair[1]}」に関する省察を記述している。冒頭: 「${content.slice(0, 80).replace(/\s+/g, " ")}…」 文章全体としては、教育的判断と児童理解の往還が観察される。`;
-    const theoreticalDescription = `本日誌は、教師の${pair[0]}行為と${pair[1]}の関係を、実践の事後省察として記述している。RD2〜RD3 水準の省察深度であり、児童の反応を媒介とした実践知の言語化が進行中。`;
+    if (apiKey && journalText.length > 30) {
+      try {
+        const scatPrompt = buildSCATPrompt(journalText, studentName, weekNumber);
+        const raw = await callOpenAI(apiKey, [{ role: "user", content: scatPrompt }], 0.4);
+        llmResult = JSON.parse(raw);
+        if (llmResult && Array.isArray(llmResult.segments) && llmResult.segments.length > 0
+          && typeof llmResult.storyline === "string" && llmResult.storyline.length > 50) {
+          scatSource = "llm";
+        } else {
+          llmResult = null;
+        }
+      } catch (eLlmScat) {
+        console.error("LLM SCAT failed, falling back to dictionary:", String(eLlmScat));
+        pipelineResult.scat_llm_error = String(eLlmScat).slice(0, 200);
+        llmResult = null;
+      }
+    }
 
     const analysisId = "auto-scat-" + journalId + "-" + Date.now();
-    await db.prepare(`
-      INSERT INTO journal_scat_analyses (id, journal_id, user_id, analysis_status, storyline, theoretical_description, created_at, updated_at)
-      VALUES (?, ?, ?, 'completed', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `).bind(analysisId, journalId, studentId, storyline, theoreticalDescription).run();
+    let storyline: string;
+    let theoreticalDescription: string;
+    let primaryThemes: string[] = [];
+    let rdLevelEstimate: string | null = null;
+    let segmentsToInsert: Array<{
+      raw_text: string;
+      step1: string; step2: string; step3: string; step4: string; step5: string;
+    }> = [];
 
-    // セグメントは内容を3分割
-    const chunkSize = Math.max(80, Math.ceil(content.length / 3));
-    const numSeg = Math.min(3, Math.ceil(content.length / chunkSize));
-    for (let i = 0; i < numSeg; i++) {
-      const segText = content.slice(i * chunkSize, (i + 1) * chunkSize);
-      const focusWord = pair[i % 2];
+    if (scatSource === "llm" && llmResult) {
+      // LLM 結果を採用
+      storyline = String(llmResult.storyline).slice(0, 2000);
+      theoreticalDescription = String(llmResult.theoretical_description || "").slice(0, 2000);
+      primaryThemes = Array.isArray(llmResult.primary_themes) ? llmResult.primary_themes.slice(0, 5).map(String) : [];
+      rdLevelEstimate = typeof llmResult.rd_level_estimate === "string" ? llmResult.rd_level_estimate : null;
+      segmentsToInsert = (llmResult.segments as any[]).slice(0, 6).map((s: any, idx: number) => ({
+        raw_text: String(s.raw_text || `セグメント${idx + 1}`).slice(0, 1000),
+        step1: String(s.step1_focus_words || "").slice(0, 500),
+        step2: String(s.step2_outside_words || "").slice(0, 500),
+        step3: String(s.step3_explanatory_words || "").slice(0, 500),
+        step4: String(s.step4_theme_construct || "").slice(0, 200),
+        step5: String(s.step5_questions_issues || "").slice(0, 500),
+      }));
+    } else {
+      // フォールバック (従来の辞書ベース)
+      const themeDict: Array<{ keys: string[]; pair: [string, string] }> = [
+        { keys: ["教材", "準備", "指導案", "プラン"], pair: ["授業準備", "教材研究"] },
+        { keys: ["個別", "支援", "つまずき", "苦手", "得意"], pair: ["生徒指導", "個別支援"] },
+        { keys: ["振り返", "反省", "気づ", "省察", "改善"], pair: ["振り返り", "省察"] },
+        { keys: ["時間", "進度", "テンポ", "管理", "規律"], pair: ["時間管理", "学級経営"] },
+        { keys: ["観察", "発問", "問いかけ", "判断", "反応"], pair: ["教師観察", "教師の判断"] },
+        { keys: ["協働", "話し合い", "グループ", "対話"], pair: ["協働学習", "対話的学び"] },
+        { keys: ["評価", "ルーブリック", "フィードバック"], pair: ["学習評価", "教育的判断"] },
+      ];
+      const scored = themeDict.map(t => ({
+        pair: t.pair,
+        score: t.keys.reduce((s, k) => s + (content.includes(k) ? 1 : 0), 0),
+      }));
+      scored.sort((a, b) => b.score - a.score);
+      const pair: [string, string] = scored[0].score > 0
+        ? scored[0].pair
+        : themeDict[Math.floor(Math.random() * themeDict.length)].pair;
+      primaryThemes = pair;
+      storyline = `第${weekNumber}週、${studentName}は「${pair[0]}」「${pair[1]}」に関する省察を記述している。冒頭: 「${content.slice(0, 80).replace(/\s+/g, " ")}…」 文章全体としては、教育的判断と児童理解の往還が観察される。`;
+      theoreticalDescription = `本日誌は、教師の${pair[0]}行為と${pair[1]}の関係を、実践の事後省察として記述している。RD2〜RD3 水準の省察深度であり、児童の反応を媒介とした実践知の言語化が進行中。`;
+
+      const chunkSize = Math.max(80, Math.ceil(content.length / 3));
+      const numSeg = Math.min(3, Math.ceil(content.length / chunkSize));
+      for (let i = 0; i < numSeg; i++) {
+        const segText = content.slice(i * chunkSize, (i + 1) * chunkSize);
+        const focusWord = pair[i % 2];
+        segmentsToInsert.push({
+          raw_text: segText || `セグメント${i + 1}`,
+          step1: focusWord,
+          step2: "授業の流れ、児童の反応",
+          step3: `${focusWord}に関わる教育的判断`,
+          step4: focusWord,
+          step5: "次回の改善点を検討する",
+        });
+      }
+    }
+
+    // analysis_source カラム自動補強 (既存DBに無ければ追加)
+    await db.prepare(`ALTER TABLE journal_scat_analyses ADD COLUMN analysis_source TEXT`).run().catch(() => {});
+    await db.prepare(`ALTER TABLE journal_scat_analyses ADD COLUMN rd_level_estimate TEXT`).run().catch(() => {});
+    await db.prepare(`ALTER TABLE journal_scat_analyses ADD COLUMN primary_themes TEXT`).run().catch(() => {});
+
+    await db.prepare(`
+      INSERT INTO journal_scat_analyses (id, journal_id, user_id, analysis_status, storyline, theoretical_description, analysis_source, rd_level_estimate, primary_themes, created_at, updated_at)
+      VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).bind(
+      analysisId, journalId, studentId, storyline, theoreticalDescription,
+      scatSource, rdLevelEstimate, JSON.stringify(primaryThemes)
+    ).run();
+
+    for (let i = 0; i < segmentsToInsert.length; i++) {
+      const seg = segmentsToInsert[i];
       await db.prepare(`
         INSERT INTO journal_scat_segments (id, analysis_id, journal_id, segment_order, raw_text, step1_focus_words, step2_outside_words, step3_explanatory_words, step4_theme_construct, step5_questions_issues, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `).bind(
         `${analysisId}-seg-${i}`, analysisId, journalId, i + 1,
-        segText || `セグメント${i + 1}`,
-        focusWord, "授業の流れ、児童の反応",
-        `${focusWord}に関わる教育的判断`, focusWord, "次回の改善点を検討する"
+        seg.raw_text, seg.step1, seg.step2, seg.step3, seg.step4, seg.step5
       ).run().catch(() => {});
     }
     pipelineResult.scat_saved = true;
     pipelineResult.analysis_id = analysisId;
-    pipelineResult.scat_themes = pair;
+    pipelineResult.scat_source = scatSource;
+    pipelineResult.scat_themes = primaryThemes;
+    pipelineResult.scat_segments_count = segmentsToInsert.length;
     pipelineResult.scat_storyline_len = storyline.length;
+    pipelineResult.scat_rd_estimate = rdLevelEstimate;
   } catch (eScat) {
     console.error("Auto SCAT analysis failed:", String(eScat));
     pipelineResult.scat_error = String(eScat).slice(0, 200);
@@ -3360,6 +3428,266 @@ dataRouter.get("/bfi/responses/:userId", requireRoles(["student", "researcher", 
       scores,
     });
   } catch (e) {
+    return c.json({ error: String(e) }, 500);
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────
+// BFI × 省察深度 統合分析
+// ・BFI 5因子スコア
+// ・AI評価4因子スコア (全提出済日誌の平均)
+// ・省察深度 (RD0〜RD4) 分布 + 平均
+// ・SCAT分析の直近テーマ
+// ・パーソナリティ ⇄ 各評価次元のピアソン相関 (学生本人の時系列)
+// ・LLM による文脈解釈 (強み/弱み/相関洞察/伸ばし方の提言)
+// ──────────────────────────────────────────────────────────────────
+function pearsonCorrelation(xs: number[], ys: number[]): number | null {
+  if (xs.length !== ys.length || xs.length < 3) return null;
+  const n = xs.length;
+  const mx = xs.reduce((s, v) => s + v, 0) / n;
+  const my = ys.reduce((s, v) => s + v, 0) / n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx;
+    const dy = ys[i] - my;
+    num += dx * dy;
+    dx2 += dx * dx;
+    dy2 += dy * dy;
+  }
+  if (dx2 === 0 || dy2 === 0) return null;
+  return num / Math.sqrt(dx2 * dy2);
+}
+
+function rdLevelToScore(rd: string | null | undefined): number | null {
+  if (!rd) return null;
+  const m: Record<string, number> = { RD0: 0, RD1: 1, RD2: 2, RD3: 3, RD4: 4 };
+  return m[rd] ?? null;
+}
+
+dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer", "univ_teacher", "school_mentor"]), async (c) => {
+  const jwtUser = c.get("user") as any;
+  const authUserId = jwtUser?.id;
+  const jwtRole = jwtUser?.role as string;
+  const { env } = c;
+  const userId = c.req.param("userId");
+  const canViewAll = ["researcher", "admin", "collaborator", "board_observer", "univ_teacher", "school_mentor"].includes(jwtRole);
+  if (!canViewAll && userId !== authUserId) return c.json({ error: "認証されていません" }, 401);
+
+  const db = env?.DB;
+  if (!db) return c.json({ error: "DB not configured" }, 503);
+
+  try {
+    // スキーマブートストラップ (journals, evaluations, evaluation_items, etc.)
+    await ensureSchema(db).catch(() => {});
+    // namikawa_bfi_responses が無い場合に備えて簡易作成
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS namikawa_bfi_responses (
+        user_id TEXT NOT NULL,
+        item_id INTEGER NOT NULL,
+        score INTEGER NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, item_id)
+      )
+    `).run().catch(() => {});
+    // ① BFI スコア取得
+    const bfiRes = await db.prepare("SELECT item_id, score FROM namikawa_bfi_responses WHERE user_id = ?").bind(userId).all();
+    const responses: Record<number, number> = {};
+    for (const row of bfiRes.results || []) {
+      responses[(row as any).item_id as number] = (row as any).score as number;
+    }
+    const answered = Object.keys(responses).length;
+    if (answered === 0) {
+      return c.json({
+        user_id: userId,
+        status: "no_bfi",
+        message: "BFI 未回答です。先に /bfi で 29 項目に回答してください。",
+        next_step: "/bfi",
+      });
+    }
+    const bfiScores = calculateBfiScores(responses);
+
+    // ② 学生名取得
+    const userRow: any = await db.prepare("SELECT name FROM users WHERE id = ?").bind(userId).first().catch(() => null);
+    const studentName = userRow?.name || "学生";
+
+    // ③ AI評価データ取得 (該当学生の全 submitted 日誌)
+    let evaluations: any[] = [];
+    try {
+      const evalRes = await db.prepare(`
+        SELECT e.id as eval_id, e.journal_id, e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score,
+               j.week_number, j.entry_date
+        FROM evaluations e
+        INNER JOIN journals j ON j.id = e.journal_id
+        WHERE j.student_id = ? AND e.eval_type = 'ai'
+        ORDER BY j.week_number ASC, j.entry_date ASC
+      `).bind(userId).all();
+      evaluations = (evalRes.results || []) as any[];
+    } catch (eEval) {
+      console.warn("evaluations/journals table not available:", String(eEval).slice(0, 120));
+    }
+
+    // ④ RD分布
+    let rdDistribution: Record<string, number> = { RD0: 0, RD1: 1, RD2: 0, RD3: 0, RD4: 0 };
+    rdDistribution = { RD0: 0, RD1: 0, RD2: 0, RD3: 0, RD4: 0 };
+    let rdScores: number[] = [];
+    if (evaluations.length > 0) {
+      try {
+        const evalIds = evaluations.map(e => e.eval_id);
+        const placeholders = evalIds.map(() => "?").join(",");
+        const itemRes = await db.prepare(`SELECT rd_level FROM evaluation_items WHERE evaluation_id IN (${placeholders}) AND rd_level IS NOT NULL`).bind(...evalIds).all().catch(() => ({ results: [] as any[] }));
+        for (const r of (itemRes.results || []) as any[]) {
+          const rd = String(r.rd_level || "");
+          if (rdDistribution[rd] !== undefined) rdDistribution[rd]++;
+          const sc = rdLevelToScore(rd);
+          if (sc !== null) rdScores.push(sc);
+        }
+      } catch (eRd) {
+        console.warn("evaluation_items.rd_level lookup failed:", String(eRd).slice(0, 120));
+      }
+    }
+    const avgRdScore = rdScores.length > 0 ? rdScores.reduce((s, v) => s + v, 0) / rdScores.length : 0;
+
+    // ⑤ AI評価4因子平均
+    const factorAverages: Record<string, number> = { f1: 0, f2: 0, f3: 0, f4: 0 };
+    if (evaluations.length > 0) {
+      let cnt1 = 0, cnt2 = 0, cnt3 = 0, cnt4 = 0;
+      let sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0;
+      for (const ev of evaluations) {
+        if (typeof ev.factor1_score === "number") { sum1 += ev.factor1_score; cnt1++; }
+        if (typeof ev.factor2_score === "number") { sum2 += ev.factor2_score; cnt2++; }
+        if (typeof ev.factor3_score === "number") { sum3 += ev.factor3_score; cnt3++; }
+        if (typeof ev.factor4_score === "number") { sum4 += ev.factor4_score; cnt4++; }
+      }
+      factorAverages.f1 = cnt1 > 0 ? sum1 / cnt1 : 0;
+      factorAverages.f2 = cnt2 > 0 ? sum2 / cnt2 : 0;
+      factorAverages.f3 = cnt3 > 0 ? sum3 / cnt3 : 0;
+      factorAverages.f4 = cnt4 > 0 ? sum4 / cnt4 : 0;
+    }
+
+    // ⑥ SCAT 直近テーマ取得 (テーブル不在も許容)
+    await db.prepare(`ALTER TABLE journal_scat_analyses ADD COLUMN primary_themes TEXT`).run().catch(() => {});
+    const scatRes = await db.prepare(`
+      SELECT primary_themes FROM journal_scat_analyses
+      WHERE user_id = ? AND primary_themes IS NOT NULL
+      ORDER BY created_at DESC LIMIT 5
+    `).bind(userId).all().catch(() => ({ results: [] as any[] }));
+    const recentThemes: string[] = [];
+    for (const row of (scatRes.results || []) as any[]) {
+      try {
+        const arr = JSON.parse(row.primary_themes || "[]");
+        if (Array.isArray(arr)) recentThemes.push(...arr.slice(0, 2));
+      } catch {}
+    }
+    const uniqueThemes = Array.from(new Set(recentThemes)).slice(0, 8);
+
+    // ⑦ パーソナリティ × 評価次元の相関 (時系列ではなく対象学生群との比較は未対応のため、
+    //    ここでは「全評価の各因子スコア時系列」と「BFI 5因子定数」の相関を取る代わりに、
+    //    全学生の BFI × 平均評価スコアでクロス集団相関を計算する)
+    const correlations: Record<string, number | null> = {};
+    try {
+      const allBfiRows = await db.prepare(`
+        SELECT user_id, item_id, score FROM namikawa_bfi_responses
+      `).all().catch(() => ({ results: [] as any[] }));
+      const allBfi: Record<string, Record<number, number>> = {};
+      for (const r of (allBfiRows.results || []) as any[]) {
+        const uid = String(r.user_id);
+        if (!allBfi[uid]) allBfi[uid] = {};
+        allBfi[uid][Number(r.item_id)] = Number(r.score);
+      }
+      const allEvalRows = await db.prepare(`
+        SELECT j.student_id, AVG(e.total_score) AS avg_total,
+               AVG(e.factor1_score) AS avg_f1, AVG(e.factor2_score) AS avg_f2,
+               AVG(e.factor3_score) AS avg_f3, AVG(e.factor4_score) AS avg_f4
+        FROM evaluations e
+        INNER JOIN journals j ON j.id = e.journal_id
+        WHERE e.eval_type = 'ai'
+        GROUP BY j.student_id
+      `).all().catch(() => ({ results: [] as any[] }));
+      const allEval: Record<string, any> = {};
+      for (const r of (allEvalRows.results || []) as any[]) {
+        allEval[String(r.student_id)] = r;
+      }
+
+      const pairUserIds = Object.keys(allBfi).filter(uid => allEval[uid] && Object.keys(allBfi[uid]).length >= 29);
+      if (pairUserIds.length >= 3) {
+        const personalityFactors = ["extraversion", "neuroticism", "openness", "agreeableness", "conscientiousness"];
+        const evalDimensions: Array<{ key: string; label: string }> = [
+          { key: "avg_total", label: "total" },
+          { key: "avg_f1", label: "f1" },
+          { key: "avg_f2", label: "f2" },
+          { key: "avg_f3", label: "f3" },
+          { key: "avg_f4", label: "f4" },
+        ];
+        for (const pf of personalityFactors) {
+          const bfiVec = pairUserIds.map(uid => calculateBfiScores(allBfi[uid])[pf] || 0);
+          for (const ed of evalDimensions) {
+            const evalVec = pairUserIds.map(uid => Number(allEval[uid][ed.key]) || 0);
+            const r = pearsonCorrelation(bfiVec, evalVec);
+            correlations[`${pf}_x_${ed.label}`] = r !== null ? Math.round(r * 1000) / 1000 : null;
+          }
+        }
+      }
+    } catch (eCorr) {
+      console.error("Correlation calculation failed:", String(eCorr));
+    }
+
+    // ⑧ LLM 統合解釈
+    const apiKey = (c.env as any)?.OPENAI_API_KEY;
+    let llmInsights: any = null;
+    if (apiKey) {
+      try {
+        const prompt = buildBfiIntegratedPrompt({
+          studentName,
+          bfiScores,
+          rdDistribution,
+          avgRdScore,
+          recentThemes: uniqueThemes,
+          factorAverages,
+        });
+        const raw = await callOpenAI(apiKey, [{ role: "user", content: prompt }], 0.3);
+        llmInsights = JSON.parse(raw);
+      } catch (eLlm) {
+        console.error("BFI integrated LLM failed:", String(eLlm));
+        llmInsights = { error: String(eLlm).slice(0, 200) };
+      }
+    } else {
+      llmInsights = { error: "OPENAI_API_KEY not configured" };
+    }
+
+    return c.json({
+      user_id: userId,
+      student_name: studentName,
+      bfi: {
+        scores: bfiScores,
+        answered,
+        is_completed: answered >= 29,
+      },
+      evaluation: {
+        total_count: evaluations.length,
+        factor_averages: {
+          f1: Math.round(factorAverages.f1 * 100) / 100,
+          f2: Math.round(factorAverages.f2 * 100) / 100,
+          f3: Math.round(factorAverages.f3 * 100) / 100,
+          f4: Math.round(factorAverages.f4 * 100) / 100,
+        },
+      },
+      reflection_depth: {
+        distribution: rdDistribution,
+        avg_score: Math.round(avgRdScore * 100) / 100,
+        total_items: rdScores.length,
+      },
+      scat: {
+        recent_themes: uniqueThemes,
+      },
+      correlations,
+      correlation_note: Object.keys(correlations).length > 0
+        ? "全BFI回答済学生(N>=3)を母集団としたクロスセクション・ピアソン相関係数 (-1〜+1)"
+        : "相関計算には BFI 完答済の学生が 3 名以上必要です",
+      llm_insights: llmInsights,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error("BFI integrated analysis error:", String(e));
     return c.json({ error: String(e) }, 500);
   }
 });

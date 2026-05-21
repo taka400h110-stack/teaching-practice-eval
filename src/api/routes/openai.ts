@@ -421,6 +421,165 @@ ${bfiRules}
 }
 
 // ────────────────────────────────────────────────────────────────
+// SCAT (Steps for Coding And Theorization) 用プロンプト
+// 大谷尚 (2008,2011) の質的データ分析手法に基づく4ステップコーディング
+// + 第5ステップ (テーマ・構成概念) + 第6ステップ (理論記述)
+// ────────────────────────────────────────────────────────────────
+export function buildSCATPrompt(journalContent: string, studentName: string, weekNumber: number): string {
+  return `あなたは質的データ分析 (SCAT: Steps for Coding And Theorization, 大谷尚 2008,2011) の専門家AIです。
+以下の教育実習日誌に対して、SCAT の手続きに従って質的分析を実施してください。
+
+## 分析対象
+実習生: ${studentName}
+第${weekNumber}週 実習日誌:
+---
+${journalContent}
+---
+
+## SCAT 分析手順
+日誌全体を「意味のまとまり」で 3〜5 個のセグメント (テクスト) に分割し、各セグメントに対して以下の4ステップを順に行ってください。
+
+- **ステップ①: テクスト中の注目すべき語句** (focus_words)
+  - 実習生の経験・判断・葛藤が表出している具体的な語句を抜き出す (3〜6語程度)
+  - 元の表現を尊重 (改変しない)
+
+- **ステップ②: テクスト中の語句の言いかえ** (outside_words)
+  - ①の語句を、より抽象度の高い・教育学的に整理された語に言いかえる
+  - 学術用語・教育実習指導用語を活用
+
+- **ステップ③: 左を説明するようなテクスト外の概念** (explanatory_words)
+  - ②をさらに広い概念・理論枠組みで説明する
+  - 教育心理学・授業論・省察的実践論などの概念を援用
+
+- **ステップ④: テーマ・構成概念** (theme_construct)
+  - ①〜③を統合する短いテーマ語 (10〜25字以内、名詞句)
+  - 例: 「児童の躓きへの即時的応答」「教材研究の不足を補う指導観の揺らぎ」
+
+加えて以下を行ってください:
+
+- **ステップ⑤: 疑問・課題** (questions_issues)
+  - そのセグメントから生まれる問い・次回への課題 (1〜2文)
+
+- **全体: ストーリーライン** (storyline)
+  - 全セグメントのテーマ④を時系列でつなぐ約 200〜400 字の物語的記述
+  - 「実習生 ${studentName} は…」で始める
+
+- **全体: 理論記述** (theoretical_description)
+  - ストーリーラインから導かれる教育学的・理論的考察 (200〜400 字)
+  - 省察深度 (Reflection Depth: RD0=描写のみ / RD1=説明 / RD2=評価 / RD3=分析 / RD4=変容) の判定根拠も含める
+
+## 出力形式 (JSON)
+\`\`\`json
+{
+  "segments": [
+    {
+      "segment_order": 1,
+      "raw_text": "セグメント①の原文 (40〜200字)",
+      "step1_focus_words": "実習生の注目語句をカンマ区切りで",
+      "step2_outside_words": "言いかえ語をカンマ区切りで",
+      "step3_explanatory_words": "外部概念をカンマ区切りで",
+      "step4_theme_construct": "テーマ語 (10〜25字)",
+      "step5_questions_issues": "疑問・課題 (1〜2文)"
+    }
+  ],
+  "storyline": "200〜400字のストーリーライン",
+  "theoretical_description": "200〜400字の理論記述 (RD判定根拠含む)",
+  "rd_level_estimate": "RD0|RD1|RD2|RD3|RD4 のいずれか",
+  "primary_themes": ["主要テーマ1", "主要テーマ2"]
+}
+\`\`\`
+
+注意:
+- segments は 3 個以上 5 個以下
+- 各 step1〜step5 は文字列 (配列ではない)
+- raw_text はセグメント内の元のテクストをそのまま (改変しない)`;
+}
+
+// ────────────────────────────────────────────────────────────────
+// BFI 統合分析プロンプト
+// パーソナリティ (5因子) × 省察深度 (RD) の文脈解釈
+// ────────────────────────────────────────────────────────────────
+export function buildBfiIntegratedPrompt(args: {
+  studentName: string;
+  bfiScores: Record<string, number>;
+  rdDistribution: Record<string, number>;
+  avgRdScore: number;
+  recentThemes: string[];
+  factorAverages: Record<string, number>;
+}): string {
+  const { studentName, bfiScores, rdDistribution, avgRdScore, recentThemes, factorAverages } = args;
+  return `あなたは教師教育・パーソナリティ心理学の専門家AIです。
+以下の学生のBFI(Big Five Inventory)パーソナリティ特性と、教育実習日誌のAI評価結果(省察深度・4因子スコア)を統合的に分析し、強み・弱み・伸ばし方の提言を行ってください。
+
+## 学生情報
+実習生: ${studentName}
+
+## BFIパーソナリティスコア (0-5, 高いほどその特性が強い)
+- 外向性 (Extraversion): ${bfiScores.extraversion ?? "未測定"}
+- 神経症傾向 (Neuroticism): ${bfiScores.neuroticism ?? "未測定"}
+- 開放性 (Openness): ${bfiScores.openness ?? "未測定"}
+- 協調性 (Agreeableness): ${bfiScores.agreeableness ?? "未測定"}
+- 誠実性 (Conscientiousness): ${bfiScores.conscientiousness ?? "未測定"}
+
+## 省察深度 (Reflection Depth) 分布
+- RD0 (描写のみ): ${rdDistribution.RD0 || 0}件
+- RD1 (説明): ${rdDistribution.RD1 || 0}件
+- RD2 (評価): ${rdDistribution.RD2 || 0}件
+- RD3 (分析): ${rdDistribution.RD3 || 0}件
+- RD4 (変容): ${rdDistribution.RD4 || 0}件
+- 平均スコア: ${avgRdScore.toFixed(2)} / 5.0
+
+## 実習評価4因子平均
+- 因子1 (学習指導): ${factorAverages.f1?.toFixed(2) ?? "N/A"}
+- 因子2 (生徒指導): ${factorAverages.f2?.toFixed(2) ?? "N/A"}
+- 因子3 (学級経営): ${factorAverages.f3?.toFixed(2) ?? "N/A"}
+- 因子4 (省察): ${factorAverages.f4?.toFixed(2) ?? "N/A"}
+
+## 直近の日誌テーマ (SCAT分析より)
+${recentThemes.length > 0 ? recentThemes.map(t => `- ${t}`).join("\n") : "(分析データなし)"}
+
+## 出力形式 (JSON)
+\`\`\`json
+{
+  "personality_summary": "BFI 5因子の総合プロファイル (150-250字)",
+  "personality_strengths": ["パーソナリティ的な強み (具体的)", "..."],
+  "personality_growth_areas": ["伸び代になりうる側面 (否定的でなく中立的に)", "..."],
+  "correlation_insights": [
+    {
+      "personality_factor": "外向性|神経症傾向|開放性|協調性|誠実性",
+      "evaluation_dimension": "省察深度|因子1|因子2|因子3|因子4",
+      "observed_pattern": "観察される相関パターン (例: 高い誠実性が省察記述の構造化に表れている)",
+      "evidence": "根拠 (具体的にどのデータからその傾向が読み取れるか)"
+    }
+  ],
+  "factor_strength_map": {
+    "extraversion": {
+      "score": ${bfiScores.extraversion ?? 0},
+      "label": "高|中|低",
+      "teaching_implication": "授業実践での現れ方 (60-100字)"
+    },
+    "neuroticism": { "score": ${bfiScores.neuroticism ?? 0}, "label": "高|中|低", "teaching_implication": "..." },
+    "openness": { "score": ${bfiScores.openness ?? 0}, "label": "高|中|低", "teaching_implication": "..." },
+    "agreeableness": { "score": ${bfiScores.agreeableness ?? 0}, "label": "高|中|低", "teaching_implication": "..." },
+    "conscientiousness": { "score": ${bfiScores.conscientiousness ?? 0}, "label": "高|中|低", "teaching_implication": "..." }
+  },
+  "personalized_recommendations": [
+    "具体的な実習における提言 1 (パーソナリティ特性に基づく)",
+    "具体的な実習における提言 2",
+    "具体的な実習における提言 3"
+  ],
+  "next_week_focus": "次週の重点課題 (パーソナリティに即した1文)"
+}
+\`\`\`
+
+注意:
+- label は score を以下で判定: <2.0=低, 2.0-3.5=中, >3.5=高
+- 強み/弱みは断定せず「特性として現れやすい」など中立的表現
+- correlation_insights は実データから読み取れる範囲で 2〜4 個
+- 教師教育における Reflective Practice (Schön, 1983) と性格特性研究の知見を踏まえる`;
+}
+
+// ────────────────────────────────────────────────────────────────
 // OpenAI API 呼び出し共通関数
 // ────────────────────────────────────────────────────────────────
 export async function callOpenAI(
