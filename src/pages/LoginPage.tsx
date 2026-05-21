@@ -147,24 +147,39 @@ export default function ログインPage() {
     try {
       const result = await apiClient.login(loginEmail, loginPw) as any;
       const user = apiClient.getCurrentUser();
-      console.log("LOGIN RESULT", result, "USER", user);
-      if (false) {
-          // navigate("/onboarding");
-        } else {
-        const user = apiClient.getCurrentUser();
-        const role = user?.role || user?.roles?.[0] || 'student';
-        if (role === 'admin' || role === 'researcher' || role === 'collaborator' || role === 'board_observer') {
-          navigate("/admin");
-        } else if (role === 'teacher' || role === 'univ_teacher' || role === 'school_mentor') {
-          navigate("/teacher-dashboard");
-        } else if (role === 'evaluator') {
-          navigate("/evaluations");
-        } else {
-          navigate("/dashboard");
-        }
+      console.log("[LoginPage] login result:", result, "user from storage:", user);
+
+      // user_info が保存されたか確認 (PrivateRoute は isAuthenticated を見る)
+      if (!user || !localStorage.getItem("auth_token")) {
+        console.error("[LoginPage] user_info/auth_token missing after login");
+        setError("ログイン情報の保存に失敗しました。ブラウザのキャッシュをクリアして再度お試しください。");
+        setLoggingIn(null);
+        return;
       }
-    } catch {
-      setError("ログインに失敗しました。");
+
+      const role = user?.role || user?.roles?.[0] || 'student';
+      let dest = "/dashboard";
+      if (role === 'admin' || role === 'researcher' || role === 'collaborator' || role === 'board_observer') {
+        dest = "/admin";
+      } else if (role === 'teacher' || role === 'univ_teacher' || role === 'school_mentor') {
+        dest = "/teacher-dashboard";
+      } else if (role === 'evaluator') {
+        dest = "/evaluations";
+      }
+      console.log("[LoginPage] navigating to:", dest, "role:", role);
+      navigate(dest, { replace: true });
+
+      // navigate() が SPA ルータで効かない場合のフォールバック (300ms 後にも /login のままなら強制遷移)
+      setTimeout(() => {
+        if (window.location.pathname === "/login" || window.location.pathname === "/") {
+          console.warn("[LoginPage] SPA navigate failed; using window.location");
+          window.location.href = dest;
+        }
+      }, 400);
+    } catch (e: any) {
+      const msg = String(e?.message || e || "ログインに失敗しました");
+      console.error("[LoginPage] login failed:", msg, e);
+      setError(`ログインに失敗しました: ${msg}`);
       setLoggingIn(null);
     } finally {
       setLoading(false);

@@ -172,26 +172,58 @@ const apiClient = {
   // ── 認証 ──
   login: async (email: string, password: string) => {
     if (!email.includes("@")) throw new Error("Invalid credentials");
-    
-    const res = await apiFetch("/api/data/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-    
-    if (!res.ok) throw new Error("User not found or invalid credentials");
-    const data = await res.json() as any;
+
+    // 注意: apiFetch は JSON レスポンスを Proxy 化するため、
+    //   ここでは生の fetch を使い、確実に JSON ボディを取得する。
+    //   また localStorage に古いトークンが残っていると 401 で
+    //   apiFetch がリダイレクト副作用を起こすため、事前に除去。
+    try {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user_info");
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+    } catch {}
+
+    let res: Response;
+    try {
+      res = await fetch("/api/data/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+    } catch (netErr) {
+      console.error("[login] network error:", netErr);
+      throw new Error("ネットワークエラー: サーバに接続できません");
+    }
+
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      console.error("[login] JSON parse error:", parseErr);
+      throw new Error(`サーバの応答を解析できませんでした (HTTP ${res.status})`);
+    }
+
+    if (!res.ok || !data || data.error || !data.user || !data.token) {
+      const msg = data?.error || data?.message || `ログイン失敗 (HTTP ${res.status})`;
+      console.error("[login] failure:", msg, data);
+      throw new Error(msg);
+    }
+
     const user = data.user;
-    if (data.token) localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(user));
-    
-    localStorage.setItem("user_info", JSON.stringify(user));
+    // すべての localStorage キーに保存 (互換性のため複数キー併用)
+    localStorage.setItem("token", data.token);
     localStorage.setItem("auth_token", data.token);
-    
-    // Check if onboarding is done (for students)
+    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("user_info", JSON.stringify(user));
+
+    // Onboarding 判定
     const onboardingDone = localStorage.getItem(`onboarding_done_${user.id}`);
     if (!onboardingDone && user.role === "student") {
       localStorage.setItem("pending_onboarding", "true");
     }
-    
+
+    console.log("[login] success:", user.email, user.role);
     return { ...user, requiresOnboarding: false };
   },
   logout: async () => {
