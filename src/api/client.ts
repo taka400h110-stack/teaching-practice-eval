@@ -257,11 +257,14 @@ const apiClient = {
   completeOnboarding: (userId: string) => {},
 
   // ── 日誌 ──
-  getJournals: async (): Promise<JournalEntry[]> => {
+  // studentId を渡せば対象学生で絞り込み (教員・指導教員などが「特定の学生の日誌一覧」を見るために使用)
+  getJournals: async (studentId?: string): Promise<JournalEntry[]> => {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
     const role = user.role || "student";
     let url = "/api/data/journals";
-    if (role === "student") {
+    if (studentId) {
+      url += "?student_id=" + encodeURIComponent(studentId);
+    } else if (role === "student") {
       url += "?student_id=" + user.id;
     }
     const res = await apiFetch(url);

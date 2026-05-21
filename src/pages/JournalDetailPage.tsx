@@ -17,6 +17,7 @@ import EditIcon           from "@mui/icons-material/Edit";
 import AssessmentIcon     from "@mui/icons-material/Assessment";
 import MenuBookIcon       from "@mui/icons-material/MenuBook";
 import PsychologyIcon     from "@mui/icons-material/Psychology";
+import PersonIcon         from "@mui/icons-material/Person";
 import CommentIcon        from "@mui/icons-material/Comment";
 import SchoolIcon         from "@mui/icons-material/School";
 import AccessTimeIcon     from "@mui/icons-material/AccessTime";
@@ -659,6 +660,17 @@ const JournalDetailPage: React.FC = () => {
             <Chip label={STATUS_CONFIG[journal.status]?.label || "不明"} color={STATUS_CONFIG[journal.status]?.color || "default"} />
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {/* 非学生ロール向け: 誰の日誌か明示 */}
+            {userRole !== "student" && ((journal as any).student_name || (journal as any).student_id) && (
+              <Chip
+                size="small"
+                icon={<PersonIcon />}
+                label={(journal as any).student_name || (journal as any).student_id}
+                color="info"
+                variant="filled"
+                sx={{ fontWeight: "bold" }}
+              />
+            )}
             <Chip size="small" icon={<SchoolIcon />} label={`Week ${journal.week_number || "-"}`} color="primary" variant="outlined" />
             {journal.subject && <Chip size="small" label={`📚 ${journal.subject}`} variant="outlined" />}
             <Chip size="small" label={`📅 ${formattedDate}`} variant="outlined" />

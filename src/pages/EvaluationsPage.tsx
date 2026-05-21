@@ -62,7 +62,18 @@ export default function EvaluationsPage() {
     queryFn: () => apiClient.getJournals(),
   });
 
-  const { data: humanEvals = [] } = useQuery({ queryKey: ["humanEvaluations"], queryFn: () => apiClient.getHumanEvaluations() });
+  // 人間評価一覧は evaluator / admin / researcher / collaborator / board_observer のみ取得可
+  // 大学教員・校内指導教員でAPIを呼ぶと 403 になりコンソールが汚れるため、ロールで切り分け
+  const currentUser = apiClient.getCurrentUser() as { role?: string } | null;
+  const canViewHumanEvals = (() => {
+    const r = currentUser?.role;
+    return r === "evaluator" || r === "admin" || r === "researcher" || r === "collaborator" || r === "board_observer";
+  })();
+  const { data: humanEvals = [] } = useQuery({
+    queryKey: ["humanEvaluations"],
+    queryFn: () => apiClient.getHumanEvaluations(),
+    enabled: canViewHumanEvals,
+  });
   const { data: allEvals = [] } = useQuery({
     queryKey: ["allEvaluations"],
     queryFn: () => apiClient.getAllEvaluations(),

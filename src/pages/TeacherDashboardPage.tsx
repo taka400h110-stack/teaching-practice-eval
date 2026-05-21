@@ -6,7 +6,8 @@ import {
   Paper, Button, Avatar, LinearProgress, Tabs, Tab,
 } from "@mui/material";
 import SearchIcon     from "@mui/icons-material/Search";
-import AssessmentIcon from "@mui/icons-material/Assessment";
+import MenuBookIcon   from "@mui/icons-material/MenuBook";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { useQuery }   from "@tanstack/react-query";
 import apiClient from "../api/client";
 
@@ -81,7 +82,12 @@ export default function TeacherDashboardPage() {
                 </TableHead>
                 <TableBody>
                   {filtered.slice(0, 20).map((p) => (
-                    <TableRow key={p.id} hover>
+                    <TableRow
+                      key={p.id}
+                      hover
+                      onClick={() => navigate(`/journals?student_id=${encodeURIComponent(p.id)}`)}
+                      sx={{ cursor: "pointer" }}
+                    >
                       <TableCell>
                         <Box display="flex" alignItems="center" gap={1}>
                           <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: p.gender === "male" ? "primary.main" : "secondary.main" }}>
@@ -109,9 +115,26 @@ export default function TeacherDashboardPage() {
                         <Chip label={`+${p.growth_delta.toFixed(2)}`} size="small"
                           color={p.growth_delta >= 1 ? "success" : p.growth_delta >= 0.5 ? "primary" : "default"} />
                       </TableCell>
-                      <TableCell align="center">
-                        <Button size="small" startIcon={<AssessmentIcon />}
-                          onClick={() => navigate(`/human-evaluation`)}>評価</Button>
+                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                        <Box display="flex" gap={0.5} justifyContent="center">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<MenuBookIcon />}
+                            onClick={() => navigate(`/journals?student_id=${encodeURIComponent(p.id)}`)}
+                          >
+                            日誌
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="secondary"
+                            startIcon={<TrendingUpIcon />}
+                            onClick={() => navigate(`/teacher-statistics?student_id=${encodeURIComponent(p.id)}`)}
+                          >
+                            成長
+                          </Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))}

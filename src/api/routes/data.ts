@@ -934,7 +934,13 @@ dataRouter.get("/journals/:id", requireRoles(["student", "teacher", "univ_teache
   const journalId = c.req.param("id");
 
   try {
-    const { results } = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(journalId).all();
+    // 学生名も同時取得し、教員・指導教員が「誰の日誌か」を一目で識別できるようにする
+    const { results } = await db.prepare(`
+      SELECT j.*, u.name as student_name
+      FROM journal_entries j
+      LEFT JOIN users u ON u.id = j.student_id
+      WHERE j.id = ?
+    `).bind(journalId).all();
     if (!results || results.length === 0) {
       return c.json({ success: false, error: "見つかりません" }, 404);
     }
