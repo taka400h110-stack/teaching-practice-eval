@@ -734,7 +734,16 @@ async function runJournalAutoPipeline(
 
 // ──────────────────────────────────────────────────────────────────
 // 統計キャッシュ (オンデマンドの集計結果を保存し、N秒以内は再利用)
+// TTL は env.STATS_CACHE_TTL_SECONDS で上書き可能 (デフォルト 300秒)
 // ──────────────────────────────────────────────────────────────────
+function getDefaultStatsCacheTtl(env: any): number {
+  const raw = env?.STATS_CACHE_TTL_SECONDS;
+  if (!raw) return 300;
+  const n = parseInt(String(raw), 10);
+  if (isNaN(n) || n <= 0) return 300;
+  return Math.min(n, 86400); // 上限 1 日
+}
+
 async function ensureStatsCacheSchema(db: D1Database): Promise<void> {
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS stats_cache (
@@ -1751,6 +1760,18 @@ dataRouter.get("/rubric-behaviors", requireRoles(["student", "teacher", "univ_te
 });
 
 // ────────────────────────────────────────────────────────────────
+// GET /api/data/stats-cache/config
+// 現在のキャッシュ TTL 設定を返す (admin/researcher 用)
+// ────────────────────────────────────────────────────────────────
+dataRouter.get("/stats-cache/config", requireRoles(["admin", "researcher"] as UserRole[]), async (c) => {
+  const ttl = getDefaultStatsCacheTtl(c.env);
+  return c.json({
+    default_ttl_seconds: ttl,
+    source: (c.env as any)?.STATS_CACHE_TTL_SECONDS ? "env(STATS_CACHE_TTL_SECONDS)" : "default(300)",
+    max_allowed: 86400,
+  });
+});
+
 // POST /api/data/evaluation-items/backfill-rd-level
 // 既存の evaluation_items.rd_level が NULL のレコードを score から自動算出して更新
 // ────────────────────────────────────────────────────────────────
@@ -2539,7 +2560,32 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
       }
     }
 
-    return c.json({ ...updated, auto_pipeline_triggered, pipeline: pipelineResult });
+    // ─────────────────────────────────────────────────────────
+    // 変更通知 (submitted → submitted の編集時)
+    // 指導教員/メンターへ「日誌が編集されました」通知を送出
+    // ─────────────────────────────────────────────────────────
+    let edit_notifications_sent = 0;
+    try {
+      const isEditAfterSubmit = beforeStatus === "submitted" && afterStatus === "submitted" && fields.length > 0;
+      if (isEditAfterSubmit) {
+        const supervisors = await resolveStudentSupervisors(db, updated.student_id);
+        const user = (c.get("user" as any) as any) as any;
+        const actorName = (user as any)?.name || "学生";
+        const significantFields = fields.filter(f => !["updated_at", "id", "student_id"].includes(f));
+        edit_notifications_sent = await sendNotifications(db, supervisors, {
+          actor_user_id: (user as any)?.id,
+          type: "journal_updated",
+          title: `${actorName} さんが日誌を編集しました`,
+          body: `第${updated.week_number || "?"}週の日誌が編集されました (変更項目: ${significantFields.slice(0, 5).join(", ")}${significantFields.length > 5 ? " ..." : ""})`,
+          resource_type: "journal",
+          resource_id: id,
+        });
+      }
+    } catch (e) {
+      console.error("[journal edit notification] failed:", String(e));
+    }
+
+    return c.json({ ...updated, auto_pipeline_triggered, pipeline: pipelineResult, edit_notifications_sent });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -2863,7 +2909,7 @@ dataRouter.get("/scat/network", requireRoles(["researcher", "admin", "collaborat
     const edges = links.map(l => ({ source: l.source, target: l.target, weight: l.val }));
 
     const payload = { nodes, links, edges };
-    await setCachedStats(db, "stats:scat:network", payload, 300).catch(() => {});
+    await setCachedStats(db, "stats:scat:network", payload, getDefaultStatsCacheTtl(c.env)).catch(() => {});
     return c.json({ ...payload, _cache: { hit: false, key: "stats:scat:network" } });
   } catch (err: any) {
     return c.json({ error: String(err) }, 500);
@@ -2938,7 +2984,7 @@ dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "c
     });
 
     const payload = { timeline, themes: topThemes, total_themes: themesGlobal.size };
-    await setCachedStats(db, cacheKey, payload, 300).catch(() => {});
+    await setCachedStats(db, cacheKey, payload, getDefaultStatsCacheTtl(c.env)).catch(() => {});
     return c.json({ ...payload, _cache: { hit: false, key: cacheKey } });
   } catch (err: any) {
     return c.json({ error: String(err) }, 500);

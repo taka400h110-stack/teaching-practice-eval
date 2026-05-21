@@ -202,21 +202,28 @@ export default function ログインPage() {
           <CardContent sx={{ p: 3 }}>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            <Box display="flex" gap={2} alignItems="flex-end" flexWrap="wrap">
+            <Box
+              component="form"
+              onSubmit={(e: React.FormEvent) => { e.preventDefault(); doログイン(email, password); }}
+              display="flex" gap={2} alignItems="flex-end" flexWrap="wrap"
+            >
               <TextField
                 label="メールアドレス" value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 size="small" sx={{ flex: "1 1 220px" }}
-                onKeyDown={(e) => e.key === "Enter" && doログイン(email, password)}
+                autoComplete="username"
+                name="email"
               />
               <TextField
                 label="パスワード" type="password" value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 size="small" sx={{ flex: "1 1 140px" }}
-                onKeyDown={(e) => e.key === "Enter" && doログイン(email, password)}
+                autoComplete="current-password"
+                name="password"
               />
               <Button
-                variant="contained" onClick={() => doログイン(email, password)}
+                type="submit"
+                variant="contained"
                 disabled={loading} startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <ログインIcon />}
                 sx={{ height: 40, fontWeight: "bold", minWidth: 120 }}
               >

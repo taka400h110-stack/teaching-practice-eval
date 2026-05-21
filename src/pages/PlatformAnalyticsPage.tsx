@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Typography, Card, CardContent, Grid, Button, Tab, Tabs, Chip, Divider, CircularProgress } from "@mui/material";
+import { Box, Typography, Card, CardContent, Grid, Button, Tab, Tabs, Chip, Divider, CircularProgress, Alert } from "@mui/material";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Science from "@mui/icons-material/Science";
 import Security from "@mui/icons-material/Security";
@@ -103,7 +103,15 @@ export default function PlatformAnalyticsPage() {
           </Button>
         </Box>
 
-        {gMethodMutation.data && (
+        {gMethodMutation.data && gMethodMutation.data.status === "not_available" && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <strong>{gMethodMutation.data.method}</strong>: {gMethodMutation.data.message}
+            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+              Run ID: {gMethodMutation.data.run_id}
+            </Typography>
+          </Alert>
+        )}
+        {gMethodMutation.data && gMethodMutation.data.status !== "not_available" && gMethodMutation.data.results && (
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>G-Methods 実行結果: {gMethodMutation.data.method}</Typography>
@@ -144,7 +152,14 @@ export default function PlatformAnalyticsPage() {
 
       {/* Tab 3: Fairness & Validity */}
       <TabPanel value={tabIndex} index={2}>
-        {fairLoading ? <CircularProgress /> : (
+        {fairLoading ? <CircularProgress /> : (fairnessData as any)?.status === "not_available" ? (
+          <Alert severity="info">
+            <strong>公平性・妥当性監査</strong>: {(fairnessData as any).message}
+            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+              Run ID: {(fairnessData as any).run_id} | Timestamp: {(fairnessData as any).timestamp}
+            </Typography>
+          </Alert>
+        ) : (
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 6 }} >
               <Card>
