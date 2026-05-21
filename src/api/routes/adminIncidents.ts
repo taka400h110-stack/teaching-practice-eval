@@ -1,8 +1,13 @@
 import { Hono } from 'hono';
 import { Env } from '../../types/env';
+import { requireAuth, requireRoles } from '../middleware/auth';
 import { getIncidentsForAlert, triggerIncident, resolveIncident } from '../services/cleanupIncidentService';
 
 const adminIncidentsRouter = new Hono<{ Bindings: Env }>();
+
+// ロールチェック: admin / researcher / collaborator / board_observer のみインシデント管理が可能
+adminIncidentsRouter.use('*', requireAuth);
+adminIncidentsRouter.use('*', requireRoles(['admin', 'researcher', 'collaborator', 'board_observer'] as any));
 
 // GET /api/admin/incidents/cleanup?fingerprint=...
 adminIncidentsRouter.get('/cleanup', async (c) => {
