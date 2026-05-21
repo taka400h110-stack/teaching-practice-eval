@@ -30,7 +30,8 @@ analyticsRouter.get("/pipeline", requireRoles(["researcher", "admin", "collabora
 });
 
 // G-Methods (IPTW / MSM) - Mark as Not Available
-analyticsRouter.post("/g-methods", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+// g-methods は計算のみ(DB書き込みなし)だが、専門研究者の操作を想定し board_observer は除外
+analyticsRouter.post("/g-methods", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   return c.json({
     run_id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),

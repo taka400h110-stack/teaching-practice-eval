@@ -58,6 +58,9 @@ const TeacherStatisticsPage   = lazy(() => import("./pages/TeacherStatisticsPage
 const InternationalComparisonPage = lazy(() => import("./pages/InternationalComparisonPage"));
 // BFI パーソナリティ診断
 const BFIPage = lazy(() => import("./pages/BFIPage"));
+// プロフィール & プレースホルダ
+const ProfilePage             = lazy(() => import("./pages/ProfilePage"));
+const PlaceholderPage         = lazy(() => import("./pages/PlaceholderPage"));
 
 const Spinner = () => (
   <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
@@ -184,6 +187,16 @@ export default function App() {
 
           {/* BFI パーソナリティ診断 */}
           <Route path="bfi"               element={<PrivateRoute allowedRoles={["student"]}><BFIPage /></PrivateRoute>} />
+
+          {/* プロフィール (全ロール共通) */}
+          <Route path="profile"           element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+
+          {/* 通知設定 (準備中) */}
+          <Route path="notifications"          element={<PrivateRoute><PlaceholderPage title="通知" description="通知一覧機能は準備中です。" /></PrivateRoute>} />
+          <Route path="notifications/settings" element={<PrivateRoute><PlaceholderPage title="通知設定" description="通知の受信方法や頻度などの設定機能は準備中です。" /></PrivateRoute>} />
+
+          {/* アプリ設定 (準備中) */}
+          <Route path="settings"          element={<PrivateRoute><PlaceholderPage title="設定" description="アプリケーション設定機能は準備中です。" /></PrivateRoute>} />
         </Route>
         <Route path="unauthorized" element={<Box p={4}><Typography variant="h5" color="error">アクセス権限がありません (403)</Typography><Typography>このページへのアクセス権限がありません。</Typography></Box>} />
         <Route path="*" element={<RoleBasedHomeRedirect />} />

@@ -971,12 +971,26 @@ dataRouter.get("/journals/:id", requireRoles(["student", "teacher", "univ_teache
 });
 
 
-dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
   await ensureSchema(db);
   const body = await c.req.json() as any;
+
+  // 入力バリデーション
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "リクエスト本文が不正です" }, 400);
+  }
+  if (!body.journal_id || typeof body.journal_id !== "string") {
+    return c.json({ error: "journal_id は必須の文字列です" }, 400);
+  }
+  if (!body.evaluation || typeof body.evaluation !== "object") {
+    return c.json({ error: "evaluation オブジェクトは必須です" }, 400);
+  }
+  if (!Array.isArray(body.evaluation.items) || body.evaluation.items.length === 0) {
+    return c.json({ error: "evaluation.items は1件以上の配列が必要です" }, 400);
+  }
 
   try {
     const scores = { f1: [] as number[], f2: [] as number[], f3: [] as number[], f4: [] as number[] };
@@ -1122,7 +1136,7 @@ dataRouter.get("/evaluations/:journalId", requireRoles(["student", "teacher", "u
 // ────────────────────────────────────────────────────────────────
 // 人間評価
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
@@ -1133,6 +1147,20 @@ dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin"
     evaluator_name: string;
     items: Array<{ item_number: number; score: number; is_na?: boolean; comment?: string }>;
   };
+
+  // 入力バリデーション
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "リクエスト本文が不正です" }, 400);
+  }
+  if (!body.journal_id || typeof body.journal_id !== "string") {
+    return c.json({ error: "journal_id は必須の文字列です" }, 400);
+  }
+  if (!body.evaluator_id || typeof body.evaluator_id !== "string") {
+    return c.json({ error: "evaluator_id は必須の文字列です" }, 400);
+  }
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    return c.json({ error: "items は1件以上の配列が必要です" }, 400);
+  }
 
   try {
     const scores = { f1: [] as number[], f2: [] as number[], f3: [] as number[], f4: [] as number[] };
@@ -1414,29 +1442,26 @@ dataRouter.get("/goals/:studentId", requireRoles(["student", "teacher", "univ_te
 // ────────────────────────────────────────────────────────────────
 // ICC結果保存
 // ────────────────────────────────────────────────────────────────
-dataRouter.post("/icc-results", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.post("/icc-results", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
   await ensureSchema(db);
-  const body = await c.req.json() as {
-    run_id?: string;
-    scope: string;
-    factor?: string;
-    icc_value: number;
-    ci_lower?: number;
-    ci_upper?: number;
-    f_value?: number;
-    df1?: number;
-    df2?: number;
-    p_value?: number;
-    interpretation?: string;
-    rater_count?: number;
-    subject_count?: number;
-    krippendorff_alpha?: number;
-    pearson_r?: number;
-    pearson_p?: number;
-  };
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "リクエスト本文が不正です (JSON parse error)" }, 400);
+  }
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "リクエスト本文が不正です" }, 400);
+  }
+  if (!body.scope || typeof body.scope !== "string") {
+    return c.json({ error: "scope は必須の文字列です" }, 400);
+  }
+  if (typeof body.icc_value !== "number" || Number.isNaN(body.icc_value)) {
+    return c.json({ error: "icc_value は必須の数値です" }, 400);
+  }
 
   try {
     await db.prepare(`
@@ -2403,7 +2428,7 @@ dataRouter.get("/evaluator-profiles", requireRoles(["evaluator", "researcher", "
   }
 });
 
-dataRouter.post("/evaluator-profiles", requireRoles(["evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.post("/evaluator-profiles", requireRoles(["evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   await ensureSchema(db);
@@ -2468,13 +2493,25 @@ dataRouter.get("/scat/projects", requireRoles(["researcher", "admin", "collabora
   }
 });
 
-dataRouter.post("/scat/projects", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.post("/scat/projects", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
+  let body: any;
   try {
-    const { title, description, created_by } = await c.req.json();
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "リクエスト本文が不正です (JSON parse error)" }, 400);
+  }
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "リクエスト本文が不正です" }, 400);
+  }
+  if (!body.title || typeof body.title !== "string" || body.title.trim().length === 0) {
+    return c.json({ error: "title は必須の非空文字列です" }, 400);
+  }
+  try {
+    const { title, description, created_by } = body;
     const id = "proj_" + Date.now();
-    await db.prepare("INSERT INTO scat_projects (id, title, description, created_by) VALUES (?, ?, ?, ?)").bind(id, title, description, created_by).run();
+    await db.prepare("INSERT INTO scat_projects (id, title, description, created_by) VALUES (?, ?, ?, ?)").bind(id, title, description ?? null, created_by ?? null).run();
     return c.json({ success: true, id });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -2482,7 +2519,7 @@ dataRouter.post("/scat/projects", requireRoles(["researcher", "admin", "collabor
 });
 
 
-dataRouter.put("/scat/projects/:projectId/theorization", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.put("/scat/projects/:projectId/theorization", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
@@ -2515,11 +2552,23 @@ dataRouter.get("/scat/segments/:projectId", requireRoles(["researcher", "admin",
   }
 });
 
-dataRouter.post("/scat/segments/:projectId", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.post("/scat/segments/:projectId", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
+  let body: any;
   try {
-    const { segments } = await c.req.json();
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "リクエスト本文が不正です (JSON parse error)" }, 400);
+  }
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "リクエスト本文が不正です" }, 400);
+  }
+  if (!Array.isArray(body.segments) || body.segments.length === 0) {
+    return c.json({ error: "segments は1件以上の配列が必要です" }, 400);
+  }
+  try {
+    const { segments } = body;
     const projectId = c.req.param("projectId");
     const stmt = db.prepare("INSERT INTO scat_segments (id, project_id, journal_id, text_content) VALUES (?, ?, ?, ?)");
     const batch = segments.map((s: any) => stmt.bind("seg_" + Math.random().toString(36).substr(2, 9), projectId, s.journal_id || null, s.text_content));
@@ -2543,11 +2592,22 @@ dataRouter.get("/scat/codes/:projectId", requireRoles(["researcher", "admin", "c
   }
 });
 
-dataRouter.post("/scat/codes", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+dataRouter.post("/scat/codes", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
+  let body: any;
   try {
-    const body = await c.req.json();
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "リクエスト本文が不正です (JSON parse error)" }, 400);
+  }
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "リクエスト本文が不正です" }, 400);
+  }
+  if (!body.segment_id || typeof body.segment_id !== "string") {
+    return c.json({ error: "segment_id は必須の文字列です" }, 400);
+  }
+  try {
     const id = body.id || ("code_" + Date.now());
     await db.prepare(`
       INSERT INTO scat_codes (id, segment_id, researcher_id, step1_keywords, step2_thesaurus, step3_concept, step4_theme, memo, created_at, updated_at)

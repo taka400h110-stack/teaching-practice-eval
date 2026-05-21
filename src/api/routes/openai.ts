@@ -620,7 +620,7 @@ export async function callOpenAI(
 // ────────────────────────────────────────────────────────────────
 // POST /api/ai/evaluate  (CoT-A)
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
@@ -686,7 +686,7 @@ openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher
 // ────────────────────────────────────────────────────────────────
 // POST /api/ai/reflection-depth  (CoT-B)
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
@@ -723,7 +723,7 @@ openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ
 // ────────────────────────────────────────────────────────────────
 // POST /api/ai/generate-goal  (CoT-C)
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
@@ -799,7 +799,7 @@ openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_te
 // POST /api/ai/chat  (省察チャット対話生成)
 // CoT-B判定後に適切な問いかけを生成
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/chat", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+openaiRouter.post("/chat", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
@@ -874,7 +874,7 @@ ${extractJournalText(body.journal_content).slice(0, 600)}...
 // POST /api/ocr/analyze  (OCR画像解析)
 // Google Cloud Vision API → Tesseract.js フォールバック
 // ────────────────────────────────────────────────────────────────
-openaiRouter.post("/analyze", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+openaiRouter.post("/analyze", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   // Cloudflare Workers では FormData パースが可能
   try {
     const formData = await c.req.formData();
@@ -970,7 +970,7 @@ openaiRouter.post("/analyze", requireRoles(["student", "teacher", "univ_teacher"
 
 
 // POST /api/ai/check-evidence (RQ3b GA-Evidence)
-openaiRouter.post("/check-evidence", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+openaiRouter.post("/check-evidence", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
 
@@ -1023,7 +1023,7 @@ JSON形式で出力してください:
 });
 
 // POST /api/ai/evaluate-session-rd (RQ3b RD-Chat Session-level holistic judgement)
-openaiRouter.post("/evaluate-session-rd", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+openaiRouter.post("/evaluate-session-rd", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
 
@@ -1080,7 +1080,7 @@ JSON形式で出力してください:
 
 
 // 論文 3.8節: SCAT質的分析のAI自動生成エンドポイント
-openaiRouter.post("/scat-analysis", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+openaiRouter.post("/scat-analysis", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   try {
     const { text, apiKey } = await c.req.json();
     if (!text) return c.json({ error: "Text is required" }, 400);
@@ -1156,7 +1156,7 @@ openaiRouter.post("/scat-analysis", requireRoles(["researcher", "admin", "collab
 
 
 // 毎日誌単位のSCAT個別実行
-openaiRouter.post("/scat-analysis/journal", requireRoles(["student", "researcher", "admin", "collaborator", "board_observer", "teacher", "univ_teacher", "school_mentor"]), async (c) => {
+openaiRouter.post("/scat-analysis/journal", requireRoles(["student", "researcher", "admin", "collaborator", "teacher", "univ_teacher", "school_mentor"]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
   
@@ -1283,6 +1283,6 @@ openaiRouter.post("/scat-analysis/journal", requireRoles(["student", "researcher
 
 export default openaiRouter;
 
-openaiRouter.post("/scat-analysis/batch", requireRoles(["researcher", "admin", "collaborator", "board_observer", "teacher"]), async (c) => {
+openaiRouter.post("/scat-analysis/batch", requireRoles(["researcher", "admin", "collaborator", "teacher"]), async (c) => {
   return c.json({ success: true, message: "Batch processing started" });
 });

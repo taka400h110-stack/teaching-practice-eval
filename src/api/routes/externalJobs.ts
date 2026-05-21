@@ -22,7 +22,7 @@ externalJobsRouter.get("/", requireRoles(["researcher", "admin", "collaborator",
 });
 
 // POST create a job
-externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -53,7 +53,7 @@ externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator"
 });
 
 // POST import results
-externalJobsRouter.post("/:id/complete", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+externalJobsRouter.post("/:id/complete", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
