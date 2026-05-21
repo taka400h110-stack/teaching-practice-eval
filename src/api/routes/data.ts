@@ -450,9 +450,22 @@ dataRouter.get("/journals", requireRoles(["student", "teacher", "univ_teacher", 
       if (!assertCanAccessStudent(scope, studentId)) {
         return c.json({ success: false, error: "forbidden", message: "この学生のデータにアクセスする権限がありません。" }, 403);
       }
-      query = db.prepare("SELECT * FROM journal_entries WHERE student_id = ? ORDER BY entry_date DESC LIMIT ?").bind(studentId, limit);
+      // 学生名を JOIN で取得し、一覧表示時に「誰の日誌か」を識別できるようにする
+      query = db.prepare(`
+        SELECT j.*, u.name as student_name
+        FROM journal_entries j
+        LEFT JOIN users u ON u.id = j.student_id
+        WHERE j.student_id = ?
+        ORDER BY j.entry_date DESC LIMIT ?
+      `).bind(studentId, limit);
     } else {
-      query = db.prepare(`SELECT * FROM journal_entries WHERE ${condition} ORDER BY entry_date DESC LIMIT ?`).bind(...params, limit);
+      query = db.prepare(`
+        SELECT j.*, u.name as student_name
+        FROM journal_entries j
+        LEFT JOIN users u ON u.id = j.student_id
+        WHERE ${condition.replace(/student_id/g, "j.student_id")}
+        ORDER BY j.entry_date DESC LIMIT ?
+      `).bind(...params, limit);
     }
 
     const { results } = await query.all();

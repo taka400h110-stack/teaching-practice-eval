@@ -69,9 +69,21 @@ export default function JournalListPage() {
               <Box display="flex" alignItems="center" gap={1}>
                 <MenuBookIcon sx={{ color: "text.secondary", flexShrink: 0 }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body1" fontWeight="bold" noWrap>{j.title}</Typography>
+                  <Typography variant="body1" fontWeight="bold" noWrap>
+                    {!isStudent && (j as any).student_name && (
+                      <Chip
+                        label={(j as any).student_name}
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                        sx={{ mr: 1 }}
+                      />
+                    )}
+                    {j.title || "（無題）"}
+                  </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {new Date(j.entry_date).toLocaleDateString("ja-JP")} ・ Week {j.week_number}
+                    {!isStudent && (j as any).student_id && ` ・ ${(j as any).student_id}`}
                   </Typography>
                 </Box>
                 <Chip label={cfg.label} color={cfg.color} size="small" />
