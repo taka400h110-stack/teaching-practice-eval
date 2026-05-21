@@ -11,8 +11,10 @@ export function getToken(): string | null {
 // API ベース URL (同一オリジン)
 export const API_BASE_URL = "";
 
-// 既存の Response 返却版 (後方互換) — レスポンス型を any にして data?.xxx 参照を許容
-export async function apiFetch(url: string, options: RequestInit = {}): Promise<any> {
+// 認証付き fetch ラッパ。生の Response を返す（呼び出し側で .json()/.clone() を行う）
+// 注意: 過去には Proxy で parsed body を露出していたが、Proxy 越しに Response.prototype.json/clone を
+// 呼ぶと内部スロット (this) が破損して「Illegal invocation」を起こすため廃止。
+export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const token = getToken();
   const headers = {
     ...options.headers,
@@ -26,26 +28,6 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     } catch {}
     if (typeof window !== "undefined") window.location.href = '/login';
     throw new Error("Unauthorized or token expired");
-  }
-  // 呼び出し側が .json()/.ok/.status を使う場合と、直接プロパティを使う場合の両方に対応
-  // Content-Type が JSON の場合は parsed body にプロキシしておく
-  const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    try {
-      const parsed = await res.clone().json();
-      // 元 Response の ok/status/json/text/headers を保持しつつ parsed のフィールドも参照可能にする
-      return new Proxy(res as any, {
-        get(target, prop, receiver) {
-          if (prop in target) return Reflect.get(target, prop, receiver);
-          if (parsed && typeof parsed === "object" && prop in (parsed as any)) {
-            return (parsed as any)[prop as any];
-          }
-          return undefined;
-        },
-      });
-    } catch {
-      return res;
-    }
   }
   return res;
 }
