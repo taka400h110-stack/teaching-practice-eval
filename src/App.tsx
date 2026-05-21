@@ -125,9 +125,9 @@ export default function App() {
           <Route path="admin"             element={<PrivateRoute allowedRoles={["admin", "researcher", "collaborator", "board_observer"]}><AdminDashboardPage /></PrivateRoute>} />
 
           {/* 日誌 */}
-          <Route path="journals"                    element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor"]}><JournalListPage /></PrivateRoute>} />
+          <Route path="journals"                    element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><JournalListPage /></PrivateRoute>} />
           <Route path="journals/new"                element={<PrivateRoute allowedRoles={["student"]}><JournalEditorPage /></PrivateRoute>} />
-          <Route path="journals/:journalId"         element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor"]}><JournalDetailPage /></PrivateRoute>} />
+          <Route path="journals/:journalId"         element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><JournalDetailPage /></PrivateRoute>} />
           <Route path="journals/:journalId/edit"    element={<PrivateRoute allowedRoles={["student"]}><JournalEditorPage /></PrivateRoute>} />
 
           {/* 実習ワークフロー（日誌+AI評価+チャット統合） */}
