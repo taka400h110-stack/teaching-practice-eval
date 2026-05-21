@@ -2678,6 +2678,52 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
   }
 });
 
+// PATCH /journals/:id/comment
+// 大学教員 / 校内指導教員 / 管理者が日誌へのコメントを保存・更新するための専用エンドポイント
+// body: { univ_teacher_comment?: string, school_mentor_comment?: string, teacher_comment?: string }
+dataRouter.patch(
+  "/journals/:id/comment",
+  requireRoles(["univ_teacher", "teacher", "school_mentor", "admin"] as UserRole[]),
+  async (c) => {
+    const db = c.env?.DB;
+    if (!db) return c.json({ error: "DB not configured" }, 503);
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+
+    try {
+      const target = await db.prepare("SELECT student_id FROM journal_entries WHERE id = ?").bind(id).first();
+      if (!target) return c.json({ error: "見つかりません" }, 404);
+
+      // スコープチェック (担当外の学生にコメント不可)
+      const scope = await getScopeContext(c, db);
+      if (!assertCanAccessStudent(scope, target.student_id as string)) {
+        return c.json({ success: false, error: "forbidden", message: "この学生にコメントする権限がありません。" }, 403);
+      }
+
+      // 受け入れ可能カラムを限定
+      const allowed = ["univ_teacher_comment", "school_mentor_comment", "teacher_comment"] as const;
+      const updates: string[] = [];
+      const values: unknown[] = [];
+      for (const k of allowed) {
+        if (typeof body[k] === "string") {
+          updates.push(`${k} = ?`);
+          values.push(body[k]);
+        }
+      }
+      if (updates.length === 0) {
+        return c.json({ success: false, error: "no_valid_fields" }, 400);
+      }
+      updates.push("updated_at = CURRENT_TIMESTAMP");
+      values.push(id);
+      await db.prepare(`UPDATE journal_entries SET ${updates.join(", ")} WHERE id = ?`).bind(...values).run();
+      const updated = await db.prepare("SELECT * FROM journal_entries WHERE id = ?").bind(id).first();
+      return c.json({ success: true, journal: updated });
+    } catch (err) {
+      return c.json({ error: String(err) }, 500);
+    }
+  }
+);
+
 dataRouter.delete("/journals/:id", requireRoles(["student", "admin"] as UserRole[]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);

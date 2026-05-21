@@ -570,21 +570,27 @@ const JournalDetailPage: React.FC = () => {
   const [commentText, setCommentText] = useState("");
   const [commentSaved, setCommentSaved] = useState(false);
 
+  // コメント種別はログインユーザーのロールで判定する
+  // (DBスキーマに internship_type カラムが無いため。
+  //  ロールごとに自分のコメント欄を扱う設計に変更)
+  const isMentorRole  = userRole === "school_mentor";
+  const isTeacherRole = userRole === "univ_teacher" || userRole === "teacher";
+
   useEffect(() => {
     if (journal) {
-       const isIntensive = (journal as any).internship_type === "intensive";
-       const existing = isIntensive
+       const existing = isMentorRole
          ? (journal.school_mentor_comment ?? journal.teacher_comment ?? "")
          : (journal.univ_teacher_comment ?? journal.teacher_comment ?? "");
        setCommentText(existing);
     }
-  }, [journal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [journal, isMentorRole]);
 
   const commentMutation = useMutation<void, Error, string>({
     mutationFn: async (text: string) => {
-      const isIntensive = (journal as any).internship_type === "intensive";
-      const field = isIntensive ? "school_mentor_comment" : "univ_teacher_comment";
-      await apiClient.updateJournal(journalId!, { [field]: text } as Record<string, unknown>);
+      const field = isMentorRole ? "school_mentor_comment" : "univ_teacher_comment";
+      // PATCH /journals/:id/comment (大学教員・校内指導教員・管理者向け専用)
+      await apiClient.updateJournalComment(journalId!, { [field]: text });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
@@ -607,20 +613,23 @@ const JournalDetailPage: React.FC = () => {
   const isNewFormat = hourRecords !== null;
 
   // ── コメント入力 ──
-  // 実習形態ベースでコメント種別を判定
-  const internshipType = (journal as any).internship_type;
-  const isIntensive = internshipType === "intensive";
-  
-  // 入力権限判定（実習形態に基づく）
+  // ロールに応じてコメント欄の見た目を切り替え
+  // - school_mentor : 校内指導教員コメント (オレンジ系)
+  // - univ_teacher  : 大学教員コメント (ブルー系)
+  // 旧ロジックで参照していた isIntensive は色分けにのみ使う
+  const isIntensive = isMentorRole; // 表示色分け用エイリアス(後方互換)
+
+  // 入力権限: 大学教員・校内指導教員・管理者
   const canInputComment =
-    (userRole === "univ_teacher" && !isIntensive) ||       // 分散実習 → 大学教員
-    (userRole === "school_mentor" && isIntensive) ||        // 集中実習 → 校内指導教員
-    userRole === "admin";                                   // 管理者は全対応
+    userRole === "univ_teacher" ||
+    userRole === "teacher"      ||
+    userRole === "school_mentor"||
+    userRole === "admin";
 
   // 学生自身もコメントの閲覧が可能
   const canViewComment = canInputComment || userRole === "student";
 
-  const existingComment = isIntensive
+  const existingComment = isMentorRole
     ? (journal?.school_mentor_comment ?? journal?.teacher_comment ?? "")
     : (journal?.univ_teacher_comment ?? journal?.teacher_comment ?? "");
 
@@ -815,32 +824,29 @@ const JournalDetailPage: React.FC = () => {
       ──────────────────────────────────────────────────────── */}
       {canViewComment && (
         <Box sx={{ mb: 3 }}>
-          {internshipType === "distributed" || (!isIntensive && journal.student_grade && journal.student_grade <= 3) ? (
-            /* 分散実習：大学教員コメント */
-            (journal.univ_teacher_comment || journal.teacher_comment) && (
-              <Section
-                icon={<CommentIcon />}
-                title="大学教員コメント"
-                color="#1565C0"
-                bgcolor="#E3F2FD"
-                borderColor="#90CAF9"
-              >
-                <BodyText text={journal.univ_teacher_comment ?? journal.teacher_comment ?? ""} />
-              </Section>
-            )
-          ) : (
-            /* 集中実習：実習先（校内指導教員）コメント */
-            (journal.school_mentor_comment || journal.teacher_comment) && (
-              <Section
-                icon={<CommentIcon />}
-                title="実習先コメント"
-                color="#E65100"
-                bgcolor="#FFF3E0"
-                borderColor="#FFCC80"
-              >
-                <BodyText text={journal.school_mentor_comment ?? journal.teacher_comment ?? ""} />
-              </Section>
-            )
+          {/* 大学教員コメント（存在すれば表示） */}
+          {(journal.univ_teacher_comment || (!journal.school_mentor_comment && journal.teacher_comment)) && (
+            <Section
+              icon={<CommentIcon />}
+              title="大学教員コメント"
+              color="#1565C0"
+              bgcolor="#E3F2FD"
+              borderColor="#90CAF9"
+            >
+              <BodyText text={journal.univ_teacher_comment ?? journal.teacher_comment ?? ""} />
+            </Section>
+          )}
+          {/* 実習先（校内指導教員）コメント（存在すれば表示） */}
+          {journal.school_mentor_comment && (
+            <Section
+              icon={<CommentIcon />}
+              title="実習先コメント"
+              color="#E65100"
+              bgcolor="#FFF3E0"
+              borderColor="#FFCC80"
+            >
+              <BodyText text={journal.school_mentor_comment} />
+            </Section>
           )}
         </Box>
       )}

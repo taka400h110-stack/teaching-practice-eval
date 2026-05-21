@@ -299,6 +299,23 @@ const apiClient = {
     if (!res.ok) throw new Error("Failed to update journal");
     return await res.json();
   },
+  // 大学教員 / 校内指導教員 / 管理者が日誌コメントだけを保存する専用API
+  // PUT /journals/:id は学生限定のため、コメントだけは PATCH /journals/:id/comment を使う
+  updateJournalComment: async (
+    id: string,
+    fields: { univ_teacher_comment?: string; school_mentor_comment?: string; teacher_comment?: string }
+  ): Promise<JournalEntry> => {
+    const res = await apiFetch(`/api/data/journals/${id}/comment`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`Failed to update journal comment: ${res.status} ${txt}`);
+    }
+    return await res.json();
+  },
   deleteJournal: async (id: string): Promise<void> => {
     const res = await apiFetch(`/api/data/journals/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem('auth_token')}` } });
     if (!res.ok) throw new Error("Failed to delete journal");
