@@ -20,10 +20,14 @@
   - 人: 4因子を直接評価 (複数人なら平均)
   - ICC: 4因子レベルで AI vs 人を比較
 
-### 分析手法仕様
+### 分析手法仕様 (RQ3 構造分析系統)
+- **`analysis/scat_to_ism_pipeline.md`** — 🌟 SCAT → ISM/SP/T 連動仕様 (重要)
 - `analysis/ism_spec.md` — ISM (Interpretive Structural Modeling)
 - `analysis/sp_table_spec.md` — S-P 表 (Student-Problem)
 - `analysis/transmission_spec.md` — 伝達係数
+
+これらは **SCAT のネットワーク構造を上流とする派生分析** であり、
+SCAT が更新されるたびに自動再計算される設計 (ユーザ指示 2026-05-21)。
 
 ### 監査レポート
 - `audit/role_researcher.md` — researcher 監査

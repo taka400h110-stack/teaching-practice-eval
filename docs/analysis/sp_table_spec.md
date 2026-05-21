@@ -16,6 +16,23 @@ ISM 分析で抽出した **学習要素** を「問題 (Problem)」として、
 - 問題 (= 学習要素) ごとの定着度
 - 個々のずれ (caution index) を可視化する
 
+## 1.1 データソースと更新タイミング (重要)
+
+**SP 表の問題 (列) は ISM のノードから自動生成される** (ユーザ指示 2026-05-21)。
+
+```
+SCAT step4_theme  ──→  ISM ノード  ──→  SP 表の問題 (P_1, P_2, ..., P_m)
+                                            │
+        各日誌 (振り返り) を走査  ────────  │  ← セル 0/1 の判定
+                                            ▼
+                                     S-P 行列が完成
+```
+
+- 列 (問題) = ISM ノード = SCAT の `step4_theme` (重複除去)
+- セル `cell[i][j]` = 学生 `S_i` の対象期間の日誌に問題 `P_j` (テーマ) が出現するか
+- **SCAT の `step4_theme` が更新されるたびに、ISM ノード集合が変わるため SP 表も自動再計算**
+- 連動仕様の詳細: `docs/analysis/scat_to_ism_pipeline.md`
+
 ---
 
 ## 2. データ構造
@@ -153,12 +170,14 @@ GET    /api/data/sp-tables?course_id=...
 
 | 項目 | 現状 | 必要作業 |
 |---|---|---|
-| 0/1 判定ロジック | 未実装 | キーワード or AI 連携 |
-| 行列計算 | なし | `src/utils/sp-table.ts` 新設 |
+| 問題 (列) の決定 | **SCAT/ISM ノードから自動 (設計済)** | ISM 実装と同時に |
+| 0/1 判定ロジック | 未実装 | キーワードマッチ or AI 連携 |
+| 行列計算 | なし | `src/utils/sp_table.ts` 新設 |
 | 注意係数計算 | なし | 同上 |
 | UI 表 | placeholder のみ | テーブルコンポーネント実装 |
 | API ルート | なし | `src/api/routes/sp.ts` 新設 |
 | DB | なし | `sp_tables` テーブル migration |
+| **SCAT 連動再計算** | **未実装** | `POST /scat/codes` 等にフック (`scat_to_ism_pipeline.md` 参照) |
 
 ---
 

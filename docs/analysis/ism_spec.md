@@ -12,6 +12,17 @@
 要素間の階層・依存・伝達関係を明らかにする。
 これにより、学生の省察が「どの概念から始まり、どこに到達したか」を構造的に把握できる。
 
+## 1.1 上流データ源 (重要)
+
+**ISM の入力ネットワーク構造は SCAT 分析から自動生成される** (ユーザ指示 2026-05-21)。
+
+- 入力: `GET /api/data/scat/network` の `{ nodes, edges }`
+  - ノード = SCAT の `step4_theme` (テーマ) をパースして得たユニーク値
+  - エッジ = 同一グループ (= 同一日誌 / 同一プロジェクト) 内で共起するテーマペア
+- **ISM の隣接行列 A は SCAT のエッジ重みを 0/1 に二値化したもの**
+- SCAT の `step4_theme` が更新されるたびに **ISM・SP表・伝達係数を自動再計算**
+- 詳細: `docs/analysis/scat_to_ism_pipeline.md`
+
 ---
 
 ## 2. パイプライン
@@ -145,13 +156,17 @@ GET    /api/data/ism/analyses?journal_id=...   # 一覧
 
 | 項目 | 現状 | 必要作業 |
 |---|---|---|
-| 要素抽出 | 未実装 (SCAT のセグメントを流用可) | OpenAI 連携 or 手動入力 UI |
-| 隣接行列入力 | UI なし | 行列エディタコンポーネント |
+| 要素抽出 | **SCAT `step4_theme` から自動 (実装済)** | `GET /scat/network` を流用するだけで OK |
+| 隣接行列の生成 | SCAT 共起から **自動派生する設計**。手動入力 UI は不要 | SCAT エッジ重み → 0/1 二値化のヘルパ実装 |
 | 可到達行列計算 | なし | Warshall を `src/utils/ism.ts` に実装 |
 | レベル分割 | なし | 同上 |
 | DAG 描画 | なし | cytoscape ラッパ |
 | API ルート | なし | `src/api/routes/ism.ts` 新設 |
 | DB スキーマ | なし | `ism_analyses` テーブル追加 (migration) |
+| **SCAT 連動再計算** | **未実装** | `POST /scat/codes` 等にフック追加 (詳細: `scat_to_ism_pipeline.md`) |
+
+> ⚠️ **重要設計原則**: ユーザ直接編集の隣接行列エディタは設けない。
+> ISM は **SCAT ネットワークから一意に導出される派生データ** とする (single source of truth = SCAT)。
 
 ---
 

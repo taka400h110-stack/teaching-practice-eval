@@ -156,3 +156,59 @@ ICC と同様、**4 因子レベル** で計算する。
 - Hatton & Smith (1995). Reflection in teacher education: Towards definition and implementation. *Teaching and Teacher Education*, 11(1), 33-49.
 - Shrout & Fleiss (1979). Intraclass correlations: Uses in assessing rater reliability.
 - Krippendorff (2018). *Content Analysis: An Introduction to Its Methodology* (4th ed.)
+
+---
+
+## 8. 周辺分析との関係 (システム全体のデータフロー)
+
+本評価モデル (RQ2) は ICC・信頼性分析を担う独立系統。
+これとは別に、SCAT を起点とした構造分析系統 (RQ3) が存在する。
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ 入力                                                                  │
+│   学生の実習日誌 (journals)                                          │
+└────────┬────────────────────────────────────────────────────────────┘
+         │
+         ├───────────────────────────────────────┐
+         ▼                                       ▼
+┌─────────────────────────┐         ┌─────────────────────────┐
+│ 評価系統 (RQ2)            │         │ 構造分析系統 (RQ3)        │
+│                          │         │                          │
+│  AI: 23項目 個別評価     │         │  SCAT 分析               │
+│       ↓ 因子平均         │         │   ↓                      │
+│  AI 4因子スコア          │         │  step4_theme (テーマ抽出) │
+│                          │         │   ↓                      │
+│  人: 4因子 直接評価      │         │  SCAT ネットワーク        │
+│   ↓ 複数人なら平均       │         │  (nodes, edges)          │
+│  人 4因子スコア          │         │   ↓                      │
+│                          │         │  ┌─────┬──────┬───────┐ │
+│  ↓ ICC / α / Pearson    │         │  ▼     ▼      ▼       │ │
+│  信頼性分析              │         │ ISM   SP表   伝達係数  │ │
+│  (4因子レベル)           │         │      ★連動再計算       │ │
+└──────────────────────────┘         └──────────────────────────┘
+                                                  │
+                                                  ▼
+                                       SCAT が更新されるたびに
+                                       自動再計算
+                                       (scat_to_ism_pipeline.md)
+```
+
+### 8.1 系統の独立性
+
+- **評価系統 (RQ2)** は人とAIの一致度を測る系統。ICC・α・Pearson が中心
+- **構造分析系統 (RQ3)** は省察の構造を可視化する系統。ISM・SP・伝達係数が中心
+- **2 系統は相互に独立**: 評価モデルの変更が ISM に影響したり、SCAT の更新が ICC に影響したりしない
+
+### 8.2 共通の入力
+
+両系統とも入力は同じ **学生の実習日誌**:
+- 評価系統: 日誌本文を OpenAI に渡して 23 項目評価
+- 構造分析系統: 日誌本文を SCAT で 4 段階コーディング → ネットワーク化
+
+### 8.3 関連ドキュメント
+
+- `docs/analysis/scat_to_ism_pipeline.md` — SCAT → ISM/SP/T の連動仕様
+- `docs/analysis/ism_spec.md` — ISM 単体仕様
+- `docs/analysis/sp_table_spec.md` — SP 表仕様
+- `docs/analysis/transmission_spec.md` — 伝達係数仕様
