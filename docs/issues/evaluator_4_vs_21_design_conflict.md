@@ -1,107 +1,93 @@
-# 評価者ロール: 4軸評価 vs 21項目評価の設計衝突
+# 評価者ロール: 4因子評価 vs 23項目評価の設計衝突
 
-**Status**: Open  
-**Priority**: Medium (UX/データ整合性に関わる重要な意思決定が必要)  
-**Identified**: 2026-05 (evaluator ロール監査)  
-**Affected Role**: `evaluator`  
+**Status**: ✅ **RESOLVED (2026-05-21)** — 仕様確定 (`docs/evaluation_model.md` に正式仕様)
+**Priority**: Medium (UX/データ整合性に関わる重要な意思決定が必要だった)
+**Identified**: 2026-05 (evaluator ロール監査)
+**Resolved**: 2026-05-21 (ユーザによる仕様明示)
+**Affected Role**: `evaluator`
 **Affected Pages**: `/evaluations`, `/evaluations/:journalId`, `/evaluations/:journalId/human`, `/reliability`, `/comparison`
 
 ---
 
-## 概要
+## 確定された仕様 (2026-05-21)
 
-評価者ロールに対して、システム内で **2種類の評価モデル** が並列して存在しており、UI/UX とデータの両面で整合性が取れていない。具体的には:
+ユーザ指示により、以下が **正式仕様** として確定:
 
-- **4軸モデル** (Curiosity / Reflection / Empathy / Engagement 等の4つの大分類)
-- **21項目モデル** (大分類の下位にある詳細な評価項目 21個)
+> ICCなどの分析は AI が **23項目** を一つずつ評価し因子ごとに平均化、
+> 人による評価は **4因子** を評価、平均化したものと、
+> 人は複数人の平均または個人を値として分析する。
 
-両モデルが画面・API・統計分析の各所で混在しており、評価者は「どの粒度で評価を入力すべきか」「ICC計算はどちらに基づくのか」が判別困難になっている。
+### 結論
+
+| 軸 | 主体 | 入力粒度 | 集計 |
+|---|---|---|---|
+| **AI** | OpenAI による評価 | **23 項目を 1 項目ずつ** | 因子ごとに**平均**して 4 因子スコア化 |
+| **人** | 評価者 (`evaluator` ロール等) | **4 因子を直接** | 複数人なら**平均**、個人なら個人値 |
+| **ICC** | AI vs 人 | **4 因子レベルで比較** | 因子別 + 全体 |
+
+監査時に書いた 「21項目」は **誤記**。コードベースでは一貫して **23項目** (`src/constants/rubric.ts` の `RUBRIC_FACTORS[].itemRange` の合計 7+6+4+6 = 23)。
+
+正式仕様: **`docs/evaluation_model.md`** を参照。
 
 ---
 
-## 観察された現象
+## 監査時の症状記録 (アーカイブ)
 
-### 1. UI 上の混在
-- `HumanEvaluationPage` (`/evaluations/:journalId/human`) で 4軸と 21項目の両方の入力フォームが提示される場面がある
-- 評価入力フォーム内で、上位 4軸の点数と下位 21項目の点数が独立に編集可能で、合計値・平均値の関係が UI 上で示されていない
-- `ComparisonPage` (`/comparison`) ではどちらの粒度で比較するかをユーザが選択できない（固定）
+### 1. UI 上の混在 (実装の現状)
+- `HumanEvaluationPage` (`/evaluations/:journalId/human`) で 4因子と 23項目の両方の入力フォームが提示される
+- 評価入力フォーム内で、上位 4因子の点数と下位 23項目の点数が独立に編集可能で、合計値・平均値の関係が UI 上で示されていない
+- `ComparisonPage` (`/comparison`) ではどちらの粒度で比較するかをユーザが選択できない
 
 ### 2. API レイヤの混在
-- `POST /api/data/human-evals` の `items[]` が、4軸の id を含むレコードと 21項目の id を含むレコードを同列に受け付ける
+- `POST /api/data/human-evals` の `items[]` が、因子の id を含むレコードと項目の id を含むレコードを同列に受け付ける
 - データベース上 `human_eval_items` テーブルは粒度の区別を `category` か `item_id` で行っているが、フロントエンドの送信ペイロードでは粒度が暗黙化されている
 
 ### 3. 統計指標の不整合
-- ICC (`POST /api/data/icc-results`) の `factor` フィールドが「4軸の名前」を期待する箇所と「21項目の id」を期待する箇所が混在
-- Krippendorff α、Pearson r などの一致係数も、どの粒度で計算したかが結果テーブル上で識別困難
-- `ReliabilityAnalysisPage` が「全体」「4軸」「21項目」のどれを表示しているかが画面タイトル上で明確でない
+- ICC (`POST /api/data/icc-results`) の `factor` フィールドが「4因子の名前」を期待する箇所と「23項目の id」を期待する箇所が混在
 
-### 4. ドキュメント不在
-- 4軸と 21項目の正式な定義（どの項目がどの軸に属するか）がコードベース内に集約されていない
-- 評価者向けの操作マニュアルが存在せず、運用ルールが暗黙知化している
+### 4. ドキュメント不在 (本ファイル作成で解消)
+- 4因子と 23項目の正式な定義 → `src/constants/rubric.ts` および `docs/evaluation_model.md` で集約
 
 ---
 
-## なぜこれが問題か
+## 解消アクション
 
-1. **データの信頼性低下**: 評価者ごとに「4軸を埋める人 / 21項目を埋める人 / 両方埋める人」が混在すると、ICC やα係数の解釈が不可能になる
-2. **学習負荷**: 新規評価者の教育コストが高い（どこを入力すべきか自明でない）
-3. **再現性の欠如**: 研究データとして外部に提出する際、「この ICC は何粒度のものか」を明示できない
-4. **将来の拡張困難**: 4軸 / 21項目以外の新しい評価フレーム（例: 文部科学省指針の 5領域）を導入する際の影響範囲が読めない
+### ✅ 完了
 
----
+- [x] **仕様確定**: `docs/evaluation_model.md` 作成 (確定仕様の単一情報源)
+- [x] **本 Issue を Resolved に**: 上記決定を本ファイル冒頭に記載
+- [x] **入力バリデーション強化**: `POST /human-evals` で `items` 必須・配列化を 400 で返す
 
-## 解決の選択肢
+### 🔜 残作業 (別タスク)
 
-### Option A: 21項目を一次データ、4軸を派生指標とする (推奨)
-
-- **入力**: 評価者は 21項目のみ入力。4軸スコアは集計時に自動算出
-- **API**: `POST /human-evals` は 21項目のみ受け付け、4軸の値は計算で導出
-- **UI**: `HumanEvaluationPage` から 4軸入力欄を削除、結果ページで自動算出値として表示
-- **統計**: ICC・α は 21項目を一次、4軸は二次として並記
-- **メリット**: 単一情報源、粒度の不一致が物理的に発生しない
-- **デメリット**: 既存の 4軸入力データの扱い（マイグレーション）が必要
-
-### Option B: 4軸を一次データ、21項目はオプション
-
-- **入力**: 評価者は 4軸を必須、21項目は詳細解析用にオプション
-- **API**: `human_eval_items.category` で粒度を明示
-- **UI**: 4軸入力タブと「詳細項目を入力する」展開ボタンで分離
-- **統計**: 4軸での一致係数を主、21項目は補助指標として扱う
-- **メリット**: 評価者の入力負荷が軽い
-- **デメリット**: 21項目の値が欠損したサンプルが多くなり、詳細分析が困難
-
-### Option C: モード選択を運用ルールとして明文化
-
-- **入力**: 評価セッション開始時に「4軸モード」「21項目モード」「両方モード」を選択
-- **API**: `human_evals.mode` カラムを追加
-- **UI**: ダッシュボードで現在のモードを明示、ICCも mode 別に集計
-- **メリット**: 既存実装の影響が最小
-- **デメリット**: モード間の比較が困難、評価者間でモードがばらつく可能性
-
----
-
-## 推奨アクション
-
-1. **意思決定会議**: 研究者・評価者・管理者が集まり、Option A〜C のいずれかを選定（できれば 2 週間以内）
-2. **マイグレーション計画**: 選定後、既存データの再マッピング方針を策定
-3. **UI 改修**: 選定モデルに沿って `HumanEvaluationPage` を簡素化（評価者の認知負荷削減）
-4. **ドキュメント整備**: 4軸 / 21項目の正式定義を `docs/evaluation_model.md` として明文化
-5. **テスト追加**: Playwright で「評価者が 1ジャーナルに対し全項目を入力 → 統計に反映される」E2E テストを追加
+- [ ] **UI 改修**: `HumanEvaluationPage` から 23項目入力欄を撤去、4因子のみに簡素化
+- [ ] **サーバ側バリデーション強化**:
+  - `human-evals.items.length === 4` を必須化
+  - `items[].factor` を `factor1|factor2|factor3|factor4` に限定
+  - `items[].score` を 1–5 整数に限定
+- [ ] **ICC 計算ロジック**: `factor` が 4因子のみを受け取るよう改修、項目 ID は廃止
+- [ ] **既存データのマイグレーション**:
+  - `human_eval_items` で項目 ID を持つレコードを因子に集約 (平均化)
+  - `icc_results.factor` の非正規値を正規化
+- [ ] **テスト**: 4因子 ICC の単体テストを追加 (`tests/unit/icc.spec.ts`)
 
 ---
 
 ## 関連ファイル
 
 - `src/api/routes/data.ts` — `POST /human-evals`, `POST /icc-results`
-- `src/pages/HumanEvaluationPage.tsx` — 評価入力フォーム
+- `src/api/routes/openai.ts` — AI による 23 項目評価 (`POST /evaluate`)
+- `src/constants/rubric.ts` — 4因子 23項目の正式定義 (single source of truth)
+- `src/pages/HumanEvaluationPage.tsx` — 評価入力フォーム (改修対象)
 - `src/pages/EvaluationResultPage.tsx` — 評価結果表示
 - `src/pages/ComparisonPage.tsx` — AI vs Human 比較
 - `src/pages/ReliabilityAnalysisPage.tsx` — 信頼性分析
-- `docs/audit/role_evaluator.md` — 監査レポート（本問題の発見記録）
+- `docs/evaluation_model.md` — 確定仕様 (本 Issue の解決によって作成)
+- `docs/audit/role_evaluator.md` — 監査レポート (本問題の発見記録)
 
 ---
 
 ## 補足: 監査時の所見
 
-evaluator ロール監査 (2026-05) において、`/evaluations` 一覧に表示される件数（4 件）と `/reliability` 集計の対象件数（21 項目換算で多数）の差が、本問題の症状の一つとして観測された。  
+evaluator ロール監査 (2026-05) において、`/evaluations` 一覧に表示される件数（4 件）と `/reliability` 集計の対象件数（多数）の差が、本問題の症状の一つとして観測された。
 これは Playwright での自動検証時、`table tbody tr` のカウントが Material UI Card 構造とは合わず、別途 `data-testid` ベースの確認が必要となった件とも関連する。
