@@ -2570,8 +2570,14 @@ dataRouter.post("/scat/segments/:projectId", requireRoles(["researcher", "admin"
   try {
     const { segments } = body;
     const projectId = c.req.param("projectId");
-    const stmt = db.prepare("INSERT INTO scat_segments (id, project_id, journal_id, text_content) VALUES (?, ?, ?, ?)");
-    const batch = segments.map((s: any) => stmt.bind("seg_" + Math.random().toString(36).substr(2, 9), projectId, s.journal_id || null, s.text_content));
+    const stmt = db.prepare("INSERT INTO scat_segments (id, project_id, segment_order, text_content, source_journal_id) VALUES (?, ?, ?, ?, ?)");
+    const batch = segments.map((s: any, idx: number) => stmt.bind(
+      "seg_" + Math.random().toString(36).substr(2, 9),
+      projectId,
+      typeof s.segment_order === "number" ? s.segment_order : idx + 1,
+      s.text_content,
+      s.journal_id || s.source_journal_id || null
+    ));
     if (batch.length > 0) {
       await db.batch(batch);
     }
