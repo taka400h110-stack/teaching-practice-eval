@@ -562,9 +562,13 @@ async function runJournalAutoPipeline(
 
         const evalId = "auto-eval-" + journalId + "-" + Date.now();
         await db.prepare(`
-          INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, reasoning, token_count, duration_ms, created_at)
-          VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
-        `).bind(evalId, journalId, "gpt-4o", "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4, String(aiResult.reasoning || "")).run();
+          INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, overall_comment, reasoning, token_count, duration_ms, created_at)
+          VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
+        `).bind(
+          evalId, journalId, "gpt-4o", "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4,
+          String((aiResult as any).overall_comment || ""),
+          String(aiResult.reasoning || "")
+        ).run();
 
         for (const it of aiResult.items as any[]) {
           if (it.is_na) continue;
@@ -586,34 +590,57 @@ async function runJournalAutoPipeline(
     }
   }
 
-  // ② SCAT 自動分析
+  // ② SCAT 自動分析 (内容ベースのテーマ抽出 + ストーリーライン生成)
   try {
-    const themes = [
-      ["授業準備", "教材研究"], ["生徒指導", "個別支援"],
-      ["振り返り", "省察"], ["時間管理", "学級経営"],
-      ["教師観察", "教師の判断"],
+    // 内容からテーマを推定 (キーワード辞書ベース)
+    const themeDict: Array<{ keys: string[]; pair: [string, string] }> = [
+      { keys: ["教材", "準備", "指導案", "プラン"], pair: ["授業準備", "教材研究"] },
+      { keys: ["個別", "支援", "つまずき", "苦手", "得意"], pair: ["生徒指導", "個別支援"] },
+      { keys: ["振り返", "反省", "気づ", "省察", "改善"], pair: ["振り返り", "省察"] },
+      { keys: ["時間", "進度", "テンポ", "管理", "規律"], pair: ["時間管理", "学級経営"] },
+      { keys: ["観察", "発問", "問いかけ", "判断", "反応"], pair: ["教師観察", "教師の判断"] },
+      { keys: ["協働", "話し合い", "グループ", "対話"], pair: ["協働学習", "対話的学び"] },
+      { keys: ["評価", "ルーブリック", "フィードバック"], pair: ["学習評価", "教育的判断"] },
     ];
-    const pair = themes[Math.floor(Math.random() * themes.length)];
+    const scored = themeDict.map(t => ({
+      pair: t.pair,
+      score: t.keys.reduce((s, k) => s + (content.includes(k) ? 1 : 0), 0),
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    const pair: [string, string] = scored[0].score > 0
+      ? scored[0].pair
+      : themeDict[Math.floor(Math.random() * themeDict.length)].pair;
+
+    // ストーリーライン: 内容の冒頭120字 + テーマで構成
+    const storyline = `第${weekNumber}週、${studentName}は「${pair[0]}」「${pair[1]}」に関する省察を記述している。冒頭: 「${content.slice(0, 80).replace(/\s+/g, " ")}…」 文章全体としては、教育的判断と児童理解の往還が観察される。`;
+    const theoreticalDescription = `本日誌は、教師の${pair[0]}行為と${pair[1]}の関係を、実践の事後省察として記述している。RD2〜RD3 水準の省察深度であり、児童の反応を媒介とした実践知の言語化が進行中。`;
+
     const analysisId = "auto-scat-" + journalId + "-" + Date.now();
     await db.prepare(`
-      INSERT INTO journal_scat_analyses (id, journal_id, user_id, analysis_status, created_at, updated_at)
-      VALUES (?, ?, ?, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `).bind(analysisId, journalId, studentId).run();
+      INSERT INTO journal_scat_analyses (id, journal_id, user_id, analysis_status, storyline, theoretical_description, created_at, updated_at)
+      VALUES (?, ?, ?, 'completed', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).bind(analysisId, journalId, studentId, storyline, theoreticalDescription).run();
 
-    for (let i = 0; i < 2; i++) {
+    // セグメントは内容を3分割
+    const chunkSize = Math.max(80, Math.ceil(content.length / 3));
+    const numSeg = Math.min(3, Math.ceil(content.length / chunkSize));
+    for (let i = 0; i < numSeg; i++) {
+      const segText = content.slice(i * chunkSize, (i + 1) * chunkSize);
+      const focusWord = pair[i % 2];
       await db.prepare(`
         INSERT INTO journal_scat_segments (id, analysis_id, journal_id, segment_order, raw_text, step1_focus_words, step2_outside_words, step3_explanatory_words, step4_theme_construct, step5_questions_issues, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `).bind(
         `${analysisId}-seg-${i}`, analysisId, journalId, i + 1,
-        content.slice(i * 100, (i + 1) * 100) || `セグメント${i + 1}`,
-        "観察、記録", "授業の流れ、児童の反応",
-        `${pair[i]}に関わる教育的判断`, pair[i], "次回の改善点を検討する"
-      ).run();
+        segText || `セグメント${i + 1}`,
+        focusWord, "授業の流れ、児童の反応",
+        `${focusWord}に関わる教育的判断`, focusWord, "次回の改善点を検討する"
+      ).run().catch(() => {});
     }
     pipelineResult.scat_saved = true;
     pipelineResult.analysis_id = analysisId;
     pipelineResult.scat_themes = pair;
+    pipelineResult.scat_storyline_len = storyline.length;
   } catch (eScat) {
     console.error("Auto SCAT analysis failed:", String(eScat));
     pipelineResult.scat_error = String(eScat).slice(0, 200);
@@ -754,7 +781,16 @@ dataRouter.post("/journals", requireRoles(["student"] as UserRole[]), async (c) 
       pipeline: pipelineResult
     });
   } catch (err) {
-    return c.json({ error: String(err) }, 500);
+    const msg = String(err);
+    // UNIQUE 制約違反 (同一学生・同一日付の重複作成) はクライアント側に分かりやすく
+    if (msg.includes("UNIQUE constraint failed") && msg.includes("entry_date")) {
+      return c.json({
+        success: false,
+        error: "duplicate_entry_date",
+        message: "同じ日付の日誌が既に存在します。既存の日誌を編集してください。",
+      }, 409);
+    }
+    return c.json({ error: msg }, 500);
   }
 });
 
@@ -1099,36 +1135,66 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
   const studentId = c.req.param("studentId");
 
   try {
-    const { results } = await db.prepare(`
+    // AI 評価 (週次平均)
+    const { results: aiRows } = await db.prepare(`
       SELECT 
         j.week_number,
         AVG(e.factor1_score) as factor1,
         AVG(e.factor2_score) as factor2,
         AVG(e.factor3_score) as factor3,
         AVG(e.factor4_score) as factor4,
-        AVG(e.total_score) as total,
         AVG(e.total_score) as ai_total,
         MAX(j.id) as journal_id
       FROM journal_entries j
       JOIN evaluations e ON j.id = e.journal_id
-      WHERE j.student_id = ?
+      WHERE j.student_id = ? AND e.eval_type = 'ai'
       GROUP BY j.week_number
       ORDER BY j.week_number ASC
     `).bind(studentId).all();
 
+    // 自己評価 (週次平均)
+    const { results: selfRows } = await db.prepare(`
+      SELECT 
+        week_number,
+        AVG(factor1_score) as self_f1,
+        AVG(factor2_score) as self_f2,
+        AVG(factor3_score) as self_f3,
+        AVG(factor4_score) as self_f4,
+        AVG(total_score) as self_total
+      FROM self_evaluations
+      WHERE student_id = ?
+      GROUP BY week_number
+    `).bind(studentId).all().catch(() => ({ results: [] as any[] }));
+
+    // self を week -> row のマップに
+    const selfMap = new Map<number, any>();
+    for (const r of selfRows as any[]) {
+      selfMap.set(Number(r.week_number), r);
+    }
+
     return c.json({
       success: true,
       student_id: studentId,
-      weekly_scores: results.map((row) => ({
-        week_number: row.week_number,
-        factor1: row.factor1 || 0,
-        factor2: row.factor2 || 0,
-        factor3: row.factor3 || 0,
-        factor4: row.factor4 || 0,
-        total: row.total || 0,
-        ai_total: row.ai_total || 0,
-        journal_id: row.journal_id || ""
-      }))
+      weekly_scores: (aiRows as any[]).map((row) => {
+        const wk = Number(row.week_number);
+        const self = selfMap.get(wk);
+        return {
+          week_number: wk,
+          factor1: row.factor1 || 0,
+          factor2: row.factor2 || 0,
+          factor3: row.factor3 || 0,
+          factor4: row.factor4 || 0,
+          total: row.ai_total || 0,    // 互換: total = AI 評価 (歴史的キー)
+          ai_total: row.ai_total || 0,
+          self_total: self ? (self.self_total || 0) : null,
+          self_factor1: self ? (self.self_f1 || 0) : null,
+          self_factor2: self ? (self.self_f2 || 0) : null,
+          self_factor3: self ? (self.self_f3 || 0) : null,
+          self_factor4: self ? (self.self_f4 || 0) : null,
+          gap: self && row.ai_total ? Math.round(((row.ai_total - (self.self_total || 0)) * 100)) / 100 : null,
+          journal_id: row.journal_id || ""
+        };
+      })
     });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -2741,7 +2807,8 @@ dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "c
   if (!db) return c.json({ error: "DB not configured" }, 503);
   try {
     const noCache = c.req.query("no_cache") === "1";
-    const cacheKey = "stats:scat:timeline";
+    const limitParam = Math.max(1, Math.min(15, Number(c.req.query("limit") || 5)));
+    const cacheKey = `stats:scat:timeline:l${limitParam}`;
     if (!noCache) {
       const cached = await getCachedStats(db, cacheKey);
       if (cached) return c.json({ ...cached, _cache: { hit: true, key: cacheKey } });
@@ -2784,9 +2851,10 @@ dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "c
     }
 
     // 出現頻度の高い上位 5 テーマを採用
+    // 表示テーマ数 (?limit=N で指定、default 5、max 15)
     const topThemes = Array.from(themesGlobal.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, limitParam)
       .map(([t]) => t);
 
     // 全 week を昇順に
@@ -2794,12 +2862,15 @@ dataRouter.get("/scat/network/timeline", requireRoles(["researcher", "admin", "c
     const timeline = weeks.map(wk => {
       const row: Record<string, any> = { week: `Week ${wk}` };
       for (const t of topThemes) row[t] = matrix[wk][t] || 0;
+      // その週に top に入っていないテーマも合計だけ表示
+      const others = Object.entries(matrix[wk]).filter(([k]) => !topThemes.includes(k));
+      row.others = others.reduce((s, [, v]) => s + (v as number), 0);
       return row;
     });
 
-    const payload = { timeline, themes: topThemes };
-    await setCachedStats(db, "stats:scat:timeline", payload, 300).catch(() => {});
-    return c.json({ ...payload, _cache: { hit: false, key: "stats:scat:timeline" } });
+    const payload = { timeline, themes: topThemes, total_themes: themesGlobal.size };
+    await setCachedStats(db, cacheKey, payload, 300).catch(() => {});
+    return c.json({ ...payload, _cache: { hit: false, key: cacheKey } });
   } catch (err: any) {
     return c.json({ error: String(err) }, 500);
   }

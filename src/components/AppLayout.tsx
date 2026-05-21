@@ -28,6 +28,7 @@ import DownloadIcon           from "@mui/icons-material/Download";
 import AccountBalanceIcon     from "@mui/icons-material/AccountBalance";
 import ScienceIcon from "@mui/icons-material/Science";
 import AnalyticsIcon from "@mui/icons-material/Analytics";
+import NotificationBell from "./NotificationBell";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import AutoGraphIcon from "@mui/icons-material/AutoGraph";
 import DescriptionIcon from "@mui/icons-material/Description";
@@ -428,6 +429,9 @@ export default function AppLayout() {
               sx={{ bgcolor: "rgba(255,255,255,0.25)", color: "white", fontSize: 10, height: 20, ml: 0.5 }}
             />
           ))}
+          <Box sx={{ ml: 1 }}>
+            <NotificationBell />
+          </Box>
         </Toolbar>
       </AppBar>
 
