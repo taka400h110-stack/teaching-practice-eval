@@ -2662,19 +2662,49 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
 dataRouter.delete("/journals/:id", requireRoles(["student", "admin"] as UserRole[]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
-  
+
   const id = c.req.param("id");
-  
+
   try {
     const target = await db.prepare("SELECT student_id FROM journal_entries WHERE id = ?").bind(id).first();
-  if (!target) return c.json({ error: "見つかりません" }, 404);
-  
-  const scope = await getScopeContext(c, db);
-  if (!assertCanAccessStudent(scope, target.student_id as string)) {
-    return c.json({ success: false, error: "forbidden", message: "データアクセス範囲外です。" }, 403);
-  }
+    if (!target) return c.json({ error: "見つかりません" }, 404);
 
-  await db.prepare("DELETE FROM journal_entries WHERE id = ?").bind(id).run();
+    const scope = await getScopeContext(c, db);
+    if (!assertCanAccessStudent(scope, target.student_id as string)) {
+      return c.json({ success: false, error: "forbidden", message: "データアクセス範囲外です。" }, 403);
+    }
+
+    // 外部キー制約のため、子レコードから順に削除する
+    // 1. evaluation_items (evaluations の子)
+    await db.prepare(`
+      DELETE FROM evaluation_items
+      WHERE evaluation_id IN (SELECT id FROM evaluations WHERE journal_id = ?)
+    `).bind(id).run();
+
+    // 2. human_eval_items (human_evaluations の子)
+    await db.prepare(`
+      DELETE FROM human_eval_items
+      WHERE human_eval_id IN (SELECT id FROM human_evaluations WHERE journal_id = ?)
+    `).bind(id).run();
+
+    // 3. evaluations / human_evaluations (journal_entries の子)
+    await db.prepare("DELETE FROM evaluations WHERE journal_id = ?").bind(id).run();
+    await db.prepare("DELETE FROM human_evaluations WHERE journal_id = ?").bind(id).run();
+
+    // 4. learning_progress_scores (journal_id を持つが FK 制約は無いはず。念のため掃除)
+    await db.prepare("DELETE FROM learning_progress_scores WHERE journal_id = ?").bind(id).run().catch(() => {});
+
+    // 5. chat_sessions / chat_messages (journal_id を持つテーブル。FK 未設定でも掃除)
+    await db.prepare("DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE journal_id = ?)").bind(id).run().catch(() => {});
+    await db.prepare("DELETE FROM chat_sessions WHERE journal_id = ?").bind(id).run().catch(() => {});
+
+    // 6. SCAT 関連 (journal_id を持つ複数テーブル)
+    await db.prepare("DELETE FROM scat_analysis_results WHERE journal_id = ?").bind(id).run().catch(() => {});
+    await db.prepare("DELETE FROM scat_detailed_segments WHERE journal_id = ?").bind(id).run().catch(() => {});
+
+    // 7. 最後に journal_entries 本体
+    await db.prepare("DELETE FROM journal_entries WHERE id = ?").bind(id).run();
+
     return c.json({ success: true });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
