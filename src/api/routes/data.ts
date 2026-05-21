@@ -20,6 +20,8 @@ import { applyAnonymization } from "../services/anonymization";
  */
 import { Hono } from "hono";
 import exportsRouter from "./exports";
+import analysisRouter from "./analysisState";
+import { markScatDependentsDirty } from "../services/scatDerivedAnalysis";
 import { cors } from "hono/cors";
 import { requireRoles } from "../middleware/auth";
 import { getScopeContext, buildScopeFilter, assertCanAccessStudent } from "../middleware/scope";
@@ -2512,6 +2514,8 @@ dataRouter.post("/scat/projects", requireRoles(["researcher", "admin", "collabor
     const { title, description, created_by } = body;
     const id = "proj_" + Date.now();
     await db.prepare("INSERT INTO scat_projects (id, title, description, created_by) VALUES (?, ?, ?, ?)").bind(id, title, description ?? null, created_by ?? null).run();
+    // SCAT 連動: ISM/SP/伝達係数を dirty 化
+    await markScatDependentsDirty(db).catch((e) => console.warn("markScatDependentsDirty failed:", e));
     return c.json({ success: true, id });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -2534,6 +2538,8 @@ dataRouter.put("/scat/projects/:projectId/theorization", requireRoles(["research
 
     await db.prepare("UPDATE scat_projects SET storyline = ?, theoretical_description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
       .bind(storyline || "", theoretical_description || "", projectId).run();
+    // SCAT 連動: dirty 化
+    await markScatDependentsDirty(db).catch((e) => console.warn("markScatDependentsDirty failed:", e));
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ error: String(err) }, 500);
@@ -2581,6 +2587,8 @@ dataRouter.post("/scat/segments/:projectId", requireRoles(["researcher", "admin"
     if (batch.length > 0) {
       await db.batch(batch);
     }
+    // SCAT 連動: dirty 化
+    await markScatDependentsDirty(db).catch((e) => console.warn("markScatDependentsDirty failed:", e));
     return c.json({ success: true });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -2626,6 +2634,8 @@ dataRouter.post("/scat/codes", requireRoles(["researcher", "admin", "collaborato
         memo = excluded.memo,
         updated_at = CURRENT_TIMESTAMP
     `).bind(id, body.segment_id, body.researcher_id, body.step1_words || body.step1_keywords || "", body.step2_words || body.step2_thesaurus || "", body.step3_concepts || body.step3_concept || "", body.step4_themes || body.step4_theme || "", body.memo || "").run();
+    // SCAT 連動: step4_theme 変更時は ISM/SP/伝達係数を dirty 化 (最重要トリガー)
+    await markScatDependentsDirty(db).catch((e) => console.warn("markScatDependentsDirty failed:", e));
     return c.json({ success: true, id });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -3974,3 +3984,4 @@ dataRouter.post("/auth/login", async (c) => {
 
 
 dataRouter.route("/exports", exportsRouter);
+dataRouter.route("/analysis", analysisRouter);
