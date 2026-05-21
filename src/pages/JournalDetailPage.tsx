@@ -543,10 +543,13 @@ const JournalDetailPage: React.FC = () => {
   
   const currentGoal = journal ? goals.find(g => g.week === journal.week_number) : undefined;
 
+  // 日誌のstatusに関わらず AI評価データが存在する可能性があるため、status=evaluatedに限定せず取得を試みる
+  // 失敗時(404)は静かに無視 (retry: false)
   const { data: evalData } = useQuery<EvaluationResult>({
     queryKey: ["evaluation", journalId],
     queryFn:  () => apiClient.getEvaluation(journalId ?? ""),
-    enabled:  !!journalId && journal?.status === "evaluated",
+    enabled:  !!journalId && !!journal,
+    retry:    false,
   });
 
   const { data: selfEvals = [] } = useQuery({
@@ -629,7 +632,8 @@ const JournalDetailPage: React.FC = () => {
           一覧に戻る
         </Button>
         <Box flex={1} />
-        {journal.status !== "evaluated" && (
+        {/* 編集ボタン: 学生本人のみ表示。教員/管理者などは閲覧のみ */}
+        {userRole === "student" && journal.status !== "evaluated" && (
           <Button
             startIcon={<EditIcon />}
             variant="outlined"
@@ -640,7 +644,8 @@ const JournalDetailPage: React.FC = () => {
             編集
           </Button>
         )}
-        {journal.status === "evaluated" && (
+        {/* 評価詳細ボタン: AI評価データが実在すれば status に関わらず表示 */}
+        {evalData && (
           <Button
             startIcon={<AssessmentIcon />}
             variant="contained"
