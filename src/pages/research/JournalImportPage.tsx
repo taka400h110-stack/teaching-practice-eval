@@ -75,6 +75,8 @@ import TableChartIcon from "@mui/icons-material/TableChart";
 import DataObjectIcon from "@mui/icons-material/DataObject";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import CodeIcon from "@mui/icons-material/Code";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { unzip } from "fflate";
 import { apiFetch, getToken } from "../../api/client";
@@ -620,8 +622,8 @@ export default function JournalImportPage() {
     });
   };
 
-  // エクスポート (4 種類)
-  type ExportFormat = "summary_csv" | "detail_csv" | "json" | "analysis_csv";
+  // エクスポート (6 種類)
+  type ExportFormat = "summary_csv" | "detail_csv" | "json" | "analysis_csv" | "codebook_md" | "codebook_json";
   const handleExport = async (format: ExportFormat) => {
     const params = new URLSearchParams();
     if (searchQ.trim()) params.set("q", searchQ.trim());
@@ -645,6 +647,23 @@ export default function JournalImportPage() {
       // analysis では q / status は使わない
       params.delete("q");
       params.delete("status");
+    } else if (format === "codebook_md") {
+      endpoint = "/api/data/journal-imports/export.codebook.md";
+      fallbackName = "journal-imports-codebook";
+      ext = "md";
+      // codebook はフィルタ非依存 (静的な列定義)
+      params.delete("q");
+      params.delete("status");
+      params.delete("from");
+      params.delete("to");
+    } else if (format === "codebook_json") {
+      endpoint = "/api/data/journal-imports/export.codebook.json";
+      fallbackName = "journal-imports-codebook";
+      ext = "json";
+      params.delete("q");
+      params.delete("status");
+      params.delete("from");
+      params.delete("to");
     }
     const url = `${endpoint}${params.toString() ? "?" + params.toString() : ""}`;
 
@@ -1128,7 +1147,26 @@ export default function JournalImportPage() {
           </ListItemIcon>
           <ListItemText
             primary="統合分析 CSV (量的分析向け)"
-            secondary="日誌 + AI評価 + 人間評価 + SCAT概念数"
+            secondary="日誌 + AI評価 + 人間評価 + SCAT概念数 49 列"
+          />
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => handleExport("codebook_md")}>
+          <ListItemIcon>
+            <MenuBookIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="データ辞書 (Markdown)"
+            secondary="列定義・型・由来テーブル / 論文 Appendix 用"
+          />
+        </MenuItem>
+        <MenuItem onClick={() => handleExport("codebook_json")}>
+          <ListItemIcon>
+            <CodeIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="データ辞書 (JSON)"
+            secondary="機械可読 / プログラムから列定義を参照"
           />
         </MenuItem>
       </Menu>

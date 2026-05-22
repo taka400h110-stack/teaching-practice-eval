@@ -13,6 +13,7 @@
  */
 import { Hono } from "hono";
 import { requireAuth, requireRoles } from "../middleware/auth";
+import { setAuditReadContext } from "../middleware/audit";
 import { UserRole } from "../../types";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
@@ -256,6 +257,15 @@ journalImportsRouter.get(
     const csv = bom + lines.join("\r\n");
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 
+    // 監査ログ: エクスポート件数・形式・絞り込み条件を記録
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "summary_csv",
+      visibleRecordCount: rows.length,
+      scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
+      reason: `summary_csv | filters: status=${status ?? ""},student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""},q=${q ?? ""}`,
+    });
+
     return new Response(csv, {
       status: 200,
       headers: {
@@ -380,6 +390,15 @@ journalImportsRouter.get(
 
     const bom = "\uFEFF";
     const csv = bom + lines.join("\r\n");
+
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "detail_csv",
+      visibleRecordCount: rows.length,
+      scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
+      reason: `detail_csv | filters: status=${status ?? ""},student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""},q=${q ?? ""}`,
+    });
+
     return new Response(csv, {
       status: 200,
       headers: {
@@ -491,6 +510,15 @@ journalImportsRouter.get(
     };
 
     const ts = csvTimestamp();
+
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "json",
+      visibleRecordCount: items.length,
+      scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
+      reason: `json | filters: status=${status ?? ""},student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""},q=${q ?? ""}`,
+    });
+
     return new Response(JSON.stringify(payload, null, 2), {
       status: 200,
       headers: {
@@ -817,11 +845,332 @@ journalImportsRouter.get(
 
     const bom = "\uFEFF";
     const csv = bom + lines.join("\r\n");
+
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "analysis_csv",
+      visibleRecordCount: lines.length - 1, // header を除く
+      scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
+      reason: `analysis_csv | filters: student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""}`,
+    });
+
     return new Response(csv, {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="journal-analysis-${csvTimestamp()}.csv"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────
+// データ辞書 (codebook) - 各エクスポート CSV/JSON の列定義を提供
+// 論文化・倫理審査・追跡可能性のために、列の意味・型・由来テーブルを記述
+// ────────────────────────────────────────────────────────────────
+type CodebookField = {
+  name: string;
+  type: "string" | "integer" | "number" | "boolean" | "datetime" | "date" | "enum" | "object" | "array";
+  description: string;
+  source: string;          // 由来 (テーブル.列 or 計算式)
+  unit?: string;           // 単位 (chars, score など)
+  enum_values?: string[];  // type=enum の場合の取りうる値
+  nullable?: boolean;
+  notes?: string;
+};
+
+type CodebookSection = {
+  format: "summary_csv" | "detail_csv" | "json" | "analysis_csv";
+  endpoint: string;
+  description: string;
+  fields: CodebookField[];
+  filters: { name: string; type: string; description: string }[];
+  row_limit: number;
+};
+
+function buildCodebook(): {
+  generated_at: string;
+  version: string;
+  description: string;
+  block_keys: string[];
+  sections: CodebookSection[];
+} {
+  const blockFields = (suffix = "", note?: string): CodebookField[] =>
+    BLOCK_KEYS.map((k) => ({
+      name: suffix ? `${k}${suffix}` : k,
+      type: suffix === "_chars" ? "integer" : ("string" as const),
+      description:
+        k === "block_morning" ? "朝の活動の記述" :
+        k === "block_p1" ? "1時限目の記述" :
+        k === "block_p2" ? "2時限目の記述" :
+        k === "block_p3" ? "3時限目の記述" :
+        k === "block_p4" ? "4時限目の記述" :
+        k === "block_lunch" ? "給食・昼休みの記述" :
+        k === "block_p5" ? "5時限目の記述" :
+        k === "block_p6" ? "6時限目の記述" :
+        k === "block_cleaning" ? "清掃時間の記述" :
+        k === "block_closing" ? "終学活/帰りの会の記述" :
+        "放課後の記述",
+      source: `journal_imports.structured_json.blocks.${k}${suffix === "_chars" ? " (文字数)" : ""}`,
+      unit: suffix === "_chars" ? "chars" : undefined,
+      nullable: true,
+      notes: note,
+    }));
+
+  const summary: CodebookSection = {
+    format: "summary_csv",
+    endpoint: "GET /api/data/journal-imports/export.csv",
+    description: "取り込み一覧の基本メタ情報 (19 列)。日誌本文や時限ブロックは含まれない。一覧確認・進捗追跡向け。",
+    row_limit: 5000,
+    filters: [
+      { name: "status", type: "enum", description: "pending|extracting|extracted|structured|committed|failed" },
+      { name: "student_id", type: "string", description: "学生 ID で絞り込み" },
+      { name: "from", type: "date", description: "entry_date >= YYYY-MM-DD" },
+      { name: "to", type: "date", description: "entry_date <= YYYY-MM-DD" },
+      { name: "q", type: "string", description: "filename 部分一致 (LIKE %q%)" },
+    ],
+    fields: [
+      { name: "id", type: "string", description: "取り込み ID (UUID)", source: "journal_imports.id" },
+      { name: "filename", type: "string", description: "アップロードされたファイル名", source: "journal_imports.filename" },
+      { name: "student_id", type: "string", description: "学生 ID", source: "journal_imports.student_id", nullable: true },
+      { name: "student_name", type: "string", description: "学生氏名", source: "users.name (JOIN)", nullable: true },
+      { name: "entry_date", type: "date", description: "実習日", source: "journal_imports.entry_date", nullable: true },
+      { name: "week_number", type: "integer", description: "実習週 (1-N)", source: "journal_imports.week_number", nullable: true },
+      { name: "status", type: "enum", description: "取り込みステータス", source: "journal_imports.status", enum_values: ["pending", "extracting", "extracted", "structured", "committed", "failed"] },
+      { name: "extract_source", type: "enum", description: "テキスト抽出に使われた手段", source: "journal_imports.extract_source", enum_values: ["to_markdown", "gcv_ocr", "raw_text"], nullable: true },
+      { name: "mime_type", type: "string", description: "アップロードファイルの MIME", source: "journal_imports.mime_type" },
+      { name: "file_size", type: "integer", description: "ファイルサイズ", source: "journal_imports.file_size", unit: "bytes" },
+      { name: "word_count", type: "integer", description: "抽出後の語数推定", source: "journal_imports.word_count", nullable: true },
+      { name: "token_count", type: "integer", description: "GPT-4 構造化に使ったトークン数", source: "journal_imports.token_count", nullable: true },
+      { name: "title", type: "string", description: "構造化後のタイトル", source: "structured_json.title", nullable: true },
+      { name: "reflection", type: "string", description: "省察パートのテキスト", source: "structured_json.reflection", nullable: true },
+      { name: "confidence", type: "number", description: "構造化の信頼度 (0-1)", source: "structured_json.confidence", nullable: true },
+      { name: "journal_id", type: "string", description: "コミット後の journal_entries.id", source: "journal_imports.journal_id", nullable: true, notes: "status=committed の時のみ非NULL" },
+      { name: "error_message", type: "string", description: "失敗時のエラーメッセージ", source: "journal_imports.error_message", nullable: true },
+      { name: "created_at", type: "datetime", description: "取り込み作成日時 (UTC)", source: "journal_imports.created_at" },
+      { name: "updated_at", type: "datetime", description: "取り込み更新日時 (UTC)", source: "journal_imports.updated_at" },
+    ],
+  };
+
+  const detail: CodebookSection = {
+    format: "detail_csv",
+    endpoint: "GET /api/data/journal-imports/export.detail.csv",
+    description: "質的分析向け詳細 CSV (32 列)。時限ブロックを 11 列に展開 + 抽出原文 (raw_text) を含む。NVivo / MAXQDA / pandas でのコーディング作業を想定。",
+    row_limit: 5000,
+    filters: summary.filters,
+    fields: [
+      ...summary.fields.slice(0, 13).filter((f) => f.name !== "reflection" && f.name !== "confidence" && f.name !== "journal_id" && f.name !== "error_message" && f.name !== "created_at" && f.name !== "updated_at"),
+      ...blockFields("", "時限ブロックの本文。構造化失敗の場合は空文字。"),
+      { name: "reflection", type: "string", description: "省察パートの本文", source: "structured_json.reflection", nullable: true },
+      { name: "confidence", type: "number", description: "構造化信頼度 (0-1)", source: "structured_json.confidence", nullable: true },
+      { name: "notes", type: "string", description: "備考欄", source: "structured_json.notes", nullable: true },
+      { name: "raw_text", type: "string", description: "抽出された生テキスト全文 (toMarkdown または OCR の出力)", source: "journal_imports.raw_text", nullable: true, notes: "質的コーディングの 1 次資料" },
+      { name: "journal_id", type: "string", description: "コミット後の journal_entries.id", source: "journal_imports.journal_id", nullable: true },
+      { name: "error_message", type: "string", description: "失敗時メッセージ", source: "journal_imports.error_message", nullable: true },
+      { name: "created_at", type: "datetime", description: "作成日時", source: "journal_imports.created_at" },
+      { name: "updated_at", type: "datetime", description: "更新日時", source: "journal_imports.updated_at" },
+    ],
+  };
+
+  const json: CodebookSection = {
+    format: "json",
+    endpoint: "GET /api/data/journal-imports/export.json",
+    description: "質的分析向けネスト構造 JSON。NVivo / MAXQDA / Python pandas へのインポートを想定。ファイル名・絞り込み条件・エクスポート実施者などのメタ情報を payload 直下に持つ。",
+    row_limit: 5000,
+    filters: summary.filters,
+    fields: [
+      { name: "exported_at", type: "datetime", description: "エクスポート実施日時 (ISO 8601 UTC)", source: "サーバー時刻" },
+      { name: "exported_by", type: "object", description: "実施者 { id, role }", source: "認証ユーザー" },
+      { name: "filters", type: "object", description: "リクエスト時に指定された絞り込み", source: "クエリパラメータ" },
+      { name: "block_keys", type: "array", description: "時限ブロックキーの順序付き配列 (11 個)", source: "BLOCK_KEYS 定数" },
+      { name: "count", type: "integer", description: "items 配列の長さ", source: "計算" },
+      { name: "items[].id", type: "string", description: "取り込み ID", source: "journal_imports.id" },
+      { name: "items[].filename", type: "string", description: "ファイル名", source: "journal_imports.filename" },
+      { name: "items[].student", type: "object", description: "{ id, name, email } または null", source: "users JOIN", nullable: true },
+      { name: "items[].entry_date", type: "date", description: "実習日", source: "journal_imports.entry_date", nullable: true },
+      { name: "items[].week_number", type: "integer", description: "実習週", source: "journal_imports.week_number", nullable: true },
+      { name: "items[].status", type: "enum", description: "ステータス", source: "journal_imports.status" },
+      { name: "items[].extract", type: "object", description: "{ source, mime_type, file_size, word_count, token_count }", source: "journal_imports 抽出情報" },
+      { name: "items[].structured", type: "object", description: "{ title, blocks{}, reflection, confidence, notes } または null", source: "structured_json", nullable: true },
+      { name: "items[].raw_text", type: "string", description: "抽出生テキスト", source: "journal_imports.raw_text", nullable: true },
+      { name: "items[].journal_id", type: "string", description: "コミット後 journal_entries.id", source: "journal_imports.journal_id", nullable: true },
+      { name: "items[].error_message", type: "string", description: "失敗時メッセージ", source: "journal_imports.error_message", nullable: true },
+      { name: "items[].created_at", type: "datetime", description: "作成日時", source: "journal_imports.created_at" },
+      { name: "items[].updated_at", type: "datetime", description: "更新日時", source: "journal_imports.updated_at" },
+    ],
+  };
+
+  const analysis: CodebookSection = {
+    format: "analysis_csv",
+    endpoint: "GET /api/data/journal-imports/export.analysis.csv",
+    description: "量的分析向け統合 CSV (49 列)。journal_entries + AI 評価 + 人間評価 (平均) + SCAT 概念数 を結合。score_diff_* 列は AI 値 - 人間平均 で事前計算済み。R / SPSS / Python statsmodels での t 検定 / ANOVA / 相関分析を想定。コミット済み日誌のみが対象 (status='committed')。",
+    row_limit: 5000,
+    filters: [
+      { name: "student_id", type: "string", description: "学生 ID 絞り込み" },
+      { name: "from", type: "date", description: "entry_date >= YYYY-MM-DD" },
+      { name: "to", type: "date", description: "entry_date <= YYYY-MM-DD" },
+    ],
+    fields: [
+      // 日誌コア
+      { name: "journal_id", type: "string", description: "日誌 ID (主キー)", source: "journal_entries.id" },
+      { name: "student_id", type: "string", description: "学生 ID", source: "journal_entries.student_id" },
+      { name: "student_name", type: "string", description: "学生氏名", source: "users.name", nullable: true },
+      { name: "entry_date", type: "date", description: "実習日", source: "journal_entries.entry_date" },
+      { name: "week_number", type: "integer", description: "実習週", source: "journal_entries.week_number" },
+      { name: "title", type: "string", description: "日誌タイトル", source: "journal_entries.title", nullable: true },
+      { name: "word_count", type: "integer", description: "日誌本文の語数", source: "journal_entries.word_count", unit: "words", nullable: true },
+      { name: "journal_status", type: "enum", description: "日誌のステータス", source: "journal_entries.status" },
+      { name: "ocr_source", type: "string", description: "OCR ソース", source: "journal_entries.ocr_source", nullable: true },
+      { name: "ocr_confidence", type: "number", description: "OCR 信頼度 (0-1)", source: "journal_entries.ocr_confidence", nullable: true },
+      { name: "journal_created_at", type: "datetime", description: "日誌作成日時", source: "journal_entries.created_at" },
+      // 取り込みメタ
+      { name: "import_id", type: "string", description: "取り込み ID", source: "journal_imports.id", nullable: true },
+      { name: "import_filename", type: "string", description: "取り込み元ファイル名", source: "journal_imports.filename", nullable: true },
+      { name: "import_source", type: "string", description: "テキスト抽出方法", source: "journal_imports.extract_source", nullable: true },
+      { name: "import_confidence", type: "number", description: "構造化信頼度 (0-1)", source: "structured_json.confidence", nullable: true },
+      // 時限ブロック (文字数)
+      ...blockFields("_chars", "時限ブロックの文字数 (構造化済み本文の長さ)"),
+      { name: "reflection_chars", type: "integer", description: "省察パートの文字数", source: "structured_json.reflection (文字数)", unit: "chars" },
+      // AI 評価
+      { name: "ai_total_score", type: "number", description: "AI 評価の合計スコア", source: "evaluations.total_score (eval_type='ai')", nullable: true },
+      { name: "ai_factor1", type: "number", description: "AI 評価 因子1", source: "evaluations.factor1_score", nullable: true },
+      { name: "ai_factor2", type: "number", description: "AI 評価 因子2", source: "evaluations.factor2_score", nullable: true },
+      { name: "ai_factor3", type: "number", description: "AI 評価 因子3", source: "evaluations.factor3_score", nullable: true },
+      { name: "ai_factor4", type: "number", description: "AI 評価 因子4", source: "evaluations.factor4_score", nullable: true },
+      { name: "ai_model", type: "string", description: "使用 AI モデル名", source: "evaluations.model", nullable: true },
+      { name: "ai_prompt_version", type: "string", description: "プロンプトバージョン", source: "evaluations.prompt_version", nullable: true },
+      { name: "ai_halo_detected", type: "boolean", description: "ハロー効果が検出されたか", source: "evaluations.halo_detected", nullable: true },
+      { name: "ai_token_count", type: "integer", description: "AI 評価で使ったトークン数", source: "evaluations.token_count", unit: "tokens", nullable: true },
+      // 人間評価 (平均)
+      { name: "human_evaluator_count", type: "integer", description: "評価者数", source: "COUNT(human_evaluations.id)" },
+      { name: "human_avg_total", type: "number", description: "人間評価の平均合計スコア", source: "AVG(human_evaluations.total_score)", nullable: true },
+      { name: "human_avg_f1", type: "number", description: "人間評価 因子1 平均", source: "AVG(human_evaluations.factor1_score)", nullable: true },
+      { name: "human_avg_f2", type: "number", description: "人間評価 因子2 平均", source: "AVG(human_evaluations.factor2_score)", nullable: true },
+      { name: "human_avg_f3", type: "number", description: "人間評価 因子3 平均", source: "AVG(human_evaluations.factor3_score)", nullable: true },
+      { name: "human_avg_f4", type: "number", description: "人間評価 因子4 平均", source: "AVG(human_evaluations.factor4_score)", nullable: true },
+      // AI - 人間 の差分
+      { name: "score_diff_total", type: "number", description: "ai_total_score - human_avg_total", source: "サーバ計算", nullable: true, notes: "正値: AI が高評価、負値: 人間が高評価" },
+      { name: "score_diff_f1", type: "number", description: "ai_factor1 - human_avg_f1", source: "サーバ計算", nullable: true },
+      { name: "score_diff_f2", type: "number", description: "ai_factor2 - human_avg_f2", source: "サーバ計算", nullable: true },
+      { name: "score_diff_f3", type: "number", description: "ai_factor3 - human_avg_f3", source: "サーバ計算", nullable: true },
+      { name: "score_diff_f4", type: "number", description: "ai_factor4 - human_avg_f4", source: "サーバ計算", nullable: true },
+      // SCAT
+      { name: "scat_segments", type: "integer", description: "SCAT セグメント数 (この日誌から切り出された質的データ単位)", source: "COUNT(scat_segments WHERE source_journal_id=journal_id)" },
+      { name: "scat_concepts", type: "integer", description: "SCAT step3 概念の数 (step3_concept != '')", source: "COUNT(scat_codes step3_concept)" },
+      { name: "scat_themes", type: "integer", description: "SCAT step4 テーマの数 (step4_theme != '')", source: "COUNT(scat_codes step4_theme)" },
+    ],
+  };
+
+  return {
+    generated_at: new Date().toISOString(),
+    version: "1.0",
+    description: "教育実習日誌 評価プラットフォーム / 過去日誌取り込み機能のエクスポート列定義。論文 Appendix / IRB 提出資料 / 共同研究者へのデータ受け渡しにそのまま使えます。",
+    block_keys: BLOCK_KEYS,
+    sections: [summary, detail, json, analysis],
+  };
+}
+
+// GET /export.codebook.json - データ辞書 (機械可読 / JSON Schema 互換的構造)
+journalImportsRouter.get(
+  "/export.codebook.json",
+  requireAuth,
+  requireRoles(READ_ROLES),
+  async (c) => {
+    const cb = buildCodebook();
+
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "codebook_json",
+      visibleRecordCount: cb.sections.reduce((s, sec) => s + sec.fields.length, 0),
+      scopeBasis: "public_metadata",
+      reason: "codebook_json",
+    });
+
+    return new Response(JSON.stringify(cb, null, 2), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": `attachment; filename="journal-imports-codebook-${csvTimestamp()}.json"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  },
+);
+
+// GET /export.codebook.md - データ辞書 (Markdown / 論文 Appendix にそのまま貼れる形式)
+journalImportsRouter.get(
+  "/export.codebook.md",
+  requireAuth,
+  requireRoles(READ_ROLES),
+  async (c) => {
+    const cb = buildCodebook();
+    const lines: string[] = [];
+    lines.push(`# 教育実習日誌取り込み エクスポート データ辞書 (Codebook)`);
+    lines.push("");
+    lines.push(`- **バージョン**: ${cb.version}`);
+    lines.push(`- **生成日時**: ${cb.generated_at}`);
+    lines.push("");
+    lines.push(cb.description);
+    lines.push("");
+    lines.push(`## 時限ブロックキー一覧 (BLOCK_KEYS, n=${cb.block_keys.length})`);
+    lines.push("");
+    lines.push(cb.block_keys.map((k) => `\`${k}\``).join(", "));
+    lines.push("");
+
+    for (const sec of cb.sections) {
+      lines.push(`---`);
+      lines.push("");
+      lines.push(`## ${sec.format.toUpperCase()} — ${sec.endpoint}`);
+      lines.push("");
+      lines.push(sec.description);
+      lines.push("");
+      lines.push(`- **行数上限**: ${sec.row_limit}`);
+      lines.push("");
+      if (sec.filters.length > 0) {
+        lines.push(`### フィルタ`);
+        lines.push("");
+        lines.push("| 名称 | 型 | 説明 |");
+        lines.push("|---|---|---|");
+        for (const f of sec.filters) {
+          lines.push(`| \`${f.name}\` | ${f.type} | ${f.description} |`);
+        }
+        lines.push("");
+      }
+      lines.push(`### フィールド定義 (n=${sec.fields.length})`);
+      lines.push("");
+      lines.push("| 列名 | 型 | 由来 | 説明 | 単位 | NULL可 | 備考 |");
+      lines.push("|---|---|---|---|---|---|---|");
+      for (const f of sec.fields) {
+        lines.push(
+          `| \`${f.name}\` | ${f.type}${f.enum_values ? ` (${f.enum_values.join("\\|")})` : ""} | ${f.source} | ${f.description} | ${f.unit ?? "-"} | ${f.nullable ? "○" : "-"} | ${f.notes ?? "-"} |`,
+        );
+      }
+      lines.push("");
+    }
+
+    lines.push(`---`);
+    lines.push("");
+    lines.push(`## 引用について`);
+    lines.push("");
+    lines.push("本プラットフォームから出力されたデータを研究で使用される際は、エクスポート時の codebook (本ファイル) と監査ログを保存してください。再現可能性 (reproducibility) のため、`exported_at` と `filters` を論文 Methods に記載することを推奨します。");
+    lines.push("");
+
+    const md = lines.join("\n");
+
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "codebook_md",
+      visibleRecordCount: cb.sections.reduce((s, sec) => s + sec.fields.length, 0),
+      scopeBasis: "public_metadata",
+      reason: "codebook_md",
+    });
+
+    return new Response(md, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="journal-imports-codebook-${csvTimestamp()}.md"`,
         "Cache-Control": "no-store",
       },
     });
