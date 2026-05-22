@@ -15,6 +15,24 @@ export function cleanNumbers(values: Array<number | null | undefined>): number[]
   return values.filter((v): v is number => typeof v === "number" && !isNaN(v) && isFinite(v));
 }
 
+/**
+ * 統計計算をスキップ / 退化した理由 (Phase 7-3: edge case 表示改善)
+ *
+ *  - `insufficient_n`         : 必要な n に満たない (welch: n<2, paired: n<2, pearson: n<3, etc.)
+ *  - `insufficient_n_for_ci`  : 計算は可能だが CI 推定には n が足りない (pearson の n<4 など)
+ *  - `no_variance`            : SD = 0 / 分母 0 (定数列 / pairedTTest の se_diff=0 / welch の se=0)
+ *  - `perfect_correlation`    : |r| = 1 で t/p は計算可能だが CI が不定
+ *  - `no_pairs`               : 対応 pair が 1 つも取れない (xs/ys 全 null など)
+ *  - `no_complete_pairs`      : pearson で listwise 後の n が 0
+ */
+export type StatsSkipReason =
+  | "insufficient_n"
+  | "insufficient_n_for_ci"
+  | "no_variance"
+  | "perfect_correlation"
+  | "no_pairs"
+  | "no_complete_pairs";
+
 export interface DescriptiveStats {
   n: number;
   mean: number | null;
@@ -27,6 +45,9 @@ export interface DescriptiveStats {
   skewness: number | null; // Fisher-Pearson 標準化モーメント (bias adjusted)
   kurtosis: number | null; // excess kurtosis (正規分布で 0)
   se: number | null; // 標準誤差 (SD / sqrt(n))
+  /** Phase 7-3: edge-case 注釈 (n=0 や n=1 で SD/skew/kurt が計算不能のとき) */
+  skipped?: boolean;
+  skip_reason?: StatsSkipReason;
 }
 
 const EMPTY_DESC: DescriptiveStats = {
@@ -41,6 +62,8 @@ const EMPTY_DESC: DescriptiveStats = {
   skewness: null,
   kurtosis: null,
   se: null,
+  skipped: true,
+  skip_reason: "insufficient_n",
 };
 
 /** 記述統計を一括計算 */
@@ -62,8 +85,8 @@ export function describe(values: Array<number | null | undefined>): DescriptiveS
     m3 += d2 * d;
     m4 += d2 * d2;
   }
-  const variance = n > 1 ? m2 / (n - 1) : 0;
-  const sd = Math.sqrt(variance);
+  // Phase 7-3: n=1 のときは SD を 0 ではなく null として扱う (計算不能)
+  const sd: number | null = n > 1 ? Math.sqrt(m2 / (n - 1)) : null;
 
   // ソート済み配列で min/max/median/Q1/Q3
   const sorted = [...xs].sort((a, b) => a - b);
@@ -75,21 +98,37 @@ export function describe(values: Array<number | null | undefined>): DescriptiveS
 
   // 歪度 (Fisher-Pearson, n >= 3, SciPy bias=False と一致)
   let skewness: number | null = null;
-  if (n >= 3 && sd > 0) {
+  if (n >= 3 && sd != null && sd > 0) {
     const g1 = (m3 / n) / Math.pow(m2 / n, 1.5);
     skewness = (Math.sqrt(n * (n - 1)) / (n - 2)) * g1;
   }
 
   // 尖度 (excess kurtosis, n >= 4, SciPy bias=False と一致)
   let kurtosis: number | null = null;
-  if (n >= 4 && sd > 0) {
+  if (n >= 4 && sd != null && sd > 0) {
     const g2 = (m4 / n) / Math.pow(m2 / n, 2) - 3;
     kurtosis = ((n - 1) / ((n - 2) * (n - 3))) * ((n + 1) * g2 + 6);
   }
 
-  const se = n > 0 ? sd / Math.sqrt(n) : null;
+  const se = sd != null ? sd / Math.sqrt(n) : null;
 
-  return { n, mean, sd, median, min, max, q1, q3, skewness, kurtosis, se };
+  // Phase 7-3: edge-case 注釈
+  //   - n=1               : SD/skew/kurt が計算不能
+  //   - n>=2 かつ SD=0    : 完全に定数列 (分散ゼロ)
+  let skipped: boolean | undefined;
+  let skip_reason: StatsSkipReason | undefined;
+  if (n < 2) {
+    skipped = true;
+    skip_reason = "insufficient_n";
+  } else if (sd != null && sd === 0) {
+    skipped = true;
+    skip_reason = "no_variance";
+  }
+
+  return {
+    n, mean, sd, median, min, max, q1, q3, skewness, kurtosis, se,
+    ...(skipped ? { skipped, skip_reason } : {}),
+  };
 }
 
 function quantile(sorted: number[], p: number): number | null {
@@ -112,11 +151,23 @@ export interface PearsonResult {
   p: number | null; // 両側 p 値
   ci_lower: number | null; // 95% CI (Fisher z)
   ci_upper: number | null;
+  /** Phase 7-3: edge-case 注釈 */
+  skipped?: boolean;
+  skip_reason?: StatsSkipReason;
 }
 
 /**
  * ピアソン積率相関係数 + 有意性検定
  * pair-wise complete observations のみ使用
+ *
+ * Phase 7-3 edge-case 取り扱い:
+ *   - listwise 後の n が 0           → skip_reason='no_complete_pairs'
+ *   - n が 1〜2 (n<3)                → skip_reason='insufficient_n'
+ *   - dx2*dy2 = 0 (どちらか定数列)   → skip_reason='no_variance'
+ *   - |r| = 1 (完全相関)             → r/t/p は算出 + skip_reason='perfect_correlation'
+ *                                       (CI が Fisher z 変換で発散するため CI のみ null)
+ *   - 計算は可能だが n<=3            → skip_reason='insufficient_n_for_ci'
+ *                                       (CI を Fisher z 変換で出すには n>=4 が必要)
  */
 export function pearson(
   xs: Array<number | null | undefined>,
@@ -137,8 +188,17 @@ export function pearson(
     }
   }
   const n = pairs.length;
+  if (n === 0) {
+    return {
+      r: null, n, t: null, df: null, p: null, ci_lower: null, ci_upper: null,
+      skipped: true, skip_reason: "no_complete_pairs",
+    };
+  }
   if (n < 3) {
-    return { r: null, n, t: null, df: null, p: null, ci_lower: null, ci_upper: null };
+    return {
+      r: null, n, t: null, df: null, p: null, ci_lower: null, ci_upper: null,
+      skipped: true, skip_reason: "insufficient_n",
+    };
   }
 
   let sx = 0, sy = 0;
@@ -156,7 +216,10 @@ export function pearson(
   }
   const denom = Math.sqrt(dx2 * dy2);
   if (denom === 0) {
-    return { r: null, n, t: null, df: null, p: null, ci_lower: null, ci_upper: null };
+    return {
+      r: null, n, t: null, df: null, p: null, ci_lower: null, ci_upper: null,
+      skipped: true, skip_reason: "no_variance",
+    };
   }
   const r = num / denom;
   const df = n - 2;
@@ -184,7 +247,21 @@ export function pearson(
     ci_upper = (Math.exp(2 * zU) - 1) / (Math.exp(2 * zU) + 1);
   }
 
-  return { r, n, t, df, p, ci_lower, ci_upper };
+  // Phase 7-3: CI 不在の理由を機械可読に
+  let skipped: boolean | undefined;
+  let skip_reason: StatsSkipReason | undefined;
+  if (Math.abs(r) >= 1) {
+    skipped = true;
+    skip_reason = "perfect_correlation";
+  } else if (n <= 3) {
+    skipped = true;
+    skip_reason = "insufficient_n_for_ci";
+  }
+
+  return {
+    r, n, t, df, p, ci_lower, ci_upper,
+    ...(skipped ? { skipped, skip_reason } : {}),
+  };
 }
 
 export interface TTestResult {
@@ -201,6 +278,9 @@ export interface TTestResult {
   se_diff: number | null;
   cohen_d: number | null; // 効果量 (pooled SD)
   test_type: "welch_independent" | "paired" | "insufficient_data";
+  /** Phase 7-3: edge-case 注釈 */
+  skipped?: boolean;
+  skip_reason?: StatsSkipReason;
 }
 
 /**
@@ -221,6 +301,8 @@ export function welchTTest(
       mean2: n2 > 0 ? ys.reduce((s, y) => s + y, 0) / n2 : null,
       sd1: null, sd2: null, mean_diff: null, se_diff: null, cohen_d: null,
       test_type: "insufficient_data",
+      skipped: true,
+      skip_reason: "insufficient_n",
     };
   }
 
@@ -233,9 +315,13 @@ export function welchTTest(
 
   const se = Math.sqrt(v1 / n1 + v2 / n2);
   if (se === 0) {
+    // 両群とも分散ゼロ (定数列同士) → t/df/p は計算不能
     return {
       t: null, df: null, p: null, n1, n2, mean1: m1, mean2: m2, sd1, sd2,
-      mean_diff: m1 - m2, se_diff: 0, cohen_d: null, test_type: "welch_independent",
+      mean_diff: m1 - m2, se_diff: 0, cohen_d: null,
+      test_type: "welch_independent",
+      skipped: true,
+      skip_reason: "no_variance",
     };
   }
 
@@ -292,6 +378,8 @@ export function pairedTTest(
       mean1: null, mean2: null, sd1: null, sd2: null,
       mean_diff: null, se_diff: null, cohen_d: null,
       test_type: "insufficient_data",
+      skipped: true,
+      skip_reason: n === 0 ? "no_pairs" : "insufficient_n",
     };
   }
   const mD = diffs.reduce((s, d) => s + d, 0) / n;
@@ -314,10 +402,15 @@ export function pairedTTest(
     cohen_d = sdD > 0 ? mD / sdD : null; // Cohen's dz (paired)
   }
 
+  // Phase 7-3: 差分の SD=0 (= 全 pair で AI と人間が完全一致) は機械可読化
+  const skipped = se === 0;
+  const skip_reason: StatsSkipReason | undefined = skipped ? "no_variance" : undefined;
+
   return {
     t, df, p, n1: n, n2: n, mean1: mX, mean2: mY, sd1: sdX, sd2: sdY,
     mean_diff: mD, se_diff: se, cohen_d,
     test_type: "paired",
+    ...(skipped ? { skipped, skip_reason } : {}),
   };
 }
 
@@ -436,4 +529,55 @@ export function pStars(p: number | null | undefined): string {
   if (p < 0.01) return "**";
   if (p < 0.05) return "*";
   return "";
+}
+
+// ────────────────────────────────────────────────────────────────
+// Phase 7-3: edge case 表示ヘルパ
+// ────────────────────────────────────────────────────────────────
+
+/** skip_reason を日本語の短いラベルに変換 (テーブル末尾列や注記に使用) */
+export function formatSkipReason(reason: StatsSkipReason | undefined): string {
+  switch (reason) {
+    case "insufficient_n":        return "n < 必要数";
+    case "insufficient_n_for_ci": return "n < 4 (CI 算出不能)";
+    case "no_variance":           return "SD = 0";
+    case "perfect_correlation":   return "|r| = 1";
+    case "no_pairs":              return "対応 pair 0";
+    case "no_complete_pairs":     return "両側 valid pair 0";
+    default:                      return "";
+  }
+}
+
+/**
+ * 統計結果のセル表示: 値が null なら skip_reason ラベル付きで "—" を返す。
+ * 値が有限値なら通常の fmt(value, digits) と同じ動作。
+ *
+ *   fmtCell(t.t, t)          → "2.34" / "— (n < 必要数)"
+ *   fmtCell(t.df, t, { digits: 1 })
+ */
+export function fmtCell(
+  value: number | null | undefined,
+  result: { skipped?: boolean; skip_reason?: StatsSkipReason } | null | undefined,
+  opts: { digits?: number; emptyOnly?: boolean } = {},
+): string {
+  const digits = opts.digits ?? 2;
+  if (value != null && Number.isFinite(value)) return value.toFixed(digits);
+  if (result?.skipped && !opts.emptyOnly) {
+    const label = formatSkipReason(result.skip_reason);
+    return label ? `— (${label})` : "—";
+  }
+  return "—";
+}
+
+/** p 値専用: APA 形式で値があれば ".XXX"、なければ "— (理由)" */
+export function fmtPCell(
+  p: number | null | undefined,
+  result: { skipped?: boolean; skip_reason?: StatsSkipReason } | null | undefined,
+): string {
+  if (p != null && Number.isFinite(p)) return fmtP(p);
+  if (result?.skipped) {
+    const label = formatSkipReason(result.skip_reason);
+    return label ? `— (${label})` : "—";
+  }
+  return "—";
 }

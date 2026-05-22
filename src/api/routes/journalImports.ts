@@ -25,6 +25,9 @@ import {
   fmtP,
   fmtCoef,
   pStars,
+  fmtCell,
+  fmtPCell,
+  formatSkipReason,
   type DescriptiveStats,
 } from "../utils/stats";
 import { requireWeekNumber, validateWeekNumber } from "../utils/validation";
@@ -1472,8 +1475,10 @@ async function gatherAnalysisData(
 }
 
 // APA 形式の記述統計行 (Markdown テーブル 1 行) を生成
+// Phase 7-3: SD/skewness/kurtosis が null の場合は備考列に skip 理由を表示
 function apaDescRow(label: string, d: DescriptiveStats): string {
-  return `| ${label} | ${d.n} | ${fmt(d.mean)} | ${fmt(d.sd)} | ${fmt(d.median)} | ${fmt(d.min)} | ${fmt(d.max)} | ${fmt(d.skewness)} | ${fmt(d.kurtosis)} |`;
+  const note = d.skipped ? formatSkipReason(d.skip_reason) : "";
+  return `| ${label} | ${d.n} | ${fmt(d.mean)} | ${fmtCell(d.sd, d)} | ${fmt(d.median)} | ${fmt(d.min)} | ${fmt(d.max)} | ${fmtCell(d.skewness, d)} | ${fmtCell(d.kurtosis, d)} | ${note} |`;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -1526,8 +1531,8 @@ journalImportsRouter.get(
     lines.push("");
     lines.push(`*Note.* M = mean, SD = standard deviation, Mdn = median.`);
     lines.push("");
-    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis |`);
-    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis | 備考 |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|---|`);
     lines.push(apaDescRow("AI 合計スコア", aiTotal));
     lines.push(apaDescRow("AI 因子1", aiF1));
     lines.push(apaDescRow("AI 因子2", aiF2));
@@ -1537,8 +1542,8 @@ journalImportsRouter.get(
 
     lines.push(`## 表2. 人間評価スコア(評価者平均)の記述統計`);
     lines.push("");
-    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis |`);
-    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis | 備考 |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|---|`);
     lines.push(apaDescRow("人間 合計スコア (平均)", huTotal));
     lines.push(apaDescRow("人間 因子1 (平均)", huF1));
     lines.push(apaDescRow("人間 因子2 (平均)", huF2));
@@ -1550,8 +1555,8 @@ journalImportsRouter.get(
     lines.push("");
     lines.push(`*Note.* SCAT は大谷 (2008) の Steps for Coding and Theorization。`);
     lines.push("");
-    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis |`);
-    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis | 備考 |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|---|`);
     lines.push(apaDescRow("SCAT セグメント数", segs));
     lines.push(apaDescRow("SCAT 概念数 (step3)", concs));
     lines.push(apaDescRow("SCAT テーマ数 (step4)", themes));
@@ -1559,8 +1564,8 @@ journalImportsRouter.get(
 
     lines.push(`## 表4. 日誌記述量の記述統計`);
     lines.push("");
-    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis |`);
-    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis | 備考 |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|---|`);
     lines.push(apaDescRow("語数 (word_count)", wc));
     lines.push(apaDescRow("時限ブロック総文字数", blockChars));
     lines.push(apaDescRow("省察パート文字数", refChars));
@@ -1575,6 +1580,9 @@ journalImportsRouter.get(
     lines.push(`- 欠損値は除外 (listwise deletion)。各変数の n はそれぞれ独立。`);
     lines.push(`- AI 評価は journal_id ごとに最新の eval_type='ai' レコードを採用。`);
     lines.push(`- 人間評価は評価者間で平均した値を 1 日誌の代表値として扱った。`);
+    lines.push(`- **備考**列は計算がスキップ/退化した理由を示す (Phase 7-3):`);
+    lines.push(`    - \`${formatSkipReason("insufficient_n")}\` : n<2 のため SD/歪度/尖度が算出不能。`);
+    lines.push(`    - \`${formatSkipReason("no_variance")}\` : 値が全件同一 (SD=0) のため歪度/尖度が算出不能。`);
     lines.push("");
 
     const md = lines.join("\n");
@@ -1633,8 +1641,8 @@ journalImportsRouter.get(
     );
 
     const rows: string[] = [];
-    // ヘッダ: 変数1, 変数2, n, r, t, df, p, p_sig, ci_lower, ci_upper
-    rows.push("variable_1,variable_2,n,r,t,df,p,p_sig,ci_lower_95,ci_upper_95");
+    // ヘッダ: 変数1, 変数2, n, r, t, df, p, p_sig, ci_lower, ci_upper, skip_reason (Phase 7-3)
+    rows.push("variable_1,variable_2,n,r,t,df,p,p_sig,ci_lower_95,ci_upper_95,skip_reason");
 
     for (let i = 0; i < vars.length; i++) {
       for (let j = i + 1; j < vars.length; j++) {
@@ -1645,12 +1653,14 @@ journalImportsRouter.get(
             vars[j].label,
             r.n,
             r.r != null ? r.r.toFixed(4) : "",
-            r.t != null ? r.t.toFixed(4) : "",
+            r.t != null && Number.isFinite(r.t) ? r.t.toFixed(4) : "",
             r.df != null ? r.df : "",
             r.p != null ? r.p.toFixed(6) : "",
             pStars(r.p),
             r.ci_lower != null ? r.ci_lower.toFixed(4) : "",
             r.ci_upper != null ? r.ci_upper.toFixed(4) : "",
+            // Phase 7-3: edge-case 識別子 (機械可読 enum、空文字なら通常推定)
+            r.skip_reason ?? "",
           ]
             .map(csvEscape)
             .join(","),
@@ -1727,14 +1737,16 @@ journalImportsRouter.get(
 
     lines.push(`## 表1. 実習前半 vs 後半 (Welch's independent t-test)`);
     lines.push("");
-    lines.push(`| 変数 | n₁ | M₁ (SD₁) | n₂ | M₂ (SD₂) | M差 | t | df | p | Cohen's d |`);
-    lines.push(`|---|---|---|---|---|---|---|---|---|---|`);
+    // Phase 7-3: skip 理由を末尾列に表示
+    lines.push(`| 変数 | n₁ | M₁ (SD₁) | n₂ | M₂ (SD₂) | M差 | t | df | p | Cohen's d | 備考 |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|---|---|`);
     for (const v of welchVars) {
       const g1 = firstHalf.map((d) => (d[v.key] == null ? null : Number(d[v.key] as any)));
       const g2 = secondHalf.map((d) => (d[v.key] == null ? null : Number(d[v.key] as any)));
       const t = welchTTest(g1, g2);
+      const note = t.skipped ? formatSkipReason(t.skip_reason) : "";
       lines.push(
-        `| ${v.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${t.n2} | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${t.t != null ? fmt(t.t) : "-"} | ${t.df != null ? fmt(t.df, 1) : "-"} | ${fmtP(t.p)}${pStars(t.p)} | ${t.cohen_d != null ? fmt(t.cohen_d) : "-"} |`,
+        `| ${v.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${t.n2} | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${fmtCell(t.t, t)} | ${fmtCell(t.df, t, { digits: 1 })} | ${fmtPCell(t.p, t)}${pStars(t.p)} | ${fmtCell(t.cohen_d, t)} | ${note} |`,
       );
     }
     lines.push("");
@@ -1743,8 +1755,9 @@ journalImportsRouter.get(
     lines.push("");
     lines.push(`*Note.* AI と人間 (評価者平均) が両方存在する日誌のみが対象。`);
     lines.push("");
-    lines.push(`| 比較ペア | n | M_AI (SD) | M_人間 (SD) | M差 (AI−人間) | t | df | p | Cohen's dz |`);
-    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    // Phase 7-3: skip 理由を末尾列に表示
+    lines.push(`| 比較ペア | n | M_AI (SD) | M_人間 (SD) | M差 (AI−人間) | t | df | p | Cohen's dz | 備考 |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|---|`);
     const pairedPairs: Array<{ ai: keyof AnalysisDatum; hu: keyof AnalysisDatum; label: string }> = [
       { ai: "ai_total", hu: "hu_total", label: "合計スコア" },
       { ai: "ai_f1", hu: "hu_f1", label: "因子1" },
@@ -1756,8 +1769,9 @@ journalImportsRouter.get(
       const xs = data.map((d) => (d[pp.ai] == null ? null : Number(d[pp.ai] as any)));
       const ys = data.map((d) => (d[pp.hu] == null ? null : Number(d[pp.hu] as any)));
       const t = pairedTTest(xs, ys);
+      const note = t.skipped ? formatSkipReason(t.skip_reason) : "";
       lines.push(
-        `| ${pp.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${t.t != null ? fmt(t.t) : "-"} | ${t.df != null ? t.df : "-"} | ${fmtP(t.p)}${pStars(t.p)} | ${t.cohen_d != null ? fmt(t.cohen_d) : "-"} |`,
+        `| ${pp.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${fmtCell(t.t, t)} | ${t.df != null ? t.df : (t.skipped ? `— (${formatSkipReason(t.skip_reason)})` : "—")} | ${fmtPCell(t.p, t)}${pStars(t.p)} | ${fmtCell(t.cohen_d, t)} | ${note} |`,
       );
     }
     lines.push("");
@@ -1768,9 +1782,12 @@ journalImportsRouter.get(
     lines.push("");
     lines.push(`- 有意水準は * p < .05, ** p < .01, *** p < .001 を採用。`);
     lines.push(`- Welch 自由度は Welch-Satterthwaite 近似で算出。`);
-    lines.push(`- 標本サイズが 2 未満の群は \`-\` 表示 (検定実行不可)。`);
     lines.push(`- p 値は Student t 分布の両側確率を不完全ベータ関数 (Numerical Recipes 6.4) で計算。`);
     lines.push(`- 結果はリッスンワイズ削除 (両群とも値がある日誌のみ paired 検定の対象)。`);
+    lines.push(`- **備考**列は計算がスキップ/退化した理由を示す (Phase 7-3):`);
+    lines.push(`    - \`${formatSkipReason("insufficient_n")}\` : Welch は n₁<2 または n₂<2、Paired は n<2。`);
+    lines.push(`    - \`${formatSkipReason("no_variance")}\` : Welch は両群とも分散ゼロ、Paired は AI と人間が全 pair で完全一致 (差分の SD=0)。`);
+    lines.push(`    - 備考列が空の場合は通常推定が可能であったことを示す。`);
     lines.push("");
 
     const md = lines.join("\n");
