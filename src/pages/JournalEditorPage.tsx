@@ -456,8 +456,14 @@ const JournalEditorPage: React.FC = () => {
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
             <TextField label="実施日" type="date" value={entryDate} onChange={(e) => { setEntryDate(e.target.value); setErrors((ev) => ({ ...ev, date: undefined })); }}
               error={!!errors.date} helperText={errors.date} size="small" slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 180 }} />
-            <TextField label="実習週" type="number" value={weekNumber} onChange={(e) => setWeekNumber(Math.max(1, Number(e.target.value)))}
-              size="small" slotProps={{ input: { inputProps: { min: 1, max: 15 } } }} sx={{ width: 110 }} />
+            {/* Phase 7-2: API バリデーションと整合させ 1..52 を強制 (UI 側で paste/直接入力もクランプ) */}
+            <TextField label="実習週" type="number" value={weekNumber}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n)) return;
+                setWeekNumber(Math.max(1, Math.min(52, Math.floor(n))));
+              }}
+              size="small" slotProps={{ input: { inputProps: { min: 1, max: 52, step: 1 } } }} sx={{ width: 110 }} />
           </Box>
         </CardContent>
       </Card>

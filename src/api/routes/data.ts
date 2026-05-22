@@ -23,6 +23,7 @@ import exportsRouter from "./exports";
 import analysisRouter from "./analysisState";
 import journalImportsRouter from "./journalImports";
 import { markScatDependentsDirty } from "../services/scatDerivedAnalysis";
+import { requireWeekNumber } from "../utils/validation";
 import { cors } from "hono/cors";
 import { requireRoles } from "../middleware/auth";
 import { getScopeContext, buildScopeFilter, assertCanAccessStudent } from "../middleware/scope";
@@ -878,7 +879,13 @@ dataRouter.post("/journals", requireRoles(["student"] as UserRole[]), async (c) 
     const id = body.id || crypto.randomUUID();
     const content = body.content || "";
     const status = body.status || "draft";
-    const weekNumber = body.week_number || 1;
+
+    // Phase 7-2: week_number は 1..52 の整数のみ許可。
+    // 省略時は 1 (デフォルト) を採用 (従来挙動を維持)。
+    const weekNumberRaw = body.week_number ?? 1;
+    const validated = requireWeekNumber(c, weekNumberRaw);
+    if (validated instanceof Response) return validated;
+    const weekNumber = validated;
     const studentName = (user as any).name || "学生";
     await ensureSchema(db);
 
@@ -1277,6 +1284,10 @@ dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c
     comment?: string;
   };
 
+  // Phase 7-2: week_number は 1..52 の整数のみ許可
+  const validatedWeek = requireWeekNumber(c, body.week_number);
+  if (validatedWeek instanceof Response) return validatedWeek;
+
   try {
     const total = (body.factor1_score * 7 + body.factor2_score * 6 + body.factor3_score * 4 + body.factor4_score * 6) / 23;
     const id = genId();
@@ -1287,7 +1298,7 @@ dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c
          total_score, rd_journal_level, comment, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      id, body.student_id, body.week_number, body.journal_id ?? null,
+      id, body.student_id, validatedWeek, body.journal_id ?? null,
       body.factor1_score, body.factor2_score, body.factor3_score, body.factor4_score,
       Math.round(total * 100) / 100,
       body.rd_journal_level ?? null, body.comment ?? null, nowISO()
@@ -1406,6 +1417,10 @@ dataRouter.post("/goals", requireRoles(["student"] as UserRole[]), async (c) => 
     bfi_context?: any;
   };
 
+  // Phase 7-2: week_number は 1..52 の整数のみ許可
+  const validatedWeek = requireWeekNumber(c, body.week_number);
+  if (validatedWeek instanceof Response) return validatedWeek;
+
   try {
     const id = genId();
     const sc = body.smart_criteria ?? {};
@@ -1415,7 +1430,7 @@ dataRouter.post("/goals", requireRoles(["student"] as UserRole[]), async (c) => 
         is_smart, smart_specific, smart_measurable, smart_achievable, smart_relevant, smart_time_bound, difficulty_level, adjustment_reason, bfi_context, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      id, body.student_id, body.session_id ?? null, body.week_number, body.goal_text,
+      id, body.student_id, body.session_id ?? null, validatedWeek, body.goal_text,
       body.target_item_id ?? null, body.target_factor ?? null,
       body.is_smart ? 1 : 0,
       sc.specific ? 1 : 0, sc.measurable ? 1 : 0, sc.achievable ? 1 : 0,

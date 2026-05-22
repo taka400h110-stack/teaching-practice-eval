@@ -11,6 +11,7 @@ import { adminAlertsRouter } from "./api/routes/adminAlerts";
 import adminAnalyticsRouter from "./api/routes/adminAnalytics";
 import adminIncidentsRouter from "./api/routes/adminIncidents";
 import adminOperationalReadinessRouter from "./api/routes/adminOperationalReadiness";
+import adminSanityChecksRouter from "./api/routes/adminSanityChecks";
 
 
 type Bindings = {
@@ -54,6 +55,7 @@ app.route("/api/admin/alerts", adminAlertsRouter);
 app.route("/api/admin/analytics", adminAnalyticsRouter);
 app.route("/api/admin/incidents", adminIncidentsRouter);
 app.route("/api/admin/operational-readiness", adminOperationalReadinessRouter);
+app.route("/api/admin/sanity-checks", adminSanityChecksRouter);
 
 // ────────────────────────────────────────────────────────────────
 // ヘルスチェック
