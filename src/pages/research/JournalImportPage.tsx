@@ -35,6 +35,9 @@ import {
   DialogActions,
   TextField,
   MenuItem,
+  Menu,
+  ListItemIcon,
+  ListItemText,
   Tooltip,
   Divider,
   Snackbar,
@@ -68,6 +71,10 @@ import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import FilterAltOffIcon from "@mui/icons-material/FilterAltOff";
 import DownloadIcon from "@mui/icons-material/Download";
 import FolderZipIcon from "@mui/icons-material/FolderZip";
+import TableChartIcon from "@mui/icons-material/TableChart";
+import DataObjectIcon from "@mui/icons-material/DataObject";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { unzip } from "fflate";
 import { apiFetch, getToken } from "../../api/client";
@@ -613,15 +620,35 @@ export default function JournalImportPage() {
     });
   };
 
-  // CSV エクスポート
-  const handleExportCsv = async () => {
+  // エクスポート (4 種類)
+  type ExportFormat = "summary_csv" | "detail_csv" | "json" | "analysis_csv";
+  const handleExport = async (format: ExportFormat) => {
     const params = new URLSearchParams();
     if (searchQ.trim()) params.set("q", searchQ.trim());
     if (filterStatus) params.set("status", filterStatus);
     if (filterFromDate) params.set("from", filterFromDate);
     if (filterToDate) params.set("to", filterToDate);
-    const url = `/api/data/journal-imports/export.csv${params.toString() ? "?" + params.toString() : ""}`;
 
+    let endpoint = "/api/data/journal-imports/export.csv";
+    let fallbackName = "journal-imports";
+    let ext = "csv";
+    if (format === "detail_csv") {
+      endpoint = "/api/data/journal-imports/export.detail.csv";
+      fallbackName = "journal-imports-detail";
+    } else if (format === "json") {
+      endpoint = "/api/data/journal-imports/export.json";
+      fallbackName = "journal-imports";
+      ext = "json";
+    } else if (format === "analysis_csv") {
+      endpoint = "/api/data/journal-imports/export.analysis.csv";
+      fallbackName = "journal-analysis";
+      // analysis では q / status は使わない
+      params.delete("q");
+      params.delete("status");
+    }
+    const url = `${endpoint}${params.toString() ? "?" + params.toString() : ""}`;
+
+    setExportMenuAnchor(null);
     try {
       const token = getToken();
       const r = await fetch(url, {
@@ -630,7 +657,7 @@ export default function JournalImportPage() {
       if (!r.ok) {
         setSnackbar({
           open: true,
-          message: `CSV エクスポートに失敗: ${r.status}`,
+          message: `エクスポート失敗: ${r.status}`,
           severity: "error",
         });
         return;
@@ -640,24 +667,27 @@ export default function JournalImportPage() {
       const a = document.createElement("a");
       const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
       a.href = dlUrl;
-      a.download = `journal-imports-${ts}.csv`;
+      a.download = `${fallbackName}-${ts}.${ext}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(dlUrl);
       setSnackbar({
         open: true,
-        message: "CSV をダウンロードしました",
+        message: `${a.download} をダウンロードしました`,
         severity: "success",
       });
     } catch (e: any) {
       setSnackbar({
         open: true,
-        message: `CSV エクスポート失敗: ${e?.message || e}`,
+        message: `エクスポート失敗: ${e?.message || e}`,
         severity: "error",
       });
     }
   };
+
+  // Menu 状態
+  const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
 
   const clearFilters = () => {
     setSearchQ("");
@@ -693,9 +723,12 @@ export default function JournalImportPage() {
               {filterActive ? <FilterAltIcon /> : <FilterAltOffIcon />}
             </IconButton>
           </Tooltip>
-          <Tooltip title="現在のフィルタで CSV ダウンロード">
+          <Tooltip title="エクスポート (CSV / JSON / 分析用)">
             <span>
-              <IconButton onClick={handleExportCsv} disabled={totalCount === 0}>
+              <IconButton
+                onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+                disabled={totalCount === 0}
+              >
                 <DownloadIcon />
               </IconButton>
             </span>
@@ -942,9 +975,10 @@ export default function JournalImportPage() {
                 size="small"
                 variant="outlined"
                 startIcon={<DownloadIcon />}
-                onClick={handleExportCsv}
+                endIcon={<KeyboardArrowDownIcon />}
+                onClick={(e) => setExportMenuAnchor(e.currentTarget)}
               >
-                CSV ダウンロード
+                エクスポート
               </Button>
             </Stack>
           </CardContent>
@@ -1053,6 +1087,51 @@ export default function JournalImportPage() {
           isRestructuring={false}
         />
       )}
+
+      {/* エクスポートメニュー */}
+      <Menu
+        anchorEl={exportMenuAnchor}
+        open={!!exportMenuAnchor}
+        onClose={() => setExportMenuAnchor(null)}
+      >
+        <MenuItem onClick={() => handleExport("summary_csv")}>
+          <ListItemIcon>
+            <TableChartIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="サマリー CSV"
+            secondary="基本メタ情報 19 列 (取り込み一覧)"
+          />
+        </MenuItem>
+        <MenuItem onClick={() => handleExport("detail_csv")}>
+          <ListItemIcon>
+            <TableChartIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="詳細 CSV (質的分析向け)"
+            secondary="時限ブロック 11 列 + 省察 + 抽出原文"
+          />
+        </MenuItem>
+        <MenuItem onClick={() => handleExport("json")}>
+          <ListItemIcon>
+            <DataObjectIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="JSON (NVivo / pandas 向け)"
+            secondary="ネスト構造で全フィールド"
+          />
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => handleExport("analysis_csv")}>
+          <ListItemIcon>
+            <AssessmentIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="統合分析 CSV (量的分析向け)"
+            secondary="日誌 + AI評価 + 人間評価 + SCAT概念数"
+          />
+        </MenuItem>
+      </Menu>
 
       <Snackbar
         open={snackbar.open}
