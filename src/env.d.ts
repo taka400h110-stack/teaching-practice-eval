@@ -7,6 +7,7 @@ declare global {
     STAT_API_URL?: string;
     DB: D1Database;
     KV: KVNamespace;
+    AI: Ai;
   };
 }
 export {};

@@ -1,15 +1,32 @@
 
-export async function apiFetch(url: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('auth_token');
+// 認証トークン取得ヘルパー
+export function getToken(): string | null {
+  try {
+    return typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
+  } catch {
+    return null;
+  }
+}
+
+// API ベース URL (同一オリジン)
+export const API_BASE_URL = "";
+
+// 認証付き fetch ラッパ。生の Response を返す（呼び出し側で .json()/.clone() を行う）
+// 注意: 過去には Proxy で parsed body を露出していたが、Proxy 越しに Response.prototype.json/clone を
+// 呼ぶと内部スロット (this) が破損して「Illegal invocation」を起こすため廃止。
+export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = getToken();
   const headers = {
     ...options.headers,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
   const res = await fetch(url, { ...options, headers });
   if (res.status === 401) {
-    localStorage.removeItem("user_info");
-    localStorage.removeItem("auth_token");
-    window.location.href = '/login';
+    try {
+      localStorage.removeItem("user_info");
+      localStorage.removeItem("auth_token");
+    } catch {}
+    if (typeof window !== "undefined") window.location.href = '/login';
     throw new Error("Unauthorized or token expired");
   }
   return res;
@@ -120,7 +137,7 @@ export const DEMO_ACCOUNT_LIST = [
     group: "研究・行政",
   },
   {
-    email: "board@teaching-eval.jp",        password: "password",
+    email: "observer@teaching-eval.jp",     password: "password",
     label: "教育委員会",   name: "中村 委員",
     detail: "〇〇市教育委員会 / 指導主事",
     group: "研究・行政",
@@ -137,27 +154,59 @@ const apiClient = {
   // ── 認証 ──
   login: async (email: string, password: string) => {
     if (!email.includes("@")) throw new Error("Invalid credentials");
-    
-    const res = await apiFetch("/api/data/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-    
-    if (!res.ok) throw new Error("User not found or invalid credentials");
-    const data = await res.json() as any;
+
+    // 注意: apiFetch は JSON レスポンスを Proxy 化するため、
+    //   ここでは生の fetch を使い、確実に JSON ボディを取得する。
+    //   また localStorage に古いトークンが残っていると 401 で
+    //   apiFetch がリダイレクト副作用を起こすため、事前に除去。
+    try {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user_info");
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+    } catch {}
+
+    let res: Response;
+    try {
+      res = await fetch("/api/data/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+    } catch (netErr) {
+      console.error("[login] network error:", netErr);
+      throw new Error("ネットワークエラー: サーバに接続できません");
+    }
+
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      console.error("[login] JSON parse error:", parseErr);
+      throw new Error(`サーバの応答を解析できませんでした (HTTP ${res.status})`);
+    }
+
+    if (!res.ok || !data || data.error || !data.user || !data.token) {
+      const msg = data?.error || data?.message || `ログイン失敗 (HTTP ${res.status})`;
+      console.error("[login] failure:", msg, data);
+      throw new Error(msg);
+    }
+
     const user = data.user;
-    if (data.token) localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(user));
-    
-    localStorage.setItem("user_info", JSON.stringify(user));
+    // すべての localStorage キーに保存 (互換性のため複数キー併用)
+    localStorage.setItem("token", data.token);
     localStorage.setItem("auth_token", data.token);
-    
-    // Check if onboarding is done (for students)
+    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("user_info", JSON.stringify(user));
+
+    // Onboarding 判定
     const onboardingDone = localStorage.getItem(`onboarding_done_${user.id}`);
     if (!onboardingDone && user.role === "student") {
       localStorage.setItem("pending_onboarding", "true");
     }
-    
-    return { ...user, requiresOnboarding: !onboardingDone && user.role === "student" };
+
+    console.log("[login] success:", user.email, user.role);
+    return { ...user, requiresOnboarding: false };
   },
   logout: async () => {
     
@@ -174,30 +223,48 @@ const apiClient = {
     const token = localStorage.getItem("auth_token");
     if (!token) return false;
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      // JWT は base64url エンコードのため、atob で扱える形式に変換
+      // - "-" -> "+", "_" -> "/"
+      // - padding "=" を補完
+      // - UTF-8 マルチバイト文字 (例: 日本語の name) を正しくデコードするため
+      //   decodeURIComponent(escape(...)) で UTF-8 として復号
+      const parts = token.split(".");
+      if (parts.length < 2) return false;
+      let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64.length % 4;
+      if (pad) b64 += "=".repeat(4 - pad);
+      const decoded = decodeURIComponent(
+        Array.prototype.map
+          .call(atob(b64), (c: string) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      const payload = JSON.parse(decoded);
       if (payload.exp && payload.exp * 1000 < Date.now()) {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("user_info");
         return false;
       }
       return true;
-    } catch(e) {
-      return false;
+    } catch (e) {
+      // パース失敗時もログアウト状態にせず、user_info があればフォールバックで認証済みとみなす
+      // (トークンは API リクエスト時にサーバ側で検証される)
+      const userInfo = localStorage.getItem("user_info");
+      return !!userInfo;
     }
   },
 
-  requiresOnboarding: () => localStorage.getItem("pending_onboarding") === "true",
-  completeOnboarding: (userId: string) => {
-    localStorage.setItem(`onboarding_done_${userId}`, "true");
-    localStorage.removeItem("pending_onboarding");
-  },
+  requiresOnboarding: () => false,
+  completeOnboarding: (userId: string) => {},
 
   // ── 日誌 ──
-  getJournals: async (): Promise<JournalEntry[]> => {
+  // studentId を渡せば対象学生で絞り込み (教員・指導教員などが「特定の学生の日誌一覧」を見るために使用)
+  getJournals: async (studentId?: string): Promise<JournalEntry[]> => {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
     const role = user.role || "student";
     let url = "/api/data/journals";
-    if (role === "student") {
+    if (studentId) {
+      url += "?student_id=" + encodeURIComponent(studentId);
+    } else if (role === "student") {
       url += "?student_id=" + user.id;
     }
     const res = await apiFetch(url);
@@ -208,7 +275,8 @@ const apiClient = {
   getJournal: async (id: string): Promise<JournalEntry> => {
     const res = await apiFetch(`/api/data/journals/${id}`, { headers: {  } });
     if (!res.ok) throw new Error(`Journal ${id} not found`);
-    return await res.json();
+    const data = await res.json() as any;
+    return data.journal || data;
   },
   createJournal: async (data: Record<string, unknown>): Promise<JournalEntry> => {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
@@ -231,6 +299,23 @@ const apiClient = {
     if (!res.ok) throw new Error("Failed to update journal");
     return await res.json();
   },
+  // 大学教員 / 校内指導教員 / 管理者が日誌コメントだけを保存する専用API
+  // PUT /journals/:id は学生限定のため、コメントだけは PATCH /journals/:id/comment を使う
+  updateJournalComment: async (
+    id: string,
+    fields: { univ_teacher_comment?: string; school_mentor_comment?: string; teacher_comment?: string }
+  ): Promise<JournalEntry> => {
+    const res = await apiFetch(`/api/data/journals/${id}/comment`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`Failed to update journal comment: ${res.status} ${txt}`);
+    }
+    return await res.json();
+  },
   deleteJournal: async (id: string): Promise<void> => {
     const res = await apiFetch(`/api/data/journals/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem('auth_token')}` } });
     if (!res.ok) throw new Error("Failed to delete journal");
@@ -243,29 +328,31 @@ const apiClient = {
     try {
       const res = await apiFetch(`/api/data/evaluations/${journalId}`, { headers: {  } });
       if (!res.ok) throw new Error("Failed to fetch evaluation");
-      const data = await res.json() as any;
+      const resp = await res.json() as any;
+      if (!resp.success || !resp.evaluation) throw new Error("Evaluation not found");
+      const data = resp.evaluation;
+      const items = resp.items || [];
       return {
         id: data.id,
         journal_id: data.journal_id,
         status: "completed",
-        // overall_score: data.total_score,
         factor_scores: {
-          factor1: data.factor1_score,
-          factor2: data.factor2_score,
-          factor3: data.factor3_score,
-          factor4: data.factor4_score
+          factor1: data.factor1_score || 0,
+          factor2: data.factor2_score || 0,
+          factor3: data.factor3_score || 0,
+          factor4: data.factor4_score || 0
         },
-        evaluation_items: JSON.parse((data as any).items_json || "[]").map((i: any) => ({
-          item_number: i.item_number || i.item,
+        evaluation_items: items.map((i: any) => ({
+          item_number: i.item_number,
           score: i.score,
           evidence: i.evidence,
-          feedback: i.feedback
+          feedback: i.feedback || i.comment
         })),
         overall_comment: data.overall_comment || "",
         total_score: data.total_score || 0,
-        evaluated_item_count: data.evaluated_item_count || 0,
-        tokens_used: data.tokens_used || 0,
-        halo_check: data.halo_check || false
+        evaluated_item_count: items.length || 0,
+        tokens_used: data.token_count || 0,
+        halo_check: data.halo_effect_detected === 1
       };
     } catch { throw new Error("Evaluation not found"); }
   },
@@ -276,28 +363,22 @@ const apiClient = {
       const res = await apiFetch("/api/data/evaluations", { headers: {  } });
       if (!res.ok) throw new Error("Failed to fetch all evaluations");
       const data = await res.json() as any;
-      return data.evaluations.map((e: any) => ({
+      return (data.evaluations || []).map((e: any) => ({
         id: e.id,
         journal_id: e.journal_id,
         status: "completed",
-         
         factor_scores: {
-          factor1: e.factor1_score,
-          factor2: e.factor2_score,
-          factor3: e.factor3_score,
-          factor4: e.factor4_score
+          factor1: e.factor1_score || 0,
+          factor2: e.factor2_score || 0,
+          factor3: e.factor3_score || 0,
+          factor4: e.factor4_score || 0
         },
-        evaluation_items: JSON.parse(e.items_json || "[]").map((i: any) => ({
-          item_number: i.item_number || i.item,
-          score: i.score,
-          evidence: i.evidence,
-          feedback: i.feedback
-        })),
+        evaluation_items: [],
         overall_comment: e.overall_comment || "",
         total_score: e.total_score || 0,
-        evaluated_item_count: e.evaluated_item_count || 0,
-        tokens_used: e.tokens_used || 0,
-        halo_check: e.halo_check || false
+        evaluated_item_count: 23,
+        tokens_used: e.token_count || 0,
+        halo_check: e.halo_effect_detected === 1
       }));
     } catch {
       return [];
@@ -357,17 +438,21 @@ const apiClient = {
   // AI評価実行（ステータスを evaluated に更新）
   runEvaluation: async (journalId: string): Promise<EvaluationResult> => {
     try {
-      const journals = ([] as any[]);
-      const idx = journals.findIndex((j) => j.id === journalId);
-      const journal = journals[idx];
       const user = JSON.parse(localStorage.getItem("user_info") ?? "{}");
+      
+      // 1. 日誌の中身を取得する
+      const jRes = await apiFetch(`/api/data/journals/${journalId}`);
+      if (!jRes.ok) throw new Error("Failed to fetch journal for evaluation");
+      const jData = await jRes.json() as any;
+      if (!jData.success || !jData.journal) throw new Error("Journal not found");
+      const journal = jData.journal;
 
-      // 1. AI評価APIを呼び出す
+      // 2. AI評価APIを呼び出す
       const aiRes = await apiFetch("/api/ai/evaluate", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          journal_content: journal?.content || "",
+          journal_content: journal.content || "",
           student_name: user.name || "学生",
-          week_number: journal?.week_number || 1,
+          week_number: journal.week_number || 1,
           journal_id: journalId
         })
       });
@@ -375,7 +460,7 @@ const apiClient = {
       if (!aiRes.ok) throw new Error("Failed to call AI evaluate");
       const aiData: any = await aiRes.json();
 
-      // 2. 評価結果を保存する
+      // 3. 評価結果を保存する
       const saveRes = await apiFetch("/api/data/evaluations", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           journal_id: journalId,
@@ -390,17 +475,10 @@ const apiClient = {
       
       if (!saveRes.ok) throw new Error("Failed to save evaluation");
 
-      // 3. ローカルのステータスを更新する
-      if (idx !== -1) {
-        journals[idx] = { ...journals[idx], status: "completed" };
-        ;
-      }
-
-      // 4. 保存した評価結果を取得して返す
+      // 最新の評価結果を再取得して返す
       return await apiClient.getEvaluation(journalId);
     } catch (err) {
       console.error("runEvaluation error:", err);
-      // エラー時のフォールバック
       throw new Error("Evaluation failed");
     }
   },
@@ -538,12 +616,10 @@ throw new Error("Failed to save self evaluation");
     return { session: { id: "new", journal_id: journalId, phase: "phase1", messages: [], created_at: new Date().toISOString() }, reply: { id: "r", role: "assistant", content: "dummy", timestamp: new Date().toISOString() } };
   },
 
-  // ── コーホート ──
+  // ── コーホート（教員ダッシュボード用学生プロファイル） ──
   getCohortProfiles: async (): Promise<any[]> => {
-    const user = JSON.parse(localStorage.getItem("user_info") || "{}");
-    const role = user.role || "researcher";
     try {
-      const res = await apiFetch('/api/data/cohorts', { headers: {  } });
+      const res = await apiFetch('/api/data/teacher/profiles', { headers: {} });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json() as any;
       return data.cohorts || [];

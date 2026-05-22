@@ -27,11 +27,36 @@ async function sha256(text: string) {
 exportsRouter.post("/requests", requireAuth, requireRoles(RESEARCH_ROLES), async (c) => {
   const db = c.env.DB;
   const user = c.get("user");
-  const body = await c.req.json();
-  
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "リクエスト本文が不正です (JSON parse error)" }, 400);
+  }
+
+  if (!body || typeof body !== "object") {
+    return c.json({ error: "リクエスト本文が不正です" }, 400);
+  }
+  if (!body.dataset_type || typeof body.dataset_type !== "string") {
+    return c.json({ error: "dataset_type は必須の文字列です" }, 400);
+  }
+  if (!body.scope_level || typeof body.scope_level !== "string") {
+    return c.json({ error: "scope_level は必須の文字列です" }, 400);
+  }
+  const allowedScopes = ["course", "cohort", "student", "all"];
+  if (!allowedScopes.includes(body.scope_level)) {
+    return c.json({ error: `scope_level は ${allowedScopes.join("|")} のいずれかです` }, 400);
+  }
+  if (!body.requested_anonymization_level || typeof body.requested_anonymization_level !== "string") {
+    return c.json({ error: "requested_anonymization_level は必須の文字列です" }, 400);
+  }
+  if (!body.purpose || typeof body.purpose !== "string" || body.purpose.trim().length === 0) {
+    return c.json({ error: "purpose は必須の非空文字列です" }, 400);
+  }
+
   const id = "req-" + crypto.randomUUID();
   const request_type = body.request_type || "export";
-  
+
   if (request_type === "raw_access" && !["admin"].includes(user.role) && !["researcher"].includes(user.role)) {
     return c.json({ error: "Role not allowed to request raw access" }, 403);
   }
@@ -91,7 +116,7 @@ exportsRouter.post("/requests/:id/approve", requireAuth, requireRoles(["admin"] 
   const body = await c.req.json();
   
   const { results } = await db.prepare("SELECT * FROM dataset_export_requests WHERE id = ?").bind(id).all();
-  if (results.length === 0) return c.json({ error: "Not found" }, 404);
+  if (results.length === 0) return c.json({ error: "見つかりません" }, 404);
   
   await db.prepare(`
     UPDATE dataset_export_requests
@@ -145,10 +170,10 @@ exportsRouter.post("/requests/:id/generate", requireAuth, requireRoles(["admin",
   const body = await c.req.json().catch(() => ({}));
   
   const reqRes = await db.prepare("SELECT * FROM dataset_export_requests WHERE id = ?").bind(id).first() as any;
-  if (!reqRes) return c.json({ error: "Not found" }, 404);
+  if (!reqRes) return c.json({ error: "見つかりません" }, 404);
   
   if (reqRes.requester_user_id !== user.id && user.role !== "admin") {
-    return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: "アクセス権限がありません" }, 403);
   }
   
   if (reqRes.status !== "approved") {
@@ -263,10 +288,10 @@ exportsRouter.post("/requests/:id/download-token", requireAuth, requireRoles(RES
   const user = c.get("user");
   
   const reqRes = await db.prepare("SELECT * FROM dataset_export_requests WHERE id = ?").bind(id).first() as any;
-  if (!reqRes) return c.json({ error: "Not found" }, 404);
+  if (!reqRes) return c.json({ error: "見つかりません" }, 404);
   
   if (reqRes.requester_user_id !== user.id) {
-    return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: "アクセス権限がありません" }, 403);
   }
   if (reqRes.status !== "completed" && reqRes.status !== "generated") {
     return c.json({ error: "Export not generated yet" }, 400);
@@ -334,7 +359,7 @@ exportsRouter.get("/download/:token", async (c) => {
   if (c.env.EXPORTS_BUCKET && objectKey && !objectKey.startsWith("data:")) {
     const object = await c.env.EXPORTS_BUCKET.get(objectKey);
     if (!object) {
-      return c.json({ error: "Object not found" }, 404);
+      return c.json({ error: "オブジェクトが見つかりません" }, 404);
     }
     
     const headers = new Headers();

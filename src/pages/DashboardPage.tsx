@@ -73,7 +73,7 @@ export default function DashboardPage() {
   const prev: WeeklyScore | undefined   = (growth?.weekly_scores ?? []).slice(-2)[0];
   const achievedGoals = (goals ?? []).filter((g) => g.achieved).length;
 
-  const trendDiff = latest && prev ? +(latest.total - prev.total).toFixed(2) : 0;
+  const trendDiff = latest && prev ? +(latest.total - prev.total || 0).toFixed(2) : 0;
 
   const kpiCards = [
     {
@@ -87,7 +87,7 @@ export default function DashboardPage() {
     },
     {
       label: "総合スコア（最新週）",
-      value: latest ? latest.total.toFixed(2) : "—",
+      value: latest ? (latest.total || 0).toFixed(2) : "—",
       sub: trendDiff > 0 ? `▲ ${trendDiff} 前週比` : trendDiff < 0 ? `▼ ${Math.abs(trendDiff)} 前週比` : "前週と同じ",
       color: "#388e3c",
       bg: "#e8f5e9",
@@ -200,7 +200,7 @@ export default function DashboardPage() {
                     <Box display="flex" justifyContent="space-between" mb={0.4}>
                       <Typography variant="body2" fontWeight={600}>{FACTOR_LABELS[i]}</Typography>
                       <Typography variant="body2" fontWeight="bold" color={FACTOR_COLORS[i]}>
-                        {latest[f].toFixed(2)} / 5.0
+                        {(latest[f] || 0).toFixed(2)} / 5.0
                       </Typography>
                     </Box>
                     <ScoreBar value={latest[f]} color={FACTOR_COLORS[i]} />

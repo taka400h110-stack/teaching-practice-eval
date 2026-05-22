@@ -8,7 +8,7 @@ export const DeliveryAnalyticsTable = ({ failures }: { failures: any[] }) => {
   return (
     <Card variant="outlined" sx={{ mt: 3 }}>
       <CardContent>
-        <Typography variant="h6" gutterBottom>Recent Delivery Failures</Typography>
+        <Typography variant="h6" gutterBottom>直近の配信失敗</Typography>
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>

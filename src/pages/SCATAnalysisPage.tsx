@@ -458,7 +458,7 @@ export default function SCATAnalysisPage() {
         <Box display="flex" alignItems="center" gap={1}>
           <PsychologyIcon color="primary" sx={{ fontSize: 32 }} />
           <Box>
-            <Typography variant="h5" fontWeight={700}>SCAT質的分析 (Project: {projectsData?.projects?.find((p:any) => p.id === selectedProjectId)?.title || "未選択"})</Typography>
+            <Typography variant="h5" fontWeight={700}>SCAT質的分析 (Project: {projectsData?.find?.((p:any) => p.id === selectedProjectId)?.title || "未選択"})</Typography>
             <Typography variant="body2" color="text.secondary">
               Steps for Coding and Theorization — コーダー間一致率（Cohen's κ）付き
             </Typography>
@@ -475,7 +475,7 @@ export default function SCATAnalysisPage() {
             sx={{ minWidth: 150 }}
           >
             <option value="">-- 選択 --</option>
-            {projectsData?.projects?.map((p: any) => (
+            {projectsData?.map?.((p: any) => (
               <option key={p.id} value={p.id}>{p.title}</option>
             ))}
           </TextField>
@@ -782,12 +782,12 @@ export default function SCATAnalysisPage() {
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" color="primary" mb={1}>ストーリーライン</Typography>
                 <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-wrap', bgcolor: '#f5f5f5', p: 2, borderRadius: 1 }}>
-                  {projectsData?.projects?.find((p:any) => p.id === selectedProjectId)?.storyline || "まだストーリーラインがありません。AI分析を実行するか手動で追加してください。"}
+                  {projectsData?.find?.((p:any) => p.id === selectedProjectId)?.storyline || "まだストーリーラインがありません。AI分析を実行するか手動で追加してください。"}
                 </Typography>
                 <Divider sx={{ my: 3 }} />
                 <Typography variant="h6" fontWeight="bold" color="secondary" mb={1}>理論記述</Typography>
                 <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-wrap', bgcolor: '#f5f5f5', p: 2, borderRadius: 1 }}>
-                  {projectsData?.projects?.find((p:any) => p.id === selectedProjectId)?.theoretical_description || "まだ理論記述がありません。"}
+                  {projectsData?.find?.((p:any) => p.id === selectedProjectId)?.theoretical_description || "まだ理論記述がありません。"}
                 </Typography>
               </CardContent>
             </Card>

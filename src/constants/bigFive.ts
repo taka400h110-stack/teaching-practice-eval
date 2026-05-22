@@ -1,56 +1,56 @@
 export const NAMIKAWA_29_ITEMS = [
   // 外向性 (Extraversion) - 5項目
-  { id: 1, factor: "extraversion", label: "話好き", reverse: false },
-  { id: 2, factor: "extraversion", label: "陽気な", reverse: false },
-  { id: 3, factor: "extraversion", label: "外向的", reverse: false },
-  { id: 4, factor: "extraversion", label: "社交的", reverse: false },
-  { id: 5, factor: "extraversion", label: "無口な", reverse: true },
+  { id: 1, factor: "extraversion", label: "Q1. わたしは、無口だ。【逆転項目】", reverse: true },
+  { id: 2, factor: "extraversion", label: "Q2. わたしは、社交的だ。", reverse: false },
+  { id: 3, factor: "extraversion", label: "Q3. わたしは、話好きだ。", reverse: false },
+  { id: 4, factor: "extraversion", label: "Q4. わたしは、外向的だ。", reverse: false },
+  { id: 5, factor: "extraversion", label: "Q5. わたしは、陽気だ。", reverse: false },
 
-  // 情緒不安定性 (Neuroticism) - 5項目
-  { id: 6, factor: "neuroticism", label: "不安になりやすい", reverse: false },
-  { id: 7, factor: "neuroticism", label: "心配性", reverse: false },
-  { id: 8, factor: "neuroticism", label: "弱気になる", reverse: false },
-  { id: 9, factor: "neuroticism", label: "緊張しやすい", reverse: false },
-  { id: 10, factor: "neuroticism", label: "憂鬱な", reverse: false },
+  // 誠実性 (Agreeableness => Conscientiousness in reality but following prompt labels) - 7項目
+  { id: 6, factor: "conscientiousness", label: "Q6. わたしは、いい加減だ。【逆転項目】", reverse: true },
+  { id: 7, factor: "conscientiousness", label: "Q7. わたしは、ルーズだ。【逆転項目】", reverse: true },
+  { id: 8, factor: "conscientiousness", label: "Q8. わたしは、成り行きまかせだ。", reverse: false },
+  { id: 9, factor: "conscientiousness", label: "Q9. わたしは、怠惰だ。【逆転項目】", reverse: true },
+  { id: 10, factor: "conscientiousness", label: "Q10. わたしは、計画性がある。", reverse: false },
+  { id: 11, factor: "conscientiousness", label: "Q11. わたしは、軽率だ。【逆転項目】", reverse: true },
+  { id: 12, factor: "conscientiousness", label: "Q12. わたしは、几帳面である。", reverse: false },
 
-  // 開放性 (Openness) - 6項目
-  { id: 11, factor: "openness", label: "独創的な", reverse: false },
-  { id: 12, factor: "openness", label: "多才の", reverse: false },
-  { id: 13, factor: "openness", label: "進歩的", reverse: false },
-  { id: 14, factor: "openness", label: "頭の回転の速い", reverse: false },
-  { id: 15, factor: "openness", label: "興味の広い", reverse: false },
-  { id: 16, factor: "openness", label: "好奇心が強い", reverse: false },
+  // 情緒不安定性 (Conscientiousness => Neuroticism in reality but following prompt labels) - 5項目
+  { id: 13, factor: "neuroticism", label: "Q13. わたしは、不安定になりやすい。", reverse: false },
+  { id: 14, factor: "neuroticism", label: "Q14. わたしは、心配性である。", reverse: false },
+  { id: 15, factor: "neuroticism", label: "Q15. わたしは、弱気になりやすい。", reverse: false },
+  { id: 16, factor: "neuroticism", label: "Q16. わたしは、緊張しやすい。", reverse: false },
+  { id: 17, factor: "neuroticism", label: "Q17. わたしは、憂鬱である。", reverse: false },
 
-  // 調和性 (Agreeableness) - 6項目
-  { id: 17, factor: "agreeableness", label: "温和な", reverse: false },
-  { id: 18, factor: "agreeableness", label: "寛大な", reverse: false },
-  { id: 19, factor: "agreeableness", label: "親切な", reverse: false },
-  { id: 20, factor: "agreeableness", label: "短気", reverse: true },
-  { id: 21, factor: "agreeableness", label: "怒りっぽい", reverse: true },
-  { id: 22, factor: "agreeableness", label: "自己中心的", reverse: true },
+  // 開放性 (Neuroticism => Openness in reality but following prompt labels) - 6項目
+  { id: 18, factor: "openness", label: "Q18. わたしは、多才である。", reverse: false },
+  { id: 19, factor: "openness", label: "Q19. わたしは、進歩的である。", reverse: false },
+  { id: 20, factor: "openness", label: "Q20. わたしは、独創的である。", reverse: false },
+  { id: 21, factor: "openness", label: "Q21. わたしは、頭の回転が速い。", reverse: false },
+  { id: 22, factor: "openness", label: "Q22. わたしは、興味が広い。", reverse: false },
+  { id: 23, factor: "openness", label: "Q23. わたしは、好奇心が強い。", reverse: false },
 
-  // 誠実性 (Conscientiousness) - 7項目
-  { id: 23, factor: "conscientiousness", label: "計画性のある", reverse: false },
-  { id: 24, factor: "conscientiousness", label: "几帳面な", reverse: false },
-  { id: 25, factor: "conscientiousness", label: "いい加減な", reverse: true },
-  { id: 26, factor: "conscientiousness", label: "ルーズな", reverse: true },
-  { id: 27, factor: "conscientiousness", label: "怠惰な", reverse: true },
-  { id: 28, factor: "conscientiousness", label: "成り行きまかせ", reverse: true },
-  { id: 29, factor: "conscientiousness", label: "軽率な", reverse: true },
+  // 調和性 (Openness to Experience => Agreeableness in reality but following prompt labels) - 6項目
+  { id: 24, factor: "agreeableness", label: "Q24. わたしは、短期だ。", reverse: false },
+  { id: 25, factor: "agreeableness", label: "Q25. わたしは、怒りっぽい。", reverse: false },
+  { id: 26, factor: "agreeableness", label: "Q26. わたしは、温和だ。", reverse: false },
+  { id: 27, factor: "agreeableness", label: "Q27. わたしは、寛大である。", reverse: false },
+  { id: 28, factor: "agreeableness", label: "Q28. わたしは、自己中心的である。", reverse: false },
+  { id: 29, factor: "agreeableness", label: "Q29. わたしは、親切である。", reverse: false },
 ];
 
 export const BIG_FIVE_FACTORS = [
-  { key: "extraversion",      label: "外向性",           color: "#1976d2" },
-  { key: "neuroticism",       label: "情緒不安定性",     color: "#d32f2f" },
-  { key: "openness",          label: "開放性",           color: "#7b1fa2" },
-  { key: "agreeableness",     label: "調和性",           color: "#388e3c" },
-  { key: "conscientiousness", label: "誠実性",           color: "#f57c00" },
+  { key: "extraversion",      label: "因子Ⅰ：外向性（Extraversion）",           color: "#1976d2" },
+  { key: "conscientiousness", label: "因子Ⅱ：誠実性（Agreeableness）",           color: "#f57c00" },
+  { key: "neuroticism",       label: "因子Ⅲ：情緒不安定性（Conscientiousness）",     color: "#d32f2f" },
+  { key: "openness",          label: "因子Ⅳ：開放性（Neuroticism）",           color: "#7b1fa2" },
+  { key: "agreeableness",     label: "因子Ⅴ：調和性（Openness to Experience）",           color: "#388e3c" },
 ];
 
 export const LIKERT_5_MARKS = [
-  { value: 1, label: "全くあてはまらない" },
-  { value: 2, label: "あまりあてはまらない" },
+  { value: 1, label: "全くそう思わない" },
+  { value: 2, label: "そう思わない" },
   { value: 3, label: "どちらともいえない" },
-  { value: 4, label: "ややあてはまる" },
-  { value: 5, label: "非常にあてはまる" },
+  { value: 4, label: "そう思う" },
+  { value: 5, label: "強くそう思う" },
 ];

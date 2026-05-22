@@ -10,6 +10,7 @@ import { getCleanupFailureAlert } from "../services/cleanupAlertService";
 import { NotificationService } from "../services/notificationService";
 import { SlackNotifier } from "../services/slackNotifier";
 import { EmailNotifier } from "../services/emailNotifier";
+import { calculateSlaDeadline, upsertSlaEvent } from "../services/cleanupAlertSlaService";
 
 async function evaluateAndNotifyAlerts(env: Env) {
   try {

@@ -14,6 +14,7 @@ dist/
 # deps
 node_modules/
 .wrangler
+wrangler.jsonc.bak
 
 # env
 .env
@@ -34,3 +35,17 @@ lerna-debug.log*
 
 # Node.js crash dump
 core
+
+# ─── scratch / audit ファイル (E2E監査・スクリーンショット・調査用スクリプト) ───
+# Playwright 監査スクリプト類はサンドボックス内の調査用のため commit しない
+test_*.cjs
+debug_*.cjs
+take_screenshots*.cjs
+verify_prod.cjs
+ss_*.png
+prod_ss_*.png
+ui_*.png
+screenshot_results*.json
+
+# 本番投入済みデモシード SQL (内容は demo_seed_prod.sql として保持するが必要に応じて除外)
+# demo_seed_prod.sql は repo に含めて構わないため除外しない

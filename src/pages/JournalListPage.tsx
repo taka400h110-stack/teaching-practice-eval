@@ -1,8 +1,10 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box, Button, Card, CardContent, Chip, Typography, IconButton, Tooltip,
 } from "@mui/material";
+import FilterAltIcon from "@mui/icons-material/FilterAlt";
+import ClearIcon     from "@mui/icons-material/Clear";
 import AddIcon         from "@mui/icons-material/Add";
 import EditIcon        from "@mui/icons-material/Edit";
 import VisibilityIcon  from "@mui/icons-material/Visibility";
@@ -22,11 +24,18 @@ const STATUS_CONFIG = {
 export default function JournalListPage() {
   const navigate     = useNavigate();
   const queryClient  = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterStudentId = searchParams.get("student_id") || undefined;
 
   const { data: journals = [], isLoading } = useQuery({
-    queryKey: ["journals"],
-    queryFn:  () => apiClient.getJournals(),
+    queryKey: ["journals", filterStudentId || "all"],
+    queryFn:  () => apiClient.getJournals(filterStudentId),
   });
+
+  // フィルタが効いている時の学生名（先頭エントリから取得）
+  const filterStudentName = filterStudentId
+    ? (journals[0] as any)?.student_name
+    : undefined;
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.deleteJournal(id),
@@ -50,6 +59,34 @@ export default function JournalListPage() {
         )}
       </Box>
 
+      {/* 学生フィルタ表示 (教員ダッシュボード等から飛んできた場合) */}
+      {filterStudentId && (
+        <Card sx={{ mb: 2, bgcolor: "info.50", borderLeft: "4px solid", borderLeftColor: "info.main" }}>
+          <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Box display="flex" alignItems="center" gap={1}>
+              <FilterAltIcon color="info" />
+              <Typography variant="body2">
+                絞り込み中: <strong>{filterStudentName || filterStudentId}</strong> の日誌
+              </Typography>
+              <Chip
+                label={`${journals.length}件`}
+                size="small"
+                color="info"
+              />
+              <Box sx={{ ml: "auto" }}>
+                <Button
+                  size="small"
+                  startIcon={<ClearIcon />}
+                  onClick={() => setSearchParams({})}
+                >
+                  全件表示に戻す
+                </Button>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
       {journals.length === 0 && (
         <Card>
           <CardContent sx={{ textAlign: "center", py: 6 }}>
@@ -69,9 +106,21 @@ export default function JournalListPage() {
               <Box display="flex" alignItems="center" gap={1}>
                 <MenuBookIcon sx={{ color: "text.secondary", flexShrink: 0 }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body1" fontWeight="bold" noWrap>{j.title}</Typography>
+                  <Typography variant="body1" fontWeight="bold" noWrap>
+                    {!isStudent && (j as any).student_name && (
+                      <Chip
+                        label={(j as any).student_name}
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                        sx={{ mr: 1 }}
+                      />
+                    )}
+                    {j.title || "（無題）"}
+                  </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {new Date(j.entry_date).toLocaleDateString("ja-JP")} ・ Week {j.week_number}
+                    {!isStudent && (j as any).student_id && ` ・ ${(j as any).student_id}`}
                   </Typography>
                 </Box>
                 <Chip label={cfg.label} color={cfg.color} size="small" />

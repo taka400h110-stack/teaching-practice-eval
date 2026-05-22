@@ -63,7 +63,14 @@ export default function GrowthVisualizationPage() {
     );
   }
 
-  const scores    = growth.weekly_scores;
+  const scores    = (growth.weekly_scores || []).map(s => ({
+    ...s,
+    total: s.total || 0,
+    factor1: s.factor1 || 0,
+    factor2: s.factor2 || 0,
+    factor3: s.factor3 || 0,
+    factor4: s.factor4 || 0,
+  }));
   const latest    = scores[scores.length - 1];
   const first     = scores[0];
   const prev      = scores.length >= 2 ? scores[scores.length - 2] : null;
@@ -73,11 +80,11 @@ export default function GrowthVisualizationPage() {
   // recharts 用データ
   const chartData = scores.map((s) => ({
     week: `W${s.week}`,
-    総合: +s.total.toFixed(2),
-    指導実践: +s.factor1.toFixed(2),
-    自己評価: +s.factor2.toFixed(2),
-    学級経営: +s.factor3.toFixed(2),
-    役割理解: +s.factor4.toFixed(2),
+    総合: +(s.total||0).toFixed(2),
+    指導実践: +(s.factor1||0).toFixed(2),
+    自己評価: +(s.factor2||0).toFixed(2),
+    学級経営: +(s.factor3||0).toFixed(2),
+    役割理解: +(s.factor4||0).toFixed(2),
   }));
 
   // 自己評価 vs AI 評価 比較データ
@@ -85,8 +92,8 @@ export default function GrowthVisualizationPage() {
     const aiWeek = scores.find((s) => s.week === se.week);
     return {
       week: `W${se.week}`,
-      自己評価: +se.total.toFixed(2),
-      AI評価: aiWeek ? +aiWeek.total.toFixed(2) : null,
+      自己評価: +(se.total||0).toFixed(2),
+      AI評価: aiWeek ? +(aiWeek.total||0).toFixed(2) : null,
     };
   }).filter((d) => d.AI評価 !== null);
 
@@ -103,8 +110,8 @@ export default function GrowthVisualizationPage() {
   // レーダーデータ（最終週 vs 初期週）
   const radarData = FACTOR_LABELS.map((label, i) => ({
     factor: label.slice(0, 6),
-    初期: +scores[0][FACTOR_KEYS[i]].toFixed(2),
-    最終: +scores[scores.length - 1][FACTOR_KEYS[i]].toFixed(2),
+    初期: +(scores[0]?.[FACTOR_KEYS[i]]||0).toFixed(2),
+    最終: +(scores[scores.length - 1]?.[FACTOR_KEYS[i]]||0).toFixed(2),
   }));
 
   return (
@@ -120,8 +127,8 @@ export default function GrowthVisualizationPage() {
       {/* サマリカード */}
       <Grid container spacing={2} mb={3}>
         {[
-          { label: "現在の総合スコア",  value: latest.total.toFixed(2),     color: "#1565C0", bg: "#e3f2fd", fDelta: weekDelta,   sub: `前週比 ${weekDelta >= 0 ? "+" : ""}${weekDelta.toFixed(2)}` },
-          { label: "実習開始からの成長", value: `+${totalDelta.toFixed(2)}`, color: "#388e3c", bg: "#e8f5e9", fDelta: totalDelta,  sub: `${first.total.toFixed(2)} → ${latest.total.toFixed(2)}` },
+          { label: "現在の総合スコア",  value: (latest?.total||0).toFixed(2),     color: "#1565C0", bg: "#e3f2fd", fDelta: weekDelta,   sub: `前週比 ${weekDelta >= 0 ? "+" : ""}${weekDelta.toFixed(2)}` },
+          { label: "実習開始からの成長", value: `+${totalDelta.toFixed(2)}`, color: "#388e3c", bg: "#e8f5e9", fDelta: totalDelta,  sub: `${(first?.total||0).toFixed(2)} → ${(latest?.total||0).toFixed(2)}` },
           { label: "記録週数",          value: `${scores.length}週`,         color: "#f57c00", bg: "#fff3e0", fDelta: 0,           sub: `Week ${first.week} ～ Week ${latest.week}` },
           { label: "最高スコア週",      value: `W${scores.reduce((a, b) => a.total >= b.total ? a : b).week}`, color: "#7b1fa2", bg: "#f3e5f5", fDelta: 0, sub: `${Math.max(...scores.map((s) => s.total)).toFixed(2)} / 5.0` },
         ].map((c) => (
@@ -213,9 +220,9 @@ export default function GrowthVisualizationPage() {
                     <tr key={s.week} style={{ borderBottom: "1px solid #f0f0f0", background: idx % 2 === 0 ? "#fafafa" : "#fff" }}>
                       <td style={{ padding: "6px 8px", fontWeight: idx === scores.length - 1 ? "bold" : "normal" }}>Week {s.week}</td>
                       {FACTOR_KEYS.map((fk, i) => (
-                        <td key={fk} style={{ textAlign: "center", padding: "6px 8px", color: FACTOR_COLORS[i] }}>{s[fk].toFixed(2)}</td>
+                        <td key={fk} style={{ textAlign: "center", padding: "6px 8px", color: FACTOR_COLORS[i] }}>{(s[fk]||0).toFixed(2)}</td>
                       ))}
-                      <td style={{ textAlign: "center", padding: "6px 8px", fontWeight: "bold", color: "#1565C0" }}>{s.total.toFixed(2)}</td>
+                      <td style={{ textAlign: "center", padding: "6px 8px", fontWeight: "bold", color: "#1565C0" }}>{(s.total||0).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -230,7 +237,7 @@ export default function GrowthVisualizationPage() {
         <Grid container spacing={3}>
           {FACTOR_KEYS.map((fk, i) => {
             const fDelta = latest[fk] - first[fk];
-            const factorData = scores.map((s) => ({ week: `W${s.week}`, score: +s[fk].toFixed(2) }));
+            const factorData = scores.map((s) => ({ week: `W${s.week}`, score: +(s[fk]||0).toFixed(2) }));
             return (
               <Grid key={fk} size={{ xs: 12, sm: 6 }}>
                 <Card sx={{ borderLeft: `4px solid ${FACTOR_COLORS[i]}` }}>
@@ -250,8 +257,8 @@ export default function GrowthVisualizationPage() {
                       </LineChart>
                     </ResponsiveContainer>
                     <Box display="flex" justifyContent="space-between" mt={1}>
-                      <Typography variant="caption" color="text.secondary">初期: {first[fk].toFixed(2)}</Typography>
-                      <Typography variant="caption" fontWeight="bold" color={FACTOR_COLORS[i]}>現在: {latest[fk].toFixed(2)}</Typography>
+                      <Typography variant="caption" color="text.secondary">初期: {(first?.[fk]||0).toFixed(2)}</Typography>
+                      <Typography variant="caption" fontWeight="bold" color={FACTOR_COLORS[i]}>現在: {(latest?.[fk]||0).toFixed(2)}</Typography>
                     </Box>
                     <LinearProgress
                       variant="determinate"
@@ -302,8 +309,8 @@ export default function GrowthVisualizationPage() {
                       return (
                         <tr key={se.id} style={{ borderBottom: "1px solid #f0f0f0", background: idx % 2 === 0 ? "#fafafa" : "#fff" }}>
                           <td style={{ padding: "6px 8px" }}>Week {se.week}</td>
-                          <td style={{ textAlign: "center", padding: "6px 8px", color: "#1976d2" }}>{aiScore?.total.toFixed(2) ?? "—"}</td>
-                          <td style={{ textAlign: "center", padding: "6px 8px", color: "#f57c00" }}>{se.total.toFixed(2)}</td>
+                          <td style={{ textAlign: "center", padding: "6px 8px", color: "#1976d2" }}>{(aiScore?.total||0).toFixed(2) ?? "—"}</td>
+                          <td style={{ textAlign: "center", padding: "6px 8px", color: "#f57c00" }}>{(se.total||0).toFixed(2)}</td>
                           <td style={{ textAlign: "center", padding: "6px 8px", fontWeight: "bold",
                             color: diff === null ? "#666" : diff > 0 ? "#388e3c" : diff < 0 ? "#d32f2f" : "#666" }}>
                             {diff !== null ? (diff > 0 ? `+${diff}` : diff) : "—"}
@@ -395,7 +402,7 @@ export default function GrowthVisualizationPage() {
                         <Avatar sx={{ width: 22, height: 22, bgcolor: FACTOR_COLORS[i], fontSize: 10 }}>{i + 1}</Avatar>
                         <Typography variant="body2" fontWeight="bold" color={FACTOR_COLORS[i]}>{FACTOR_LABELS[i]}</Typography>
                         <Box ml="auto" display="flex" gap={0.5}>
-                          <Chip label={`${latest[fk].toFixed(2)}`} size="small" sx={{ bgcolor: FACTOR_COLORS[i], color: "white", fontSize: 10 }} />
+                          <Chip label={`${(latest?.[fk]||0).toFixed(2)}`} size="small" sx={{ bgcolor: FACTOR_COLORS[i], color: "white", fontSize: 10 }} />
                           <Chip label={`+${fDelta.toFixed(2)}`} size="small" color={fDelta > 0 ? "success" : "default"} variant="outlined" sx={{ fontSize: 10 }} />
                         </Box>
                       </Box>

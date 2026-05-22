@@ -70,7 +70,7 @@ const BLOCK_FIELD_MAP: { keywords: string[]; field: string; label: string }[] = 
   { keywords: ["清掃", "掃除"], field: "block_cleaning", label: "清掃" },
   { keywords: ["帰り", "帰りの会", "終わりの会", "SHR"], field: "block_closing", label: "帰りの会" },
   { keywords: ["放課後", "部活", "クラブ"], field: "block_after", label: "放課後" },
-  { keywords: ["省察", "振り返り", "リフレクション", "感想", "気づき"], field: "reflection", label: "省察・振り返り" },
+  { keywords: ["省察", "振り返り", "リフレクション", "感想", "気づき", "学ばせていただいたこと", "学ばせていただいた", "次回に向けて", "抱負"], field: "reflection", label: "省察・振り返り" },
 ];
 
 function mapToField(text: string): string | undefined {
@@ -133,9 +133,15 @@ async function runOcr(file: File, pageIndex: number): Promise<OcrPageResult> {
         autoRotated: data.auto_rotated,
         brightnessAdjusted: data.brightness_adjusted,
       };
+    } else if (response.status === 503) {
+      // Vision API キー未設定 → デモモードへ
+      console.info("[OCR] Vision API key not configured, falling back to demo mode");
+    } else {
+      console.warn("[OCR] API returned status:", response.status);
     }
-  } catch {
+  } catch (err) {
     // APIエラー時はデモモードで動作
+    console.error("[OCR] API error, falling back to demo mode:", err);
   }
 
   // デモ/フォールバックモード（API未接続時）
@@ -373,6 +379,18 @@ export default function JournalOCRPage() {
           </Typography>
         </Box>
       </Box>
+
+      {/* OCR ソース表示 (結果がある場合のみ) */}
+      {ocrResults.length > 0 && (
+        <Alert
+          severity={ocrResults[0].ocrSource === "vision" ? "success" : "info"}
+          sx={{ mb: 2 }}
+        >
+          {ocrResults[0].ocrSource === "vision"
+            ? "Google Cloud Vision API で実OCRを実行しました"
+            : "Vision API キー未設定のため、デモ/Tesseractフォールバックモードで動作中です。本番運用には GOOGLE_CLOUD_VISION_API_KEY の設定が必要です。"}
+        </Alert>
+      )}
 
       {/* ステッパー */}
       <Stepper activeStep={activeStep} sx={{ mb: 4 }}>

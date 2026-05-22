@@ -9,12 +9,20 @@ externalJobsRouter.get("/", requireRoles(["researcher", "admin", "collaborator",
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
 
-  const { results } = await db.prepare("SELECT * FROM external_analysis_jobs ORDER BY created_at DESC").all();
+  
+  let results;
+  try {
+    const res = await db.prepare("SELECT * FROM external_analysis_jobs ORDER BY created_at DESC").all();
+    results = res.results;
+  } catch (err) {
+    results = []; // Table might not exist yet
+  }
+  
   return c.json({ success: true, jobs: results });
 });
 
 // POST create a job
-externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -24,11 +32,12 @@ externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator"
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'job-' + Date.now() + '-' + Math.floor(Math.random()*1000);
 
     const stmt = db.prepare(`
-      INSERT INTO external_analysis_jobs (id, job_type, created_by, role, dataset_type, parameters_json, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'queued')
+      INSERT INTO external_analysis_jobs (id, job_type, analysis_family, created_by_user_id, created_by_role, source_dataset_type, parameters_json, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'queued')
     `).bind(
       id,
       body.job_type || "UNKNOWN",
+      body.analysis_family || body.job_type || null,
       c.get("user")?.id || "unknown_user",
       c.get("user")?.role || "unknown_role",
       body.dataset_type || "default",
@@ -44,7 +53,7 @@ externalJobsRouter.post("/", requireRoles(["researcher", "admin", "collaborator"
 });
 
 // POST import results
-externalJobsRouter.post("/:id/complete", requireRoles(["researcher", "admin", "collaborator", "board_observer"]), async (c) => {
+externalJobsRouter.post("/:id/complete", requireRoles(["researcher", "admin", "collaborator"]), async (c) => {
   
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
@@ -78,7 +87,7 @@ externalJobsRouter.get("/:id/download", requireRoles(["researcher", "admin", "co
   
   const jobId = c.req.param("id");
   const jobResult = await db.prepare("SELECT * FROM external_analysis_jobs WHERE id = ?").bind(jobId).first();
-  if (!jobResult) return c.json({ error: "Job not found" }, 404);
+  if (!jobResult) return c.json({ error: "ジョブが見つかりません" }, 404);
 
   const dataset = {
     metadata: {

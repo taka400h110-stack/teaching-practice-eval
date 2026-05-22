@@ -170,7 +170,8 @@ function MessageBubble({ msg, rdLevel }: { msg: ChatMessage; rdLevel?: number })
 export default function ChatBotPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const journalId = params.get("journalId") ?? "journal-004";
+  const journalId = params.get("journalId");
+  if (!journalId) return <Box p={3}>日誌IDが指定されていません</Box>;
   const [messages, setMessages]    = useState<ChatMessage[]>([]);
   const [rdHistory, setRdHistory]  = useState<number[]>([]);
   const [input, setInput]          = useState("");

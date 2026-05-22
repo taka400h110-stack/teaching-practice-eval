@@ -24,7 +24,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ReferenceLine,
 } from "recharts";
-import { useQuery }       from "@tanstack/react-query";
+import { useQuery, useMutation }       from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { EvaluationItem } from "../types";
 import {
@@ -156,6 +156,15 @@ export default function EvaluationResultPage() {
     enabled:  !!journalId,
   });
 
+  const evalMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiClient.runEvaluation(id);
+    },
+    onSuccess: () => {
+      window.location.reload();
+    }
+  });
+
   const toggleItem = (n: number) => {
     setExpandedItems((prev) => {
       const next = new Set(prev);
@@ -175,8 +184,17 @@ export default function EvaluationResultPage() {
   if (isError || !result) {
     return (
       <Box maxWidth={1000} mx="auto" p={3}>
-        <Alert severity="error">評価結果の取得に失敗しました。一覧に戻って再度お試しください。</Alert>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mt: 2 }}>戻る</Button>
+        {evalMutation.isPending ? (
+          <Alert severity="info"><CircularProgress size={16} sx={{mr:1, verticalAlign:"middle"}}/> AI評価を実行中...</Alert>
+        ) : (
+          <Alert severity="error">評価結果が見つかりません。未評価か、取得に失敗しました。</Alert>
+        )}
+        <Box display="flex" gap={2} mt={2}>
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} variant="outlined">戻る</Button>
+          {!evalMutation.isPending && (
+            <Button variant="contained" color="primary" onClick={() => evalMutation.mutate(journalId!)}>AI評価を実行する</Button>
+          )}
+        </Box>
       </Box>
     );
   }
@@ -283,7 +301,11 @@ export default function EvaluationResultPage() {
             <Typography variant="subtitle1" fontWeight="bold">総合コメント</Typography>
           </Box>
           <Paper variant="outlined" sx={{ p: 2, bgcolor: "#E3F2FD", borderRadius: 2 }}>
-            <Typography variant="body1" sx={{ lineHeight: 1.9 }}>{result?.overall_comment}</Typography>
+            <Typography variant="body1" sx={{ lineHeight: 1.9, whiteSpace: "pre-wrap" }}>
+              {result?.overall_comment && String(result.overall_comment).trim().length > 0
+                ? result.overall_comment
+                : <em style={{ color: "#777" }}>総合コメントが生成されていません (AI評価未実行または保存失敗)</em>}
+            </Typography>
           </Paper>
         </CardContent>
       </Card>
@@ -307,10 +329,7 @@ export default function EvaluationResultPage() {
               : result?.evaluation_items;
             const fIdx = FACTOR_KEYS.indexOf(fk as typeof FACTOR_KEYS[number]);
 
-            if ((score||0) === null) return <Chip label="未評価" size="small" variant="outlined" />;
-  if (!score) return null;
-  if (isLoading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh"><CircularProgress /></Box>;
-  if (isError || !result) return <Box p={3}><Alert severity="error">評価結果の取得に失敗しました。</Alert></Box>;
+
 
   return (
               <TableContainer key={tabIdx} component={Paper} variant="outlined">

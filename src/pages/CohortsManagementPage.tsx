@@ -380,7 +380,7 @@ export default function CohortsManagementPage() {
                     const labels = ["外向性", "協調性", "誠実性", "神経症傾向", "開放性"];
                     return keys.map((k, i) => ({
                       factor: labels[i],
-                      value: +(profiles.reduce((s: any, p: any) => s + p.big_five[k], 0) / (profiles.length || 1)).toFixed(2),
+                      value: +(profiles.reduce((s: any, p: any) => s + (p?.big_five?.[k] ?? 0), 0) / (profiles.length || 1)).toFixed(2),
                     }));
                   })()}>
                     <PolarGrid />
@@ -406,7 +406,7 @@ export default function CohortsManagementPage() {
                       label={{ value: "最終スコア", angle: -90, position: "insideLeft" }} />
                     <RechartTooltip />
                     <Scatter
-                      data={filtered.map((p: any) => ({ x: p.big_five.extraversion, y: p.final_total }))}
+                      data={filtered.map((p: any) => ({ x: p?.big_five?.extraversion ?? 0, y: p?.final_total ?? 0 }))}
                       fill="#7b1fa2" opacity={0.7}
                     />
                   </ScatterChart>

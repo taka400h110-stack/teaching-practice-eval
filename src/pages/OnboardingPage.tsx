@@ -89,7 +89,7 @@ export default function OnboardingPage() {
 
   const STEPS = isStudent ? STUDENT_STEPS : STAFF_STEPS;
 
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(3);
 
   // ── Step 0: 倫理同意 ──
   const [consentChecks, setConsentChecks] = useState({
@@ -415,12 +415,16 @@ export default function OnboardingPage() {
               <Box display="flex" alignItems="center" gap={1} mb={1}>
                 <PsychologyIcon color="secondary" />
                 <Typography variant="subtitle1" fontWeight="bold">
-                  パーソナリティ測定（Big Five Inventory）
+                  BigFive性格尺度アンケート（29項目）
                 </Typography>
               </Box>
+              <Paper sx={{ p: 2, mb: 2, bgcolor: "info.50", borderLeft: "4px solid #0288d1" }}>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>性格に合ったフィードバックができるようにするために行うために必要な調査です。ご協力をお願いします。。</Typography>
+                <Typography variant="body2"><b>【出典・根拠】</b>並川ら（2012）のBigFive尺度短縮版を用いて行う。5段階リッカート（1＝全くそう思わない〜5＝強くそう思う）。逆転項目は【逆転項目】と明記。</Typography>
+              </Paper>
               <Alert severity="info" sx={{ mb: 2 }}>
-                以下の25項目について、あなた自身にどの程度当てはまるかを1〜5で評価してください。
-                このデータはRQ3の分析（外向性と成長軌跡の関連）に使用されます。
+                以下の各文について、あなた自身にどの程度当てはまるかをお答えください。<br />
+                1＝全くそう思わない　2＝そう思わない　3＝どちらでもない　4＝そう思う　5＝強くそう思う
               </Alert>
 
               {BIG_FIVE_FACTORS.map(({ key, label, color }) => {

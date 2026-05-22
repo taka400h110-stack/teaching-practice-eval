@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { CircularProgress, Box, Typography } from "@mui/material";
 import AppLayout from "./components/AppLayout";
 import apiClient from "./api/client";
@@ -44,12 +44,27 @@ const GoalHistoryPage         = lazy(() => import("./pages/GoalHistoryPage"));
 const ChatBotPage             = lazy(() => import("./pages/ChatBotPage"));
 // ユーザー登録
 const UserRegistrationPage    = lazy(() => import("./pages/UserRegistrationPage"));
+// Analysis Pages
+const JournalSCATPage         = lazy(() => import("./pages/analysis/JournalSCATPage"));
+const JournalISMPage          = lazy(() => import("./pages/analysis/JournalISMPage"));
+const JournalSPTablePage      = lazy(() => import("./pages/analysis/JournalSPTablePage"));
+const JournalTransmissionPage = lazy(() => import("./pages/analysis/JournalTransmissionPage"));
+
+// 研究者用ページ
+const JournalImportPage       = lazy(() => import("./pages/research/JournalImportPage"));
+const JournalImportDetailPage = lazy(() => import("./pages/research/JournalImportDetailPage"));
+
 // OCR
 const JournalOCRPage          = lazy(() => import("./pages/JournalOCRPage"));
 // 教員統計
 const TeacherStatisticsPage   = lazy(() => import("./pages/TeacherStatisticsPage"));
 // 国際比較
 const InternationalComparisonPage = lazy(() => import("./pages/InternationalComparisonPage"));
+// BFI パーソナリティ診断
+const BFIPage = lazy(() => import("./pages/BFIPage"));
+// プロフィール & プレースホルダ
+const ProfilePage             = lazy(() => import("./pages/ProfilePage"));
+const PlaceholderPage         = lazy(() => import("./pages/PlaceholderPage"));
 
 const Spinner = () => (
   <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
@@ -57,20 +72,55 @@ const Spinner = () => (
   </Box>
 );
 
+// 役割に応じたホームパスを返す
+function getRoleHomePath(): string {
+  if (!apiClient.isAuthenticated()) return "/login";
+  const user = apiClient.getCurrentUser() as any;
+  const role = user?.role || user?.roles?.[0] || "student";
+  if (role === "admin" || role === "researcher" || role === "collaborator" || role === "board_observer") {
+    return "/admin";
+  }
+  if (role === "teacher" || role === "univ_teacher" || role === "school_mentor") {
+    return "/teacher-dashboard";
+  }
+  if (role === "evaluator") {
+    return "/evaluations";
+  }
+  return "/dashboard";
+}
+
+// ルートパスへアクセスした際に役割に応じたホームへリダイレクト
+function RoleBasedHomeRedirect() {
+  return <Navigate to={getRoleHomePath()} replace />;
+}
+
 function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
+  const location = useLocation();
   if (!apiClient.isAuthenticated()) return <Navigate to="/login" replace />;
-  if (apiClient.requiresOnboarding()) return <Navigate to="/onboarding" replace />;
-  
+
+  const user = apiClient.getCurrentUser();
+  const userRoles = (user as any)?.roles || [(user as any)?.role || "student"];
+
+  // ── Onboarding ガード ──
+  // student かつオンボーディング未完了 (pending_onboarding=true) の場合、
+  // /onboarding 以外のルートへの遷移を強制的に /onboarding にリダイレクト。
+  // 教員・管理者・研究者は onboarding 不要 (E2E: role-ui-audit.not-onboarded.spec.ts 参照)。
+  if (typeof window !== "undefined") {
+    const pendingOnboarding = window.localStorage.getItem("pending_onboarding") === "true";
+    const isStudent = userRoles.includes("student");
+    const isOnOnboardingPage = location.pathname.startsWith("/onboarding");
+    if (pendingOnboarding && isStudent && !isOnOnboardingPage) {
+      return <Navigate to="/onboarding" replace />;
+    }
+  }
+
   if (allowedRoles && allowedRoles.length > 0) {
-    const user = apiClient.getCurrentUser();
-    // 下位互換対応
-    const userRoles = (user as any)?.roles || [(user as any)?.role || "student"];
     const hasRole = userRoles.some((r: string) => allowedRoles.includes(r));
     if (!user || !hasRole) {
       return <Navigate to="/unauthorized" replace />;
     }
   }
-  
+
   return <>{children}</>;
 }
 
@@ -80,7 +130,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route
+                <Route
           path="/"
           element={
             <PrivateRoute>
@@ -88,17 +138,17 @@ export default function App() {
             </PrivateRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<RoleBasedHomeRedirect />} />
 
           {/* ダッシュボード */}
           <Route path="dashboard"         element={<PrivateRoute allowedRoles={["student"]}><DashboardPage /></PrivateRoute>} />
-          <Route path="teacher-dashboard" element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor"]}><TeacherDashboardPage /></PrivateRoute>} />
-          <Route path="admin"             element={<PrivateRoute allowedRoles={["admin", "researcher"]}><AdminDashboardPage /></PrivateRoute>} />
+          <Route path="teacher-dashboard" element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "admin", "researcher"]}><TeacherDashboardPage /></PrivateRoute>} />
+          <Route path="admin"             element={<PrivateRoute allowedRoles={["admin", "researcher", "collaborator", "board_observer"]}><AdminDashboardPage /></PrivateRoute>} />
 
           {/* 日誌 */}
-          <Route path="journals"                    element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor"]}><JournalListPage /></PrivateRoute>} />
+          <Route path="journals"                    element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><JournalListPage /></PrivateRoute>} />
           <Route path="journals/new"                element={<PrivateRoute allowedRoles={["student"]}><JournalEditorPage /></PrivateRoute>} />
-          <Route path="journals/:journalId"         element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor"]}><JournalDetailPage /></PrivateRoute>} />
+          <Route path="journals/:journalId"         element={<PrivateRoute allowedRoles={["student", "teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><JournalDetailPage /></PrivateRoute>} />
           <Route path="journals/:journalId/edit"    element={<PrivateRoute allowedRoles={["student"]}><JournalEditorPage /></PrivateRoute>} />
 
           {/* 実習ワークフロー（日誌+AI評価+チャット統合） */}
@@ -106,7 +156,7 @@ export default function App() {
           <Route path="journal-workflow/:journalId"   element={<PrivateRoute allowedRoles={["student"]}><JournalWorkflowPage /></PrivateRoute>} />
 
           {/* 評価 (RQ2) */}
-          <Route path="evaluations"                         element={<PrivateRoute allowedRoles={["admin", "researcher", "evaluator", "teacher", "univ_teacher", "school_mentor"]}><EvaluationsPage /></PrivateRoute>} />
+          <Route path="evaluations"                         element={<PrivateRoute allowedRoles={["admin", "researcher", "evaluator", "teacher", "univ_teacher", "school_mentor", "collaborator", "board_observer"]}><EvaluationsPage /></PrivateRoute>} />
           <Route path="evaluations/:journalId"              element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer", "student", "teacher", "univ_teacher", "school_mentor"]}><EvaluationResultPage /></PrivateRoute>} />
           <Route path="evaluations/:journalId/human"        element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><HumanEvaluationPage /></PrivateRoute>} />
           <Route path="comparison"                          element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><ComparisonPage /></PrivateRoute>} />
@@ -123,11 +173,20 @@ export default function App() {
           <Route path="scat-batch"        element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATBatchAnalysisPage /></PrivateRoute>} />
           <Route path="scat-network"      element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATNetworkAnalysisPage /></PrivateRoute>} />
           <Route path="scat-timeline"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATTimelinePage /></PrivateRoute>} />
-                              
-          
+
+          {/* 研究者用：過去日誌の取り込み (Word/PDF/画像) */}
+          <Route path="research/journal-import" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator"]}><JournalImportPage /></PrivateRoute>} />
+          <Route path="research/journal-import/:id" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator"]}><JournalImportDetailPage /></PrivateRoute>} />
+
           {/* エクスポート */}
           <Route path="exports"           element={<PrivateRoute allowedRoles={["researcher", "collaborator", "board_observer", "admin"]}><ExportsPage /></PrivateRoute>} />
           <Route path="admin/exports"     element={<PrivateRoute allowedRoles={["admin"]}><AdminExportsPage /></PrivateRoute>} />
+
+          {/* Analysis Pages */}
+          <Route path="research/journals/:journalId/scat" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalSCATPage /></PrivateRoute>} />
+          <Route path="research/journals/:journalId/ism" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalISMPage /></PrivateRoute>} />
+          <Route path="research/journals/:journalId/sp-table" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalSPTablePage /></PrivateRoute>} />
+          <Route path="research/journals/:journalId/transmission" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalTransmissionPage /></PrivateRoute>} />
 
           {/* 個人 */}
           <Route path="self-evaluation"   element={<PrivateRoute allowedRoles={["student"]}><SelfEvaluationPage /></PrivateRoute>} />
@@ -145,9 +204,22 @@ export default function App() {
 
           {/* 国際比較（RQ1） */}
           <Route path="international"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><InternationalComparisonPage /></PrivateRoute>} />
+
+          {/* BFI パーソナリティ診断 */}
+          <Route path="bfi"               element={<PrivateRoute allowedRoles={["student"]}><BFIPage /></PrivateRoute>} />
+
+          {/* プロフィール (全ロール共通) */}
+          <Route path="profile"           element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+
+          {/* 通知設定 (準備中) */}
+          <Route path="notifications"          element={<PrivateRoute><PlaceholderPage title="通知" description="通知一覧機能は準備中です。" /></PrivateRoute>} />
+          <Route path="notifications/settings" element={<PrivateRoute><PlaceholderPage title="通知設定" description="通知の受信方法や頻度などの設定機能は準備中です。" /></PrivateRoute>} />
+
+          {/* アプリ設定 (準備中) */}
+          <Route path="settings"          element={<PrivateRoute><PlaceholderPage title="設定" description="アプリケーション設定機能は準備中です。" /></PrivateRoute>} />
         </Route>
-        <Route path="unauthorized" element={<Box p={4}><Typography variant="h5" color="error">403 Forbidden</Typography><Typography>このページへのアクセス権限がありません。</Typography></Box>} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="unauthorized" element={<Box p={4}><Typography variant="h5" color="error">アクセス権限がありません (403)</Typography><Typography>このページへのアクセス権限がありません。</Typography></Box>} />
+        <Route path="*" element={<RoleBasedHomeRedirect />} />
       </Routes>
     </Suspense>
   );

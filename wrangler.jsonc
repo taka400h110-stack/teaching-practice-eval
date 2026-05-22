@@ -20,6 +20,9 @@
       "database_id": "f9ec086a-d383-45de-86df-dd9d1a2c9faf"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "EXPORT_TOKEN_RETENTION_HOURS": "24",
     "EXPORT_USED_TOKEN_RETENTION_HOURS": "72",

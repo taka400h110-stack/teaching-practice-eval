@@ -80,9 +80,79 @@ export const SCATNetworkAnalysisPage: React.FC = () => {
         {isLoading ? (
           <CircularProgress />
         ) : (
-          <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} data-testid="network-canvas">
-             <Typography color="textSecondary">Network Visualization Area (Canvas Placeholder)</Typography>
+          
+          <Box sx={{ width: '100%', height: '100%', position: 'relative' }} data-testid="network-canvas">
+            <svg width="100%" height="100%" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
+              {/* Edges */}
+              {graphData.links.map((link: any, i: number) => {
+                const sourceNode = graphData.nodes.find((n: any) => n.id === link.source);
+                const targetNode = graphData.nodes.find((n: any) => n.id === link.target);
+                if (!sourceNode || !targetNode) return null;
+                
+                // Simple static positioning for demo
+                const getPos = (id: string) => {
+                  switch(id) {
+                    case '1': return { x: 400, y: 150 };
+                    case '2': return { x: 250, y: 300 };
+                    case '3': return { x: 250, y: 450 };
+                    case '4': return { x: 550, y: 300 };
+                    case '5': return { x: 550, y: 450 };
+                    default: return { x: 400, y: 300 };
+                  }
+                };
+                
+                const src = getPos(sourceNode.id);
+                const tgt = getPos(targetNode.id);
+                
+                return (
+                  <line 
+                    key={`link-${i}`}
+                    x1={src.x} y1={src.y} 
+                    x2={tgt.x} y2={tgt.y} 
+                    stroke="#cbd5e1" 
+                    strokeWidth={link.val}
+                    opacity={0.6}
+                  />
+                );
+              })}
+              
+              {/* Nodes */}
+              {graphData.nodes.map((node: any) => {
+                const getPos = (id: string) => {
+                  switch(id) {
+                    case '1': return { x: 400, y: 150 };
+                    case '2': return { x: 250, y: 300 };
+                    case '3': return { x: 250, y: 450 };
+                    case '4': return { x: 550, y: 300 };
+                    case '5': return { x: 550, y: 450 };
+                    default: return { x: 400, y: 300 };
+                  }
+                };
+                const pos = getPos(node.id);
+                const radius = Math.min(Math.max(node.val * 2, 20), 50);
+                
+                return (
+                  <g key={`node-${node.id}`} transform={`translate(${pos.x}, ${pos.y})`}>
+                    <circle 
+                      r={radius} 
+                      fill="#1976d2" 
+                      opacity={0.8}
+                    />
+                    <text 
+                      textAnchor="middle" 
+                      dy=".3em" 
+                      fill="white"
+                      fontSize={14}
+                      fontWeight="bold"
+                    >
+                      {node.name}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
           </Box>
+
         )}
       </Paper>
     </Box>

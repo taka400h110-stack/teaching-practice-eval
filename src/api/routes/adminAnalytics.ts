@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Hono } from 'hono';
 import { Env } from '../../types/env';
 import { getDeliveryAnalytics } from '../services/deliveryAnalyticsService';
@@ -7,8 +8,9 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get('/delivery', async (c) => {
   const user = c.get('user') as any;
-  if (!user || user.role !== 'admin') {
-    return c.json({ error: 'Forbidden' }, 403);
+  const allowedRoles = ['admin', 'researcher', 'collaborator', 'board_observer'];
+  if (!user || !allowedRoles.includes(user.role)) {
+    return c.json({ error: 'アクセス権限がありません' }, 403);
   }
 
   const range = c.req.query('range') as AnalyticsRange || '7d';

@@ -62,15 +62,27 @@ export default function EvaluationsPage() {
     queryFn: () => apiClient.getJournals(),
   });
 
-  const { data: humanEvals = [] } = useQuery({ queryKey: ["humanEvaluations"], queryFn: () => apiClient.getHumanEvaluations() });
+  // 人間評価一覧は evaluator / admin / researcher / collaborator / board_observer のみ取得可
+  // 大学教員・校内指導教員でAPIを呼ぶと 403 になりコンソールが汚れるため、ロールで切り分け
+  const currentUser = apiClient.getCurrentUser() as { role?: string } | null;
+  const canViewHumanEvals = (() => {
+    const r = currentUser?.role;
+    return r === "evaluator" || r === "admin" || r === "researcher" || r === "collaborator" || r === "board_observer";
+  })();
+  const { data: humanEvals = [] } = useQuery({
+    queryKey: ["humanEvaluations"],
+    queryFn: () => apiClient.getHumanEvaluations(),
+    enabled: canViewHumanEvals,
+  });
   const { data: allEvals = [] } = useQuery({
     queryKey: ["allEvaluations"],
     queryFn: () => apiClient.getAllEvaluations(),
   });
 
   // 評価対象は submitted / evaluated ステータスの日誌
-  let evalJournals = journals.filter((j) =>
-    j.status !== "draft" &&
+  const safeJournals = Array.isArray(journals) ? journals : [];
+  let evalJournals = safeJournals.filter((j) =>
+    j && j.status !== "draft" &&
     (statusFilter === "all" || j.status === statusFilter)
   );
   if (isEvaluator) {
@@ -189,6 +201,14 @@ export default function EvaluationsPage() {
       </Box>
 
       {/* 評価一覧テーブル */}
+      {evalResults.length === 0 ? (
+        <Card variant="outlined" sx={{ p: 4, textAlign: 'center', bgcolor: '#f9f9f9' }}>
+          <Typography variant="h6" color="text.secondary">データが存在しないため表示できません</Typography>
+          <Typography variant="body2" color="text.secondary">
+            現在、評価対象となる日誌データが存在しません。学生の提出をお待ちください。
+          </Typography>
+        </Card>
+      ) : (
       <TableContainer component={Paper} variant="outlined">
         <Table size="small">
           <TableHead>
@@ -230,6 +250,20 @@ export default function EvaluationsPage() {
                         <PersonIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
+                    {['admin', 'researcher', 'collaborator', 'board_observer'].includes(user?.role || '') && (
+                      <>
+                        <Tooltip title="SCAT分析結果">
+                          <IconButton size="small" onClick={() => navigate(`/research/journals/${r.journalId}/scat`)}>
+                            <Typography variant="caption" fontWeight="bold">SCAT</Typography>
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="ISM構造化結果">
+                          <IconButton size="small" onClick={() => navigate(`/research/journals/${r.journalId}/ism`)}>
+                            <Typography variant="caption" fontWeight="bold">ISM</Typography>
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    )}
                   </Box>
                 </TableCell>
               </TableRow>
@@ -237,6 +271,7 @@ export default function EvaluationsPage() {
           </TableBody>
         </Table>
       </TableContainer>
+      )}
 
       {/* 評価者用 初回アンケートダイアログ */}
       <Dialog open={showSurvey} disableEscapeKeyDown fullWidth maxWidth="sm">

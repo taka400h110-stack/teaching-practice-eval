@@ -51,6 +51,8 @@ const AUDIT_PATTERNS = [
   "/api/data/self-evals",
   "/api/data/human-evals",
   "/api/data/exports",
+  // Phase 6-1: 取り込み / エクスポート系も監査対象に
+  "/api/data/journal-imports",
 ];
 
 function shouldAuditRequest(c: Context): boolean {
@@ -67,6 +69,11 @@ function mapOutcome(status: number): string {
 }
 
 function inferResourceTypeFromPath(path: string): string {
+  // journal-imports は journals より先にマッチさせる
+  if (path.includes("journal-imports")) {
+    if (path.includes("/export.")) return "journal_import_export";
+    return "journal_import";
+  }
   if (path.includes("students")) return "student";
   if (path.includes("journals")) return "journal";
   if (path.includes("evaluations")) return "evaluation";
