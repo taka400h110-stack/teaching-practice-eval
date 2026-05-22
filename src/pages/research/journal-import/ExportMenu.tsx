@@ -1,19 +1,40 @@
 /**
- * エクスポートメニュー (10 形式)
+ * エクスポートメニュー (10 形式 / 4 グループ)
  *
- * 全形式とその用途:
- *   - summary_csv          : 取り込み一覧の基本メタ情報 19 列
- *   - detail_csv           : 質的分析向け詳細 (時限ブロック展開 + 抽出原文)
- *   - json                 : 質的分析向けネスト構造
- *   - analysis_csv         : 量的分析向け統合 (日誌 + AI/人間評価 + SCAT)
- *   - codebook_md          : 論文 Appendix 用データ辞書 (Markdown)
- *   - codebook_json        : 機械可読データ辞書 (JSON)
- *   - descriptive_stats_md : APA 記述統計テーブル (Phase 6-3)
- *   - correlation_csv      : Pearson 相関行列 (Phase 6-3)
- *   - t_test_md            : t 検定結果 (Phase 6-3)
- *   - methods_md           : 論文 Methods 自動生成 (Phase 6-3)
+ * Phase 7-5: 4 グループに分けた構造化 UI + t_test の多重比較補正セレクタ
+ *
+ * グループ:
+ *   1. 取り込み一覧データ
+ *        summary_csv          : 取り込み一覧の基本メタ情報 19 列
+ *        detail_csv           : 質的分析向け詳細 (時限ブロック展開 + 抽出原文)
+ *        json                 : 質的分析向けネスト構造
+ *   2. 量的分析用データ
+ *        analysis_csv         : 量的分析向け統合 (日誌 + AI/人間評価 + SCAT)
+ *   3. 統計レポート (論文 Results / Methods 用)
+ *        descriptive_stats_md : APA 記述統計テーブル (Phase 6-3)
+ *        correlation_csv      : Pearson 相関行列 (Phase 6-3)
+ *        t_test_md            : t 検定結果 (Phase 6-3 / 7-3 / 7-4)
+ *                                 → ListItem 内に correction セレクタ (Phase 7-5)
+ *        methods_md           : 論文 Methods 自動生成 (Phase 6-3)
+ *   4. データ辞書 (論文 Appendix 用)
+ *        codebook_md          : Markdown 列定義
+ *        codebook_json        : 機械可読
  */
-import { Divider, ListItemIcon, ListItemText, Menu, MenuItem } from "@mui/material";
+import { useState } from "react";
+import {
+  Box,
+  Divider,
+  ListItemIcon,
+  ListItemText,
+  ListSubheader,
+  Menu,
+  MenuItem,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import DataObjectIcon from "@mui/icons-material/DataObject";
 import AssessmentIcon from "@mui/icons-material/Assessment";
@@ -36,19 +57,62 @@ export type ExportFormat =
   | "t_test_md"
   | "methods_md";
 
+/** Phase 7-4 で stats.ts に追加した補正方式 (UI 側でも同じ string union を保持) */
+export type CorrectionMethod = "none" | "bonferroni" | "holm" | "fdr_bh";
+
+/** Phase 7-5: フォーマット固有の追加オプション (将来拡張のため union 形式) */
+export interface ExportOptions {
+  /** t_test_md でのみ使用 */
+  correction?: CorrectionMethod;
+}
+
 export interface ExportMenuProps {
   anchorEl: HTMLElement | null;
   onClose: () => void;
-  onExport: (format: ExportFormat) => void;
+  /** Phase 7-5: 第2引数 options を追加 (後方互換のため optional) */
+  onExport: (format: ExportFormat, options?: ExportOptions) => void;
 }
 
+/** correction の選択肢 (ToggleButtonGroup 用) */
+const CORRECTION_OPTIONS: Array<{ value: CorrectionMethod; label: string; tooltip: string }> = [
+  { value: "none",       label: "なし",   tooltip: "補正なし (生の p 値のみ)" },
+  { value: "bonferroni", label: "Bonf.",  tooltip: "Bonferroni: p × m (最も保守的, FWER 制御)" },
+  { value: "holm",       label: "Holm",   tooltip: "Holm step-down: Bonferroni より検出力が高い, FWER 制御" },
+  { value: "fdr_bh",     label: "BH",     tooltip: "Benjamini-Hochberg: FDR 制御, 最も検出力が高い" },
+];
+
 export function ExportMenu({ anchorEl, onClose, onExport }: ExportMenuProps) {
+  // Phase 7-5: t_test の多重比較補正方式 (Menu を開いている間だけ保持)
+  const [correction, setCorrection] = useState<CorrectionMethod>("none");
+
   const handle = (format: ExportFormat) => {
-    onExport(format);
+    if (format === "t_test_md") {
+      onExport(format, { correction });
+    } else {
+      onExport(format);
+    }
   };
 
   return (
-    <Menu anchorEl={anchorEl} open={!!anchorEl} onClose={onClose}>
+    <Menu
+      anchorEl={anchorEl}
+      open={!!anchorEl}
+      onClose={onClose}
+      // Phase 7-5: グループの ListSubheader を整列させるため max width / dense を調整
+      slotProps={{
+        paper: {
+          sx: { minWidth: 360, maxWidth: 480 },
+        },
+      }}
+    >
+      {/* ─── グループ 1: 取り込み一覧データ ─── */}
+      <ListSubheader
+        component="div"
+        disableSticky
+        sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", lineHeight: 1.8 }}
+      >
+        取り込み一覧データ
+      </ListSubheader>
       <MenuItem onClick={() => handle("summary_csv")}>
         <ListItemIcon>
           <TableChartIcon fontSize="small" />
@@ -73,7 +137,17 @@ export function ExportMenu({ anchorEl, onClose, onExport }: ExportMenuProps) {
           secondary="ネスト構造で全フィールド"
         />
       </MenuItem>
+
       <Divider />
+
+      {/* ─── グループ 2: 量的分析用データ ─── */}
+      <ListSubheader
+        component="div"
+        disableSticky
+        sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", lineHeight: 1.8 }}
+      >
+        量的分析用データ
+      </ListSubheader>
       <MenuItem onClick={() => handle("analysis_csv")}>
         <ListItemIcon>
           <AssessmentIcon fontSize="small" />
@@ -83,7 +157,17 @@ export function ExportMenu({ anchorEl, onClose, onExport }: ExportMenuProps) {
           secondary="日誌 + AI評価 + 人間評価 + SCAT概念数 50 列"
         />
       </MenuItem>
+
       <Divider />
+
+      {/* ─── グループ 3: 統計レポート (論文 Results 用) ─── */}
+      <ListSubheader
+        component="div"
+        disableSticky
+        sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", lineHeight: 1.8 }}
+      >
+        統計レポート (論文 Results / Methods 用)
+      </ListSubheader>
       <MenuItem onClick={() => handle("descriptive_stats_md")}>
         <ListItemIcon>
           <FunctionsIcon fontSize="small" />
@@ -102,15 +186,54 @@ export function ExportMenu({ anchorEl, onClose, onExport }: ExportMenuProps) {
           secondary="AI × 人間 × SCAT 14 変数 / r, p, 95% CI"
         />
       </MenuItem>
+
+      {/* t_test_md は補正セレクタを内包する MenuItem として、クリックでダウンロード */}
       <MenuItem onClick={() => handle("t_test_md")}>
         <ListItemIcon>
           <CompareArrowsIcon fontSize="small" />
         </ListItemIcon>
         <ListItemText
           primary="t 検定結果 (Markdown)"
-          secondary="週前半 vs 後半 (Welch) + AI vs 人間 (Paired)"
+          secondary={`週前半 vs 後半 (Welch) + AI vs 人間 (Paired)${
+            correction !== "none" ? ` / 補正: ${labelOf(correction)}` : ""
+          }`}
         />
       </MenuItem>
+
+      {/* Phase 7-5: 多重比較補正セレクタ (t_test_md 専用) */}
+      <Box
+        sx={{ px: 2, pb: 1, pt: 0.5 }}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 80 }}>
+            多重比較補正:
+          </Typography>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={correction}
+            onChange={(_, v) => {
+              if (v !== null) setCorrection(v as CorrectionMethod);
+            }}
+            aria-label="多重比較補正方式"
+          >
+            {CORRECTION_OPTIONS.map((opt) => (
+              <Tooltip key={opt.value} title={opt.tooltip} placement="bottom">
+                <ToggleButton
+                  value={opt.value}
+                  sx={{ fontSize: "0.7rem", py: 0.25, px: 1 }}
+                  aria-label={opt.tooltip}
+                >
+                  {opt.label}
+                </ToggleButton>
+              </Tooltip>
+            ))}
+          </ToggleButtonGroup>
+        </Stack>
+      </Box>
+
       <MenuItem onClick={() => handle("methods_md")}>
         <ListItemIcon>
           <ArticleIcon fontSize="small" />
@@ -120,7 +243,17 @@ export function ExportMenu({ anchorEl, onClose, onExport }: ExportMenuProps) {
           secondary="Participants / Statistical Analysis / Tools / References"
         />
       </MenuItem>
+
       <Divider />
+
+      {/* ─── グループ 4: データ辞書 (Appendix 用) ─── */}
+      <ListSubheader
+        component="div"
+        disableSticky
+        sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", lineHeight: 1.8 }}
+      >
+        データ辞書 (論文 Appendix 用)
+      </ListSubheader>
       <MenuItem onClick={() => handle("codebook_md")}>
         <ListItemIcon>
           <MenuBookIcon fontSize="small" />
@@ -143,8 +276,21 @@ export function ExportMenu({ anchorEl, onClose, onExport }: ExportMenuProps) {
   );
 }
 
+/** 補正方式の短いラベル (MenuItem の secondary 表示用) */
+function labelOf(method: CorrectionMethod): string {
+  switch (method) {
+    case "bonferroni": return "Bonferroni";
+    case "holm":       return "Holm";
+    case "fdr_bh":     return "BH-FDR";
+    case "none":
+    default:           return "なし";
+  }
+}
+
 /**
  * エクスポート用のフェッチ + ダウンロード処理 (コンテナ側で呼ぶ)
+ *
+ * Phase 7-5: optional な options 引数を追加 (t_test の correction など)
  *
  * 戻り値: 成功時はダウンロードしたファイル名、失敗時は throw
  */
@@ -157,6 +303,7 @@ export async function fetchExport(
     filterToDate: string;
   },
   getToken: () => string | null,
+  options?: ExportOptions,
 ): Promise<string> {
   const params = new URLSearchParams();
   if (filters.searchQ.trim()) params.set("q", filters.searchQ.trim());
@@ -217,6 +364,11 @@ export async function fetchExport(
       ext = "md";
       params.delete("q");
       params.delete("status");
+      // Phase 7-5: 多重比較補正を ?correction=... として付与 (none のときは付けない)
+      if (options?.correction && options.correction !== "none") {
+        params.set("correction", options.correction);
+        fallbackName = `journal-t-test-${options.correction}`;
+      }
       break;
     case "methods_md":
       endpoint = "/api/data/journal-imports/export.methods_section.md";

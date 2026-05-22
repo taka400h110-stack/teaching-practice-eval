@@ -58,7 +58,12 @@ import {
 import { uploadWithConcurrency } from "./journal-import/utils";
 import { GroupedView, FlatView } from "./journal-import/GroupedView";
 import { EditDialog } from "./journal-import/EditDialog";
-import { ExportMenu, fetchExport, type ExportFormat } from "./journal-import/ExportMenu";
+import {
+  ExportMenu,
+  fetchExport,
+  type ExportFormat,
+  type ExportOptions,
+} from "./journal-import/ExportMenu";
 
 export default function JournalImportPage() {
   const navigate = useNavigate();
@@ -490,14 +495,16 @@ export default function JournalImportPage() {
   // Menu 状態
   const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
 
-  // エクスポート (6 種類) - 実装は ./journal-import/ExportMenu.tsx の fetchExport へ委譲
-  const handleExport = async (format: ExportFormat) => {
+  // エクスポート (10 種類) - 実装は ./journal-import/ExportMenu.tsx の fetchExport へ委譲
+  // Phase 7-5: options (t_test の correction など) を受けて URL に反映
+  const handleExport = async (format: ExportFormat, options?: ExportOptions) => {
     setExportMenuAnchor(null);
     try {
       const filename = await fetchExport(
         format,
         { searchQ, filterStatus, filterFromDate, filterToDate },
         getToken,
+        options,
       );
       setSnackbar({
         open: true,
