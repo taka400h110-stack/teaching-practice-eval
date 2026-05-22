@@ -6,6 +6,7 @@
     "build": "vite build --mode client && vite build && echo '{\"version\":1,\"include\":[\"/*\"],\"exclude\":[\"/assets/*\",\"/static/*\"]}' > dist/_routes.json",
     "db:migrate:local": "npx wrangler d1 migrations apply DB --local",
     "preview": "wrangler pages dev dist --ip 127.0.0.1 --port 8788",
+    "preview:ci": "node scripts/prepare-ci-wrangler.cjs --strip && wrangler pages dev dist --ip 127.0.0.1 --port 8788",
     "deploy": "npm run build && wrangler pages deploy dist",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "test:e2e:smoke": "playwright test tests/e2e/role-ui-audit.onboarded.spec.ts tests/e2e/role-ui-audit.not-onboarded.spec.ts tests/e2e/role-rbac-matrix.spec.ts",

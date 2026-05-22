@@ -31,7 +31,11 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run build && npm run db:migrate:local && npm run preview',
+    // CI 環境では AI バインディングを除外した CI 専用 wrangler config を使用
+    // (Cloudflare API token なしでも起動可能にするため)
+    command: process.env.CI
+      ? 'npm run build && npm run db:migrate:local && npm run preview:ci'
+      : 'npm run build && npm run db:migrate:local && npm run preview',
     url: 'http://127.0.0.1:8788',
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
