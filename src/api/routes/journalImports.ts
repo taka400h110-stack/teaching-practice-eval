@@ -81,6 +81,154 @@ journalImportsRouter.get(
 );
 
 // ────────────────────────────────────────────────────────────────
+// GET /export.csv - CSV エクスポート (フィルタも適用、最大 5000 件)
+// ────────────────────────────────────────────────────────────────
+journalImportsRouter.get(
+  "/export.csv",
+  requireAuth,
+  requireRoles(READ_ROLES),
+  async (c) => {
+    const db = c.env.DB as D1Database;
+    const user = c.get("user");
+    const status = c.req.query("status");
+    const studentId = c.req.query("student_id");
+    const fromDate = c.req.query("from");
+    const toDate = c.req.query("to");
+    const q = c.req.query("q"); // ファイル名検索
+
+    let sql = `SELECT ji.*, u.name AS student_name
+               FROM journal_imports ji
+               LEFT JOIN users u ON u.id = ji.student_id
+               WHERE 1=1`;
+    const params: any[] = [];
+
+    if (user.role !== "admin") {
+      sql += ` AND ji.uploaded_by = ?`;
+      params.push(user.id);
+    }
+    if (status) {
+      sql += ` AND ji.status = ?`;
+      params.push(status);
+    }
+    if (studentId) {
+      sql += ` AND ji.student_id = ?`;
+      params.push(studentId);
+    }
+    if (fromDate) {
+      sql += ` AND ji.entry_date >= ?`;
+      params.push(fromDate);
+    }
+    if (toDate) {
+      sql += ` AND ji.entry_date <= ?`;
+      params.push(toDate);
+    }
+    if (q) {
+      sql += ` AND ji.filename LIKE ?`;
+      params.push(`%${q}%`);
+    }
+    sql += ` ORDER BY
+              CASE WHEN ji.student_id IS NULL THEN 1 ELSE 0 END,
+              ji.student_id ASC,
+              CASE WHEN ji.week_number IS NULL THEN 1 ELSE 0 END,
+              ji.week_number ASC,
+              CASE WHEN ji.entry_date IS NULL THEN 1 ELSE 0 END,
+              ji.entry_date ASC
+            LIMIT 5000`;
+
+    const res = await db
+      .prepare(sql)
+      .bind(...params)
+      .all<any>();
+    const rows = res.results || [];
+
+    // CSV 構築 (RFC 4180)
+    const headers = [
+      "id",
+      "filename",
+      "student_id",
+      "student_name",
+      "entry_date",
+      "week_number",
+      "status",
+      "extract_source",
+      "mime_type",
+      "file_size",
+      "word_count",
+      "token_count",
+      "title",
+      "reflection",
+      "confidence",
+      "journal_id",
+      "error_message",
+      "created_at",
+      "updated_at",
+    ];
+
+    const escape = (v: any): string => {
+      if (v == null) return "";
+      const s = String(v);
+      if (/[",\n\r]/.test(s)) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const lines = [headers.join(",")];
+    for (const row of rows) {
+      let title = "";
+      let reflection = "";
+      let confidence = "";
+      if (row.structured_json) {
+        try {
+          const parsed = JSON.parse(row.structured_json);
+          title = parsed?.title || "";
+          reflection = parsed?.reflection || "";
+          confidence = parsed?.confidence != null ? String(parsed.confidence) : "";
+        } catch {}
+      }
+      lines.push(
+        [
+          row.id,
+          row.filename,
+          row.student_id,
+          row.student_name,
+          row.entry_date,
+          row.week_number,
+          row.status,
+          row.extract_source,
+          row.mime_type,
+          row.file_size,
+          row.word_count,
+          row.token_count,
+          title,
+          reflection,
+          confidence,
+          row.journal_id,
+          row.error_message,
+          row.created_at,
+          row.updated_at,
+        ]
+          .map(escape)
+          .join(","),
+      );
+    }
+
+    const bom = "\uFEFF"; // Excel で UTF-8 として開けるように BOM 付与
+    const csv = bom + lines.join("\r\n");
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="journal-imports-${ts}.csv"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────
 // GET / - 取り込み一覧 (uploaded_by 単位)
 // ────────────────────────────────────────────────────────────────
 journalImportsRouter.get(
@@ -92,6 +240,9 @@ journalImportsRouter.get(
     const user = c.get("user");
     const status = c.req.query("status");
     const studentId = c.req.query("student_id");
+    const fromDate = c.req.query("from");
+    const toDate = c.req.query("to");
+    const q = c.req.query("q"); // ファイル名検索
     const limit = Math.min(
       parseInt(c.req.query("limit") || "200", 10) || 200,
       1000,
@@ -121,6 +272,21 @@ journalImportsRouter.get(
       countSql += ` AND ji.student_id = ?`;
       sql += ` AND ji.student_id = ?`;
       params.push(studentId);
+    }
+    if (fromDate) {
+      countSql += ` AND ji.entry_date >= ?`;
+      sql += ` AND ji.entry_date >= ?`;
+      params.push(fromDate);
+    }
+    if (toDate) {
+      countSql += ` AND ji.entry_date <= ?`;
+      sql += ` AND ji.entry_date <= ?`;
+      params.push(toDate);
+    }
+    if (q) {
+      countSql += ` AND ji.filename LIKE ?`;
+      sql += ` AND ji.filename LIKE ?`;
+      params.push(`%${q}%`);
     }
     // ソート: 学生ごとにまとめて → 週・日付の昇順 (グルーピング用)
     sql += ` ORDER BY

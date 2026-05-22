@@ -63,8 +63,14 @@ import PersonIcon from "@mui/icons-material/Person";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import ViewListIcon from "@mui/icons-material/ViewList";
+import SearchIcon from "@mui/icons-material/Search";
+import FilterAltIcon from "@mui/icons-material/FilterAlt";
+import FilterAltOffIcon from "@mui/icons-material/FilterAltOff";
+import DownloadIcon from "@mui/icons-material/Download";
+import FolderZipIcon from "@mui/icons-material/FolderZip";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "../../api/client";
+import { unzip } from "fflate";
+import { apiFetch, getToken } from "../../api/client";
 
 interface ImportItem {
   id: string;
@@ -193,6 +199,16 @@ export default function JournalImportPage() {
   const [viewingItem, setViewingItem] = useState<ImportItem | null>(null);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<"grouped" | "flat">("grouped");
+
+  // 検索/絞り込みフィルタ (クライアント側)
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterFromDate, setFilterFromDate] = useState<string>("");
+  const [filterToDate, setFilterToDate] = useState<string>("");
+
+  // ZIP 展開中フラグ
+  const [unzipping, setUnzipping] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "info" | "warning" | "error" }>({
     open: false,
     message: "",
@@ -307,9 +323,30 @@ export default function JournalImportPage() {
     },
   });
 
-  const items = listQ.data?.items || [];
+  const rawItems = listQ.data?.items || [];
   const totalCount = listQ.data?.total || 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+
+  // クライアント側フィルタ適用
+  const items = useMemo(() => {
+    const q = searchQ.trim().toLowerCase();
+    return rawItems.filter((it) => {
+      if (q) {
+        const hay = `${it.filename} ${it.student_name || ""} ${it.entry_date || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (filterStatus && it.status !== filterStatus) return false;
+      if (filterFromDate && it.entry_date && it.entry_date < filterFromDate) return false;
+      if (filterFromDate && !it.entry_date) return false;
+      if (filterToDate && it.entry_date && it.entry_date > filterToDate) return false;
+      if (filterToDate && !it.entry_date) return false;
+      return true;
+    });
+  }, [rawItems, searchQ, filterStatus, filterFromDate, filterToDate]);
+
+  const filterActive =
+    !!searchQ.trim() || !!filterStatus || !!filterFromDate || !!filterToDate;
+
   const readyToCommit = items.filter(
     (it) =>
       it.status === "structured" && it.student_id && it.entry_date && it.structured_json,
@@ -364,6 +401,42 @@ export default function JournalImportPage() {
       return a.studentName.localeCompare(b.studentName);
     });
   }, [items]);
+
+  // ────────────────────────────────────────────────────────────
+  // ZIP 展開 → 各ファイルを uploadFiles に流す
+  // ────────────────────────────────────────────────────────────
+  const expandZipFiles = useCallback(
+    async (zipFile: File): Promise<File[]> => {
+      const buf = new Uint8Array(await zipFile.arrayBuffer());
+      return new Promise((resolve, reject) => {
+        unzip(buf, (err, files) => {
+          if (err) return reject(err);
+          const out: File[] = [];
+          const SUPPORTED_EXT = [
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".heic",
+            ".heif",
+          ];
+          for (const [path, data] of Object.entries(files)) {
+            if (path.endsWith("/")) continue; // ディレクトリ
+            if (path.startsWith("__MACOSX/") || path.includes("/.")) continue;
+            const lower = path.toLowerCase();
+            if (!SUPPORTED_EXT.some((e) => lower.endsWith(e))) continue;
+            const name = path.split("/").pop() || path;
+            out.push(new File([data], name));
+          }
+          resolve(out);
+        });
+      });
+    },
+    [],
+  );
 
   // ────────────────────────────────────────────────────────────
   // アップロード
@@ -422,10 +495,47 @@ export default function JournalImportPage() {
     [qc],
   );
 
+  // ZIP を含む可能性のあるファイル群を処理
+  const handleIncomingFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+      const zips = files.filter((f) => /\.zip$/i.test(f.name));
+      const others = files.filter((f) => !/\.zip$/i.test(f.name));
+      const expanded: File[] = [...others];
+
+      if (zips.length > 0) {
+        setUnzipping(true);
+        try {
+          for (const zip of zips) {
+            try {
+              const inner = await expandZipFiles(zip);
+              expanded.push(...inner);
+              setSnackbar({
+                open: true,
+                message: `${zip.name}: ${inner.length} ファイルを展開`,
+                severity: "info",
+              });
+            } catch (e: any) {
+              setSnackbar({
+                open: true,
+                message: `${zip.name}: ZIP 展開失敗 (${e?.message || e})`,
+                severity: "error",
+              });
+            }
+          }
+        } finally {
+          setUnzipping(false);
+        }
+      }
+      if (expanded.length > 0) await uploadFiles(expanded);
+    },
+    [expandZipFiles, uploadFiles],
+  );
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    void uploadFiles(files);
+    void handleIncomingFiles(files);
     e.target.value = "";
   };
 
@@ -433,7 +543,7 @@ export default function JournalImportPage() {
     e.preventDefault();
     setDragOver(false);
     const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) void uploadFiles(files);
+    if (files.length > 0) void handleIncomingFiles(files);
   };
 
   // ────────────────────────────────────────────────────────────
@@ -464,6 +574,98 @@ export default function JournalImportPage() {
     }
   };
 
+  // 学生グループ単位の一括操作
+  const handleStructureGroup = async (groupItems: ImportItem[]) => {
+    const targets = groupItems.filter((it) => it.status === "extracted");
+    if (targets.length === 0) {
+      setSnackbar({ open: true, message: "構造化対象がありません", severity: "info" });
+      return;
+    }
+    for (const it of targets) await structureMut.mutateAsync(it.id);
+    setSnackbar({
+      open: true,
+      message: `${targets.length} 件を構造化しました`,
+      severity: "success",
+    });
+  };
+
+  const handleCommitGroup = async (groupItems: ImportItem[]) => {
+    const targets = groupItems.filter(
+      (it) =>
+        it.status === "structured" &&
+        it.student_id &&
+        it.entry_date &&
+        it.structured_json,
+    );
+    if (targets.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "コミット可能な項目がありません (学生・日付の指定が必要)",
+        severity: "warning",
+      });
+      return;
+    }
+    for (const it of targets) await commitMut.mutateAsync(it.id);
+    setSnackbar({
+      open: true,
+      message: `${targets.length} 件を確定しました`,
+      severity: "success",
+    });
+  };
+
+  // CSV エクスポート
+  const handleExportCsv = async () => {
+    const params = new URLSearchParams();
+    if (searchQ.trim()) params.set("q", searchQ.trim());
+    if (filterStatus) params.set("status", filterStatus);
+    if (filterFromDate) params.set("from", filterFromDate);
+    if (filterToDate) params.set("to", filterToDate);
+    const url = `/api/data/journal-imports/export.csv${params.toString() ? "?" + params.toString() : ""}`;
+
+    try {
+      const token = getToken();
+      const r = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!r.ok) {
+        setSnackbar({
+          open: true,
+          message: `CSV エクスポートに失敗: ${r.status}`,
+          severity: "error",
+        });
+        return;
+      }
+      const blob = await r.blob();
+      const dlUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      a.href = dlUrl;
+      a.download = `journal-imports-${ts}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(dlUrl);
+      setSnackbar({
+        open: true,
+        message: "CSV をダウンロードしました",
+        severity: "success",
+      });
+    } catch (e: any) {
+      setSnackbar({
+        open: true,
+        message: `CSV エクスポート失敗: ${e?.message || e}`,
+        severity: "error",
+      });
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchQ("");
+    setFilterStatus("");
+    setFilterFromDate("");
+    setFilterToDate("");
+  };
+
   // ────────────────────────────────────────────────────────────
   // 描画
   // ────────────────────────────────────────────────────────────
@@ -482,7 +684,22 @@ export default function JournalImportPage() {
             Word (.doc / .docx) / PDF / 画像 から実習日誌をデータ化します
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Tooltip title={filterOpen ? "検索を閉じる" : "検索/絞り込み"}>
+            <IconButton
+              onClick={() => setFilterOpen((v) => !v)}
+              color={filterActive ? "primary" : "default"}
+            >
+              {filterActive ? <FilterAltIcon /> : <FilterAltOffIcon />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="現在のフィルタで CSV ダウンロード">
+            <span>
+              <IconButton onClick={handleExportCsv} disabled={totalCount === 0}>
+                <DownloadIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
           <ToggleButtonGroup
             size="small"
             value={viewMode}
@@ -510,11 +727,77 @@ export default function JournalImportPage() {
 
       {/* 説明 */}
       <Alert severity="info" sx={{ mb: 2 }}>
-        対応形式: <strong>PDF / Word (.docx 推奨, .doc も試行) / 画像 (JPG/PNG/WEBP/HEIC)</strong>。
+        対応形式: <strong>PDF / Word (.docx 推奨, .doc も試行) / 画像 (JPG/PNG/WEBP/HEIC) / ZIP</strong>。
         Cloudflare Workers AI の <code>toMarkdown</code> でテキスト抽出 →
         GPT-4 で <strong>日付・週・時限ブロック・省察</strong> に自動構造化します。
         <strong>同時 {UPLOAD_CONCURRENCY} 並列</strong>、最大 {ITEMS_PER_PAGE} 件/ページで表示します。
+        ZIP はクライアントで解凍し中の対応ファイルを順次アップロードします。
       </Alert>
+
+      {/* 検索/絞り込み */}
+      {filterOpen && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ py: 2 }}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <TextField
+                size="small"
+                placeholder="ファイル名 / 学生名 / 日付で検索"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <SearchIcon fontSize="small" sx={{ mr: 1, color: "text.secondary" }} />
+                  ),
+                }}
+                sx={{ minWidth: 280, flex: 1 }}
+              />
+              <TextField
+                select
+                size="small"
+                label="状態"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                sx={{ minWidth: 140 }}
+              >
+                <MenuItem value="">すべて</MenuItem>
+                {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                  <MenuItem key={k} value={k}>
+                    {v}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                type="date"
+                size="small"
+                label="日付 (開始)"
+                value={filterFromDate}
+                onChange={(e) => setFilterFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 160 }}
+              />
+              <TextField
+                type="date"
+                size="small"
+                label="日付 (終了)"
+                value={filterToDate}
+                onChange={(e) => setFilterToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 160 }}
+              />
+              {filterActive && (
+                <Button size="small" onClick={clearFilters}>
+                  クリア
+                </Button>
+              )}
+              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                {filterActive
+                  ? `${items.length} / ${rawItems.length} 件 (ページ内)`
+                  : `${rawItems.length} 件表示中`}
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
 
       {/* アップロード領域 */}
       <Card sx={{ mb: 3 }}>
@@ -543,23 +826,53 @@ export default function JournalImportPage() {
               ファイルをドラッグ&ドロップ
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              または クリックして選択 (複数選択可・数百件まで対応)
+              または クリックして選択 (複数選択可・数百件まで対応・ZIP もOK)
             </Typography>
-            <Button variant="contained" startIcon={<CloudUploadIcon />}>
-              ファイルを選択
-            </Button>
+            <Stack direction="row" spacing={1} justifyContent="center">
+              <Button variant="contained" startIcon={<CloudUploadIcon />}>
+                ファイルを選択
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<FolderZipIcon />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // ZIP のみピッカー
+                  const inp = document.createElement("input");
+                  inp.type = "file";
+                  inp.accept = ".zip,application/zip,application/x-zip-compressed";
+                  inp.multiple = true;
+                  inp.onchange = () => {
+                    const fs = inp.files ? Array.from(inp.files) : [];
+                    if (fs.length > 0) void handleIncomingFiles(fs);
+                  };
+                  inp.click();
+                }}
+              >
+                ZIP を選択
+              </Button>
+            </Stack>
             <input
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.heic,.heif,.zip,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip,application/x-zip-compressed,image/*"
               style={{ display: "none" }}
               onChange={handleFileSelect}
             />
             <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-              最大 20MB / 1 ファイル
+              最大 20MB / 1 ファイル · ZIP 内の対応ファイルを自動展開
             </Typography>
           </Paper>
+
+          {unzipping && (
+            <Box mt={2}>
+              <Typography variant="body2" gutterBottom>
+                ZIP を展開中…
+              </Typography>
+              <LinearProgress />
+            </Box>
+          )}
 
           {uploadTotal > 0 && (
             <Box mt={2}>
@@ -593,12 +906,14 @@ export default function JournalImportPage() {
       </Card>
 
       {/* 一括操作 */}
-      {items.length > 0 && (
+      {rawItems.length > 0 && (
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ py: 1.5 }}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
               <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
-                ページ表示 {items.length} 件 / 全 {totalCount} 件
+                {filterActive
+                  ? `絞込 ${items.length} 件 / ページ ${rawItems.length} 件 / 全 ${totalCount} 件`
+                  : `ページ表示 ${rawItems.length} 件 / 全 ${totalCount} 件`}
               </Typography>
               <Button
                 size="small"
@@ -622,6 +937,15 @@ export default function JournalImportPage() {
               >
                 ready を一括コミット ({readyToCommit.length})
               </Button>
+              <Box sx={{ flex: 1 }} />
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportCsv}
+              >
+                CSV ダウンロード
+              </Button>
             </Stack>
           </CardContent>
         </Card>
@@ -632,8 +956,15 @@ export default function JournalImportPage() {
         <Box display="flex" justifyContent="center" p={4}>
           <CircularProgress />
         </Box>
-      ) : items.length === 0 ? (
+      ) : rawItems.length === 0 ? (
         <Alert severity="info">まだ取り込みはありません。上のエリアからファイルをアップロードしてください。</Alert>
+      ) : items.length === 0 ? (
+        <Alert severity="warning">
+          フィルタ条件に一致するファイルがありません。
+          <Button size="small" onClick={clearFilters} sx={{ ml: 1 }}>
+            クリア
+          </Button>
+        </Alert>
       ) : viewMode === "grouped" ? (
         <GroupedView
           groups={groupedByStudent}
@@ -642,6 +973,8 @@ export default function JournalImportPage() {
           onDetail={(it) => navigate(`/research/journal-import/${it.id}`)}
           onStructure={(id) => structureMut.mutate(id)}
           onCommit={(id) => commitMut.mutate(id)}
+          onStructureGroup={handleStructureGroup}
+          onCommitGroup={handleCommitGroup}
           onDelete={(it) => {
             if (confirm(`取り込み記録 "${it.filename}" を削除しますか?`)) {
               deleteMut.mutate(it.id);
@@ -746,67 +1079,123 @@ function GroupedView(props: {
   onDetail: (it: ImportItem) => void;
   onStructure: (id: string) => void;
   onCommit: (id: string) => void;
+  onStructureGroup: (items: ImportItem[]) => void;
+  onCommitGroup: (items: ImportItem[]) => void;
   onDelete: (it: ImportItem) => void;
   onOpenJournal: (jid: string) => void;
   structurePending: boolean;
   commitPending: boolean;
 }) {
-  const { groups } = props;
+  const { groups, onStructureGroup, onCommitGroup, structurePending, commitPending } = props;
   return (
     <Stack spacing={1.5}>
-      {groups.map((g) => (
-        <Accordion key={g.studentId || "__unassigned__"} defaultExpanded={groups.length <= 5}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1.5}
-              sx={{ width: "100%" }}
-              flexWrap="wrap"
-              useFlexGap
-            >
-              <Avatar
-                sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: g.studentId ? "primary.main" : "grey.400",
-                }}
+      {groups.map((g) => {
+        const extractedCount = g.items.filter((it) => it.status === "extracted").length;
+        const readyCount = g.items.filter(
+          (it) =>
+            it.status === "structured" &&
+            it.student_id &&
+            it.entry_date &&
+            it.structured_json,
+        ).length;
+        return (
+          <Accordion key={g.studentId || "__unassigned__"} defaultExpanded={groups.length <= 5}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1.5}
+                sx={{ width: "100%" }}
+                flexWrap="wrap"
+                useFlexGap
               >
-                {g.studentId ? <PersonIcon fontSize="small" /> : <HelpOutlineIcon fontSize="small" />}
-              </Avatar>
-              <Box sx={{ flex: 1, minWidth: 200 }}>
-                <Typography variant="subtitle1" fontWeight="bold">
-                  {g.studentName}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {g.items.length} 件の取り込み
-                </Typography>
-              </Box>
-              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                {g.stats.committed > 0 && (
-                  <Chip
-                    size="small"
-                    color="success"
-                    label={`確定 ${g.stats.committed}`}
-                  />
-                )}
-                {g.stats.structured > 0 && (
-                  <Chip size="small" color="warning" label={`編集待 ${g.stats.structured}`} />
-                )}
-                {g.stats.pending > 0 && (
-                  <Chip size="small" color="info" label={`処理中 ${g.stats.pending}`} />
-                )}
-                {g.stats.failed > 0 && (
-                  <Chip size="small" color="error" label={`失敗 ${g.stats.failed}`} />
-                )}
+                <Avatar
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    bgcolor: g.studentId ? "primary.main" : "grey.400",
+                  }}
+                >
+                  {g.studentId ? <PersonIcon fontSize="small" /> : <HelpOutlineIcon fontSize="small" />}
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 200 }}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    {g.studentName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {g.items.length} 件の取り込み
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                  {g.stats.committed > 0 && (
+                    <Chip
+                      size="small"
+                      color="success"
+                      label={`確定 ${g.stats.committed}`}
+                    />
+                  )}
+                  {g.stats.structured > 0 && (
+                    <Chip size="small" color="warning" label={`編集待 ${g.stats.structured}`} />
+                  )}
+                  {g.stats.pending > 0 && (
+                    <Chip size="small" color="info" label={`処理中 ${g.stats.pending}`} />
+                  )}
+                  {g.stats.failed > 0 && (
+                    <Chip size="small" color="error" label={`失敗 ${g.stats.failed}`} />
+                  )}
+                </Stack>
+                {/* 学生グループ別の一括操作 */}
+                <Stack
+                  direction="row"
+                  spacing={0.5}
+                  onClick={(e) => e.stopPropagation()}
+                  onFocus={(e) => e.stopPropagation()}
+                >
+                  {extractedCount > 0 && (
+                    <Tooltip title={`未構造化 ${extractedCount} 件を GPT-4 で構造化`}>
+                      <span>
+                        <Button
+                          size="small"
+                          startIcon={<AutoFixHighIcon />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStructureGroup(g.items);
+                          }}
+                          disabled={structurePending}
+                        >
+                          一括構造化 ({extractedCount})
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
+                  {readyCount > 0 && (
+                    <Tooltip title={`確定可能な ${readyCount} 件を journal_entries にコミット`}>
+                      <span>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          startIcon={<CheckCircleIcon />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCommitGroup(g.items);
+                          }}
+                          disabled={commitPending}
+                        >
+                          一括コミット ({readyCount})
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
+                </Stack>
               </Stack>
-            </Stack>
-          </AccordionSummary>
-          <AccordionDetails sx={{ p: 0 }}>
-            <WeekSubGroups items={g.items} {...props} />
-          </AccordionDetails>
-        </Accordion>
-      ))}
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 0 }}>
+              <WeekSubGroups items={g.items} {...props} />
+            </AccordionDetails>
+          </Accordion>
+        );
+      })}
     </Stack>
   );
 }
@@ -821,6 +1210,8 @@ function WeekSubGroups(props: {
   onDetail: (it: ImportItem) => void;
   onStructure: (id: string) => void;
   onCommit: (id: string) => void;
+  onStructureGroup?: (items: ImportItem[]) => void;
+  onCommitGroup?: (items: ImportItem[]) => void;
   onDelete: (it: ImportItem) => void;
   onOpenJournal: (jid: string) => void;
   structurePending: boolean;
@@ -871,6 +1262,8 @@ function FlatView(props: {
   onDetail: (it: ImportItem) => void;
   onStructure: (id: string) => void;
   onCommit: (id: string) => void;
+  onStructureGroup?: (items: ImportItem[]) => void;
+  onCommitGroup?: (items: ImportItem[]) => void;
   onDelete: (it: ImportItem) => void;
   onOpenJournal: (jid: string) => void;
   structurePending: boolean;
@@ -896,6 +1289,8 @@ function ItemTable(props: {
   onDetail: (it: ImportItem) => void;
   onStructure: (id: string) => void;
   onCommit: (id: string) => void;
+  onStructureGroup?: (items: ImportItem[]) => void;
+  onCommitGroup?: (items: ImportItem[]) => void;
   onDelete: (it: ImportItem) => void;
   onOpenJournal: (jid: string) => void;
   structurePending: boolean;
