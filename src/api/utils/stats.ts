@@ -581,3 +581,155 @@ export function fmtPCell(
   }
   return "—";
 }
+
+// ────────────────────────────────────────────────────────────────
+// Phase 7-4: 多重比較補正 (Multiple comparison correction)
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * 多重比較補正の方式
+ *
+ *  - `none`        : 補正なし (= 元の p をそのまま返す。デフォルト)
+ *  - `bonferroni`  : Bonferroni 補正 (single-step, family-wise error rate)
+ *                    p_adj = min(p × m, 1)
+ *  - `holm`        : Holm 補正 (step-down sequential, family-wise error rate)
+ *                    昇順にソートし `p_adj[i] = max(p_adj[i-1], min(p[i] × (m - i), 1))`
+ *  - `fdr_bh`      : Benjamini-Hochberg 補正 (false discovery rate)
+ *                    昇順にソートし `p_adj[i] = min_{k≥i}(p[k] × m / (k+1))`、最大値 1 で clamp、
+ *                    元順序復元時に単調性を保証。
+ *
+ * 一般に Bonferroni ≥ Holm ≥ BH-FDR(同 p 値に対して)で、BH-FDR が最も検出力が高い。
+ *
+ * 設計ポイント:
+ *  - 入力配列 (pValues) の `null` は test family から除外 (m に数えない)。
+ *    戻り値の対応位置にも `null` を入れて返す → 呼び出し側は表示順を維持できる。
+ *  - これにより Phase 7-3 の skip_reason で p=null になった test を自動的に除外できる。
+ */
+export type MultipleComparisonMethod = "none" | "bonferroni" | "holm" | "fdr_bh";
+
+const VALID_METHODS: ReadonlySet<MultipleComparisonMethod> = new Set([
+  "none", "bonferroni", "holm", "fdr_bh",
+]);
+
+/** クエリ文字列等から MultipleComparisonMethod を安全にパース (不明値は "none") */
+export function parseCorrectionMethod(raw: string | null | undefined): MultipleComparisonMethod {
+  if (!raw) return "none";
+  const v = raw.toLowerCase();
+  return (VALID_METHODS as Set<string>).has(v) ? (v as MultipleComparisonMethod) : "none";
+}
+
+/** 表示用ラベル (Markdown 注記や API レスポンスのメタデータに使用) */
+export function formatCorrectionMethod(method: MultipleComparisonMethod): string {
+  switch (method) {
+    case "bonferroni": return "Bonferroni 補正";
+    case "holm":       return "Holm 補正 (step-down)";
+    case "fdr_bh":     return "Benjamini-Hochberg FDR 補正";
+    case "none":       return "補正なし";
+    default:           return "補正なし";
+  }
+}
+
+/**
+ * 多重比較補正された p 値配列を返す。
+ *
+ * @param pValues 元の p 値配列 (null / NaN / 非有限値は test family から除外)
+ * @param method  補正方式 ("none" の場合は元の p を浅いコピーで返す)
+ * @returns       同じ長さの配列。null だった位置には null、補正できた位置には [0, 1] の数値。
+ *
+ * 例:
+ *   correctPValues([0.01, 0.04, null, 0.20], "bonferroni")
+ *     → [0.03, 0.12, null, 0.60]   (m = 3, null は除外)
+ *
+ *   correctPValues([0.01, 0.04, 0.03], "holm")
+ *     → ソート: [0.01(i=0), 0.03(i=1), 0.04(i=2)]
+ *        p_adj_sorted = [min(0.01*3,1)=0.03, max(0.03, min(0.03*2,1))=0.06, max(0.06, min(0.04*1,1))=0.06]
+ *        元順序復元: [0.03, 0.06, 0.06]
+ *
+ *   correctPValues([0.01, 0.04, 0.03, 0.20], "fdr_bh")
+ *     → m=4, ソート: [0.01, 0.03, 0.04, 0.20]
+ *        raw = [0.01*4/1=0.04, 0.03*4/2=0.06, 0.04*4/3=0.0533, 0.20*4/4=0.20]
+ *        後ろから単調化 (右から最小値を取る): [0.04, 0.0533, 0.0533, 0.20]
+ *        clamp ≤ 1
+ *        元順序復元: [0.04, 0.0533, 0.0533, 0.20]
+ */
+export function correctPValues(
+  pValues: Array<number | null | undefined>,
+  method: MultipleComparisonMethod,
+): Array<number | null> {
+  // 1) 有効 p 値のインデックスを抽出 (null/NaN/非有限値はスキップ)
+  const validIdx: number[] = [];
+  const validP: number[] = [];
+  for (let i = 0; i < pValues.length; i++) {
+    const p = pValues[i];
+    if (typeof p === "number" && Number.isFinite(p) && p >= 0 && p <= 1) {
+      validIdx.push(i);
+      validP.push(p);
+    }
+  }
+  const m = validP.length;
+
+  // 出力は null で初期化 (元配列で除外された位置はそのまま null)
+  const out: Array<number | null> = new Array(pValues.length).fill(null);
+
+  if (m === 0) return out;
+
+  // method = "none" は浅いコピー (除外位置は null のまま)
+  if (method === "none") {
+    for (let k = 0; k < validIdx.length; k++) out[validIdx[k]] = validP[k];
+    return out;
+  }
+
+  // 補正後 p (validP と同じ並び)
+  const adj: number[] = new Array(m);
+
+  if (method === "bonferroni") {
+    for (let k = 0; k < m; k++) {
+      adj[k] = Math.min(validP[k] * m, 1);
+    }
+  } else if (method === "holm") {
+    // 昇順ソート (元のインデックス k を保持)
+    const order = validP
+      .map((p, k) => ({ p, k }))
+      .sort((a, b) => a.p - b.p);
+    // step-down: p_adj_sorted[i] = max(prev, min(p × (m - i), 1))
+    let prev = 0;
+    const adjSorted: number[] = new Array(m);
+    for (let i = 0; i < m; i++) {
+      const raw = Math.min(order[i].p * (m - i), 1);
+      const cur = Math.max(prev, raw);
+      adjSorted[i] = cur;
+      prev = cur;
+    }
+    // 元順序 (validP の k) に戻す
+    for (let i = 0; i < m; i++) {
+      adj[order[i].k] = adjSorted[i];
+    }
+  } else if (method === "fdr_bh") {
+    // 昇順ソート (元のインデックス k を保持)
+    const order = validP
+      .map((p, k) => ({ p, k }))
+      .sort((a, b) => a.p - b.p);
+    // raw[i] = p × m / (i + 1)
+    const raw: number[] = new Array(m);
+    for (let i = 0; i < m; i++) {
+      raw[i] = Math.min(order[i].p * m / (i + 1), 1);
+    }
+    // 後ろから単調化 (右から最小値を取る) で単調非減少を保証
+    const adjSorted: number[] = new Array(m);
+    let minSoFar = Infinity;
+    for (let i = m - 1; i >= 0; i--) {
+      minSoFar = Math.min(minSoFar, raw[i]);
+      adjSorted[i] = minSoFar;
+    }
+    // 元順序 (validP の k) に戻す
+    for (let i = 0; i < m; i++) {
+      adj[order[i].k] = adjSorted[i];
+    }
+  }
+
+  // validIdx 経由で元配列の位置にマップ
+  for (let k = 0; k < validIdx.length; k++) {
+    out[validIdx[k]] = adj[k];
+  }
+  return out;
+}
