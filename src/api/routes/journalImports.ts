@@ -27,6 +27,7 @@ import {
   pStars,
   type DescriptiveStats,
 } from "../utils/stats";
+import { requireWeekNumber, validateWeekNumber } from "../utils/validation";
 import {
   createImportRecord,
   extractDocument,
@@ -2218,10 +2219,17 @@ journalImportsRouter.patch(
     if (body.student_id !== undefined) patch.student_id = body.student_id || null;
     if (body.entry_date !== undefined) patch.entry_date = body.entry_date || null;
     if (body.week_number !== undefined) {
-      patch.week_number =
-        body.week_number === null || body.week_number === ""
-          ? null
-          : Number(body.week_number);
+      // Phase 7-2: journal_imports.week_number は NULL 可。
+      // NULL / 空文字は許可、それ以外は 1..52 の整数のみ。
+      if (body.week_number === null || body.week_number === "") {
+        patch.week_number = null;
+      } else {
+        const v = validateWeekNumber(body.week_number);
+        if (!v.ok) {
+          return c.json({ success: false, error: "validation_error", message: v.error }, 400);
+        }
+        patch.week_number = v.value;
+      }
     }
     if (body.structured !== undefined) {
       // structured は JSON オブジェクトで来る
@@ -2229,7 +2237,18 @@ journalImportsRouter.patch(
       patch.structured_json = JSON.stringify(s);
       patch.word_count = estimateWordCount(s);
       if (s.entry_date !== undefined) patch.entry_date = s.entry_date;
-      if (s.week_number !== undefined) patch.week_number = s.week_number;
+      if (s.week_number !== undefined) {
+        // structured.week_number も同様に検証 (NULL は許容)
+        if (s.week_number === null) {
+          patch.week_number = null;
+        } else {
+          const v = validateWeekNumber(s.week_number);
+          if (!v.ok) {
+            return c.json({ success: false, error: "validation_error", message: v.error }, 400);
+          }
+          patch.week_number = v.value;
+        }
+      }
     }
     if (Object.keys(patch).length === 0) {
       return c.json({ success: false, error: "no_changes" }, 400);
@@ -2310,7 +2329,23 @@ journalImportsRouter.post(
 
     const content = structuredToJournalContent(structured);
     const wordCount = rec.word_count || estimateWordCount(structured);
-    const weekNumber = rec.week_number ?? 1;
+
+    // Phase 7-2: rec.week_number が異常な場合でもコミット段階で 1..52 を強制
+    // NULL の場合は従来通り 1 にフォールバック
+    const rawWeek = rec.week_number ?? 1;
+    const weekValidation = validateWeekNumber(rawWeek);
+    if (!weekValidation.ok) {
+      return c.json(
+        {
+          success: false,
+          error: "invalid_week_number",
+          message: `journal_imports.week_number is out of range: ${weekValidation.error}. ` +
+                   `PATCH /:id で正しい週番号 (1..52) を指定してから再度コミットしてください。`,
+        },
+        400,
+      );
+    }
+    const weekNumber = weekValidation.value;
     const title = structured.title || `(取り込み) ${rec.filename}`;
     const ocrConfidence = structured.confidence
       ? Math.round(structured.confidence * 100)
