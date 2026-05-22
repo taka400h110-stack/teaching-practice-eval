@@ -17,6 +17,17 @@ import { setAuditReadContext } from "../middleware/audit";
 import { UserRole } from "../../types";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
+  describe,
+  pearson,
+  welchTTest,
+  pairedTTest,
+  fmt,
+  fmtP,
+  fmtCoef,
+  pStars,
+  type DescriptiveStats,
+} from "../utils/stats";
+import {
   createImportRecord,
   extractDocument,
   getImportRecord,
@@ -881,7 +892,15 @@ type CodebookField = {
 };
 
 type CodebookSection = {
-  format: "summary_csv" | "detail_csv" | "json" | "analysis_csv";
+  format:
+    | "summary_csv"
+    | "detail_csv"
+    | "json"
+    | "analysis_csv"
+    | "descriptive_stats_md"
+    | "correlation_csv"
+    | "t_test_md"
+    | "methods_section_md";
   endpoint: string;
   description: string;
   fields: CodebookField[];
@@ -1062,12 +1081,96 @@ function buildCodebook(): {
     ],
   };
 
+  // ────────────────────────────────────────────────────────────────
+  // Phase 6-3 セクション: 統計集計エクスポート (APA 論文出力支援)
+  // ────────────────────────────────────────────────────────────────
+  const analysisFilters = [
+    { name: "student_id", type: "string", description: "学生 ID 絞り込み" },
+    { name: "from", type: "date", description: "entry_date >= YYYY-MM-DD" },
+    { name: "to", type: "date", description: "entry_date <= YYYY-MM-DD" },
+  ];
+
+  const descriptiveStats: CodebookSection = {
+    format: "descriptive_stats_md",
+    endpoint: "GET /api/data/journal-imports/export.descriptive_stats.md",
+    description: "APA 7th edition 形式の記述統計テーブル (Markdown)。AI 評価 / 人間評価 / SCAT 概念数 / 日誌記述量 の各変数について、平均・SD・中央値・最小最大・歪度・尖度 を計算。論文 Results セクションにコピペ可能。",
+    row_limit: 5000,
+    filters: analysisFilters,
+    fields: [
+      { name: "n", type: "integer", description: "有効サンプル数 (欠損除外後)", source: "計算" },
+      { name: "M", type: "number", description: "標本平均", source: "計算" },
+      { name: "SD", type: "number", description: "不偏標準偏差 (分母 n−1)", source: "計算" },
+      { name: "Mdn", type: "number", description: "中央値", source: "計算" },
+      { name: "Min", type: "number", description: "最小値", source: "計算" },
+      { name: "Max", type: "number", description: "最大値", source: "計算" },
+      { name: "Skewness", type: "number", description: "Fisher-Pearson 標本歪度 (g₁)", source: "計算", notes: "SciPy bias=False 相当" },
+      { name: "Kurtosis", type: "number", description: "超過尖度 (g₂; 正規分布で 0)", source: "計算", notes: "SciPy bias=False 相当" },
+    ],
+  };
+
+  const correlation: CodebookSection = {
+    format: "correlation_csv",
+    endpoint: "GET /api/data/journal-imports/export.correlation.csv",
+    description: "Pearson 積率相関の総当たり相関 (AI/人間/SCAT/語数 14 変数のペアワイズ)。各ペアに対し n, r, t, df, p, 有意性記号 (***/**/*), Fisher z 変換による 95% 信頼区間 を出力。R / SPSS / Python での再現用 CSV。",
+    row_limit: 5000,
+    filters: analysisFilters,
+    fields: [
+      { name: "variable_1", type: "string", description: "変数1 ラベル", source: "計算" },
+      { name: "variable_2", type: "string", description: "変数2 ラベル", source: "計算" },
+      { name: "n", type: "integer", description: "有効ペア数", source: "計算" },
+      { name: "r", type: "number", description: "Pearson 相関係数 (−1〜1)", source: "計算" },
+      { name: "t", type: "number", description: "相関の有意性検定 t 統計量 = r√((n−2)/(1−r²))", source: "計算" },
+      { name: "df", type: "integer", description: "自由度 = n − 2", source: "計算" },
+      { name: "p", type: "number", description: "両側 p 値 (Student t 分布)", source: "計算" },
+      { name: "p_sig", type: "string", description: "有意性記号 ('***' p<.001, '**' p<.01, '*' p<.05, '' n.s.)", source: "計算" },
+      { name: "ci_lower_95", type: "number", description: "Fisher z 変換 95% 信頼区間 下限", source: "計算" },
+      { name: "ci_upper_95", type: "number", description: "Fisher z 変換 95% 信頼区間 上限", source: "計算" },
+    ],
+  };
+
+  const tTest: CodebookSection = {
+    format: "t_test_md",
+    endpoint: "GET /api/data/journal-imports/export.t_test.md",
+    description: "群間比較の t 検定結果 (Markdown)。表1: 実習前半 vs 後半 (Welch 独立 t 検定 / split_week パラメータで境界変更可)。表2: AI vs 人間 (対応のある t 検定)。効果量 (Cohen's d / dz) 付き。",
+    row_limit: 5000,
+    filters: [
+      ...analysisFilters,
+      { name: "split_week", type: "integer", description: "前半/後半の境界 (week_number ≤ split_week が前半; デフォルト 2)" },
+    ],
+    fields: [
+      { name: "n₁ / n₂", type: "integer", description: "各群の有効サンプル数", source: "計算" },
+      { name: "M₁ (SD₁) / M₂ (SD₂)", type: "string", description: "各群の平均と SD", source: "計算" },
+      { name: "M差", type: "number", description: "Welch では M₁−M₂、Paired では平均差 (AI−人間)", source: "計算" },
+      { name: "t", type: "number", description: "t 統計量", source: "計算" },
+      { name: "df", type: "number", description: "Welch: Welch-Satterthwaite 近似自由度、Paired: n−1", source: "計算" },
+      { name: "p", type: "number", description: "両側 p 値 (APA 形式: p < .001 など)", source: "計算" },
+      { name: "Cohen's d / dz", type: "number", description: "効果量 (d: プール SD で標準化、dz: 差分の SD で標準化)", source: "計算" },
+    ],
+  };
+
+  const methodsSection: CodebookSection = {
+    format: "methods_section_md",
+    endpoint: "GET /api/data/journal-imports/export.methods_section.md",
+    description: "論文 Methods セクションの自動生成下書き (Markdown)。Participants / Materials / AI Evaluation / Statistical Analysis / Software and Tools / Ethical Considerations / References の 7 サブセクションを含む。エクスポート時点のサンプルサイズ等を埋め込み済み。",
+    row_limit: 5000,
+    filters: analysisFilters,
+    fields: [
+      { name: "Participants and Data", type: "string", description: "対象 N、学生数、実習週範囲、語数記述統計、AI/人間/SCAT データ被覆数を本文に展開", source: "計算" },
+      { name: "Materials and Instruments", type: "string", description: "評価ルーブリック (4 因子 / 0–5 リッカート) と SCAT 質的分析手法を記述", source: "テンプレート" },
+      { name: "AI Evaluation", type: "string", description: "LLM 評価の方法とプロンプトバージョン管理について記述", source: "テンプレート" },
+      { name: "Statistical Analysis", type: "string", description: "記述統計・群間比較・相関・効果量・APA 報告形式について記述", source: "テンプレート" },
+      { name: "Software and Tools", type: "string", description: "本プラットフォームの技術スタック、統計計算実装の出典 (Numerical Recipes 6.4) を記述", source: "テンプレート" },
+      { name: "Ethical Considerations", type: "string", description: "同意、匿名化、RBAC、監査ログを記述", source: "テンプレート" },
+      { name: "References", type: "string", description: "推奨引用形式 (大谷 2008 SCAT、APA Publication Manual、Numerical Recipes)", source: "テンプレート" },
+    ],
+  };
+
   return {
     generated_at: new Date().toISOString(),
-    version: "1.0",
-    description: "教育実習日誌 評価プラットフォーム / 過去日誌取り込み機能のエクスポート列定義。論文 Appendix / IRB 提出資料 / 共同研究者へのデータ受け渡しにそのまま使えます。",
+    version: "1.1",
+    description: "教育実習日誌 評価プラットフォーム / 過去日誌取り込み機能のエクスポート列定義。論文 Appendix / IRB 提出資料 / 共同研究者へのデータ受け渡しにそのまま使えます。Phase 6-3 (v1.1) で APA 統計エクスポート 4 種を追加。",
     block_keys: BLOCK_KEYS,
-    sections: [summary, detail, json, analysis],
+    sections: [summary, detail, json, analysis, descriptiveStats, correlation, tTest, methodsSection],
   };
 }
 
@@ -1171,6 +1274,634 @@ journalImportsRouter.get(
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
         "Content-Disposition": `attachment; filename="journal-imports-codebook-${csvTimestamp()}.md"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  },
+);
+
+// ════════════════════════════════════════════════════════════════
+// Phase 6-3: 論文出力支援 (APA 統計テーブル / 相関 / t 検定 / Methods 自動生成)
+// 共通ヘルパー: analysis.csv と同じ結合クエリで AI/Human/SCAT 等のデータ配列を返す
+// ════════════════════════════════════════════════════════════════
+type AnalysisDatum = {
+  journal_id: string;
+  student_id: string | null;
+  entry_date: string | null;
+  week_number: number | null;
+  word_count: number | null;
+  ai_total: number | null;
+  ai_f1: number | null;
+  ai_f2: number | null;
+  ai_f3: number | null;
+  ai_f4: number | null;
+  hu_total: number | null;
+  hu_f1: number | null;
+  hu_f2: number | null;
+  hu_f3: number | null;
+  hu_f4: number | null;
+  scat_segments: number;
+  scat_concepts: number;
+  scat_themes: number;
+  reflection_chars: number;
+  block_chars_total: number;
+};
+
+async function gatherAnalysisData(
+  db: D1Database,
+  user: { id: string; role: string },
+  filters: { studentId?: string; fromDate?: string; toDate?: string },
+): Promise<AnalysisDatum[]> {
+  let baseSql: string;
+  const baseParams: any[] = [];
+
+  if (user.role === "admin") {
+    baseSql = `
+      SELECT je.id AS journal_id,
+             je.student_id,
+             je.entry_date,
+             je.week_number,
+             je.word_count,
+             ji.id AS import_id
+      FROM journal_entries je
+      LEFT JOIN journal_imports ji ON ji.journal_id = je.id
+      WHERE 1=1
+    `;
+  } else {
+    baseSql = `
+      SELECT je.id AS journal_id,
+             je.student_id,
+             je.entry_date,
+             je.week_number,
+             je.word_count,
+             ji.id AS import_id
+      FROM journal_imports ji
+      JOIN journal_entries je ON je.id = ji.journal_id
+      WHERE ji.uploaded_by = ?
+    `;
+    baseParams.push(user.id);
+  }
+  if (filters.studentId) {
+    baseSql += ` AND je.student_id = ?`;
+    baseParams.push(filters.studentId);
+  }
+  if (filters.fromDate) {
+    baseSql += ` AND je.entry_date >= ?`;
+    baseParams.push(filters.fromDate);
+  }
+  if (filters.toDate) {
+    baseSql += ` AND je.entry_date <= ?`;
+    baseParams.push(filters.toDate);
+  }
+  baseSql += ` ORDER BY je.student_id, je.week_number, je.entry_date LIMIT 5000`;
+
+  const baseRes = await db.prepare(baseSql).bind(...baseParams).all<any>();
+  const journals = baseRes.results || [];
+  const journalIds = journals.map((j) => j.journal_id).filter(Boolean);
+
+  const aiMap = new Map<string, any>();
+  const humanMap = new Map<string, any>();
+  const scatMap = new Map<string, { segments: number; concepts: number; themes: number }>();
+  const importMetaMap = new Map<string, any>();
+
+  if (journalIds.length > 0) {
+    const placeholders = journalIds.map(() => "?").join(",");
+    const aiRes = await db
+      .prepare(
+        `SELECT * FROM evaluations WHERE journal_id IN (${placeholders}) AND eval_type='ai' ORDER BY created_at DESC`,
+      )
+      .bind(...journalIds)
+      .all<any>();
+    for (const ev of aiRes.results || []) {
+      if (!aiMap.has(ev.journal_id)) aiMap.set(ev.journal_id, ev);
+    }
+    const huRes = await db
+      .prepare(
+        `SELECT journal_id, COUNT(*) AS evaluator_count,
+                AVG(total_score) AS avg_total,
+                AVG(factor1_score) AS avg_f1,
+                AVG(factor2_score) AS avg_f2,
+                AVG(factor3_score) AS avg_f3,
+                AVG(factor4_score) AS avg_f4
+         FROM human_evaluations WHERE journal_id IN (${placeholders})
+         GROUP BY journal_id`,
+      )
+      .bind(...journalIds)
+      .all<any>();
+    for (const hu of huRes.results || []) humanMap.set(hu.journal_id, hu);
+
+    const segRes = await db
+      .prepare(
+        `SELECT source_journal_id, COUNT(*) AS seg_count FROM scat_segments
+         WHERE source_journal_id IN (${placeholders}) GROUP BY source_journal_id`,
+      )
+      .bind(...journalIds)
+      .all<any>();
+    for (const s of segRes.results || []) {
+      scatMap.set(s.source_journal_id, { segments: Number(s.seg_count || 0), concepts: 0, themes: 0 });
+    }
+    const codeRes = await db
+      .prepare(
+        `SELECT ss.source_journal_id AS jid,
+                SUM(CASE WHEN sc.step3_concept IS NOT NULL AND sc.step3_concept != '' THEN 1 ELSE 0 END) AS concept_count,
+                SUM(CASE WHEN sc.step4_theme IS NOT NULL AND sc.step4_theme != '' THEN 1 ELSE 0 END) AS theme_count
+         FROM scat_codes sc
+         JOIN scat_segments ss ON ss.id = sc.segment_id
+         WHERE ss.source_journal_id IN (${placeholders})
+         GROUP BY ss.source_journal_id`,
+      )
+      .bind(...journalIds)
+      .all<any>();
+    for (const cc of codeRes.results || []) {
+      const cur = scatMap.get(cc.jid) || { segments: 0, concepts: 0, themes: 0 };
+      cur.concepts = Number(cc.concept_count || 0);
+      cur.themes = Number(cc.theme_count || 0);
+      scatMap.set(cc.jid, cur);
+    }
+
+    const importIds = journals.map((j) => j.import_id).filter(Boolean);
+    if (importIds.length > 0) {
+      const impPh = importIds.map(() => "?").join(",");
+      const impRes = await db
+        .prepare(`SELECT id, structured_json FROM journal_imports WHERE id IN (${impPh})`)
+        .bind(...importIds)
+        .all<any>();
+      for (const imp of impRes.results || []) {
+        importMetaMap.set(imp.id, safeJsonParse<any>(imp.structured_json) || {});
+      }
+    }
+  }
+
+  const data: AnalysisDatum[] = journals.map((j) => {
+    const ai = aiMap.get(j.journal_id);
+    const hu = humanMap.get(j.journal_id);
+    const sc = scatMap.get(j.journal_id) || { segments: 0, concepts: 0, themes: 0 };
+    const imp = importMetaMap.get(j.import_id) || {};
+    const blocks = imp.blocks || {};
+    const blockCharsTotal = BLOCK_KEYS.reduce((acc, k) => {
+      const s = blocks[k];
+      return acc + (s ? String(s).length : 0);
+    }, 0);
+    const reflectionChars = imp.reflection ? String(imp.reflection).length : 0;
+    const num = (v: any): number | null => (v == null ? null : Number(v));
+    return {
+      journal_id: j.journal_id,
+      student_id: j.student_id ?? null,
+      entry_date: j.entry_date ?? null,
+      week_number: j.week_number != null ? Number(j.week_number) : null,
+      word_count: j.word_count != null ? Number(j.word_count) : null,
+      ai_total: num(ai?.total_score),
+      ai_f1: num(ai?.factor1_score),
+      ai_f2: num(ai?.factor2_score),
+      ai_f3: num(ai?.factor3_score),
+      ai_f4: num(ai?.factor4_score),
+      hu_total: num(hu?.avg_total),
+      hu_f1: num(hu?.avg_f1),
+      hu_f2: num(hu?.avg_f2),
+      hu_f3: num(hu?.avg_f3),
+      hu_f4: num(hu?.avg_f4),
+      scat_segments: sc.segments,
+      scat_concepts: sc.concepts,
+      scat_themes: sc.themes,
+      reflection_chars: reflectionChars,
+      block_chars_total: blockCharsTotal,
+    };
+  });
+  return data;
+}
+
+// APA 形式の記述統計行 (Markdown テーブル 1 行) を生成
+function apaDescRow(label: string, d: DescriptiveStats): string {
+  return `| ${label} | ${d.n} | ${fmt(d.mean)} | ${fmt(d.sd)} | ${fmt(d.median)} | ${fmt(d.min)} | ${fmt(d.max)} | ${fmt(d.skewness)} | ${fmt(d.kurtosis)} |`;
+}
+
+// ────────────────────────────────────────────────────────────────
+// GET /export.descriptive_stats.md - APA 形式 記述統計テーブル
+// ────────────────────────────────────────────────────────────────
+journalImportsRouter.get(
+  "/export.descriptive_stats.md",
+  requireAuth,
+  requireRoles(READ_ROLES),
+  async (c) => {
+    const db = c.env.DB as D1Database;
+    const user = c.get("user");
+    const studentId = c.req.query("student_id");
+    const fromDate = c.req.query("from");
+    const toDate = c.req.query("to");
+    const data = await gatherAnalysisData(db, user, { studentId, fromDate, toDate });
+
+    // 変数ごとに配列を抽出
+    const pick = (key: keyof AnalysisDatum) =>
+      data.map((d) => (d[key] == null ? null : Number(d[key] as any)));
+
+    const aiTotal = describe(pick("ai_total"));
+    const aiF1 = describe(pick("ai_f1"));
+    const aiF2 = describe(pick("ai_f2"));
+    const aiF3 = describe(pick("ai_f3"));
+    const aiF4 = describe(pick("ai_f4"));
+    const huTotal = describe(pick("hu_total"));
+    const huF1 = describe(pick("hu_f1"));
+    const huF2 = describe(pick("hu_f2"));
+    const huF3 = describe(pick("hu_f3"));
+    const huF4 = describe(pick("hu_f4"));
+    const segs = describe(pick("scat_segments"));
+    const concs = describe(pick("scat_concepts"));
+    const themes = describe(pick("scat_themes"));
+    const wc = describe(pick("word_count"));
+    const refChars = describe(pick("reflection_chars"));
+    const blockChars = describe(pick("block_chars_total"));
+
+    const now = new Date().toISOString();
+    const lines: string[] = [];
+    lines.push(`# 記述統計表 (Descriptive Statistics)`);
+    lines.push("");
+    lines.push(`- 生成日時: ${now}`);
+    lines.push(`- 対象日誌数 (N): ${data.length}`);
+    lines.push(`- フィルタ: student_id=${studentId ?? "(全件)"}, from=${fromDate ?? "(指定なし)"}, to=${toDate ?? "(指定なし)"}`);
+    lines.push(`- 形式: APA 7th edition 準拠 / 歪度はFisher-Pearson、尖度はexcess kurtosis (正規分布で 0)`);
+    lines.push("");
+
+    lines.push(`## 表1. AI 評価スコアの記述統計`);
+    lines.push("");
+    lines.push(`*Note.* M = mean, SD = standard deviation, Mdn = median.`);
+    lines.push("");
+    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    lines.push(apaDescRow("AI 合計スコア", aiTotal));
+    lines.push(apaDescRow("AI 因子1", aiF1));
+    lines.push(apaDescRow("AI 因子2", aiF2));
+    lines.push(apaDescRow("AI 因子3", aiF3));
+    lines.push(apaDescRow("AI 因子4", aiF4));
+    lines.push("");
+
+    lines.push(`## 表2. 人間評価スコア(評価者平均)の記述統計`);
+    lines.push("");
+    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    lines.push(apaDescRow("人間 合計スコア (平均)", huTotal));
+    lines.push(apaDescRow("人間 因子1 (平均)", huF1));
+    lines.push(apaDescRow("人間 因子2 (平均)", huF2));
+    lines.push(apaDescRow("人間 因子3 (平均)", huF3));
+    lines.push(apaDescRow("人間 因子4 (平均)", huF4));
+    lines.push("");
+
+    lines.push(`## 表3. SCAT 質的コーディング指標の記述統計`);
+    lines.push("");
+    lines.push(`*Note.* SCAT は大谷 (2008) の Steps for Coding and Theorization。`);
+    lines.push("");
+    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    lines.push(apaDescRow("SCAT セグメント数", segs));
+    lines.push(apaDescRow("SCAT 概念数 (step3)", concs));
+    lines.push(apaDescRow("SCAT テーマ数 (step4)", themes));
+    lines.push("");
+
+    lines.push(`## 表4. 日誌記述量の記述統計`);
+    lines.push("");
+    lines.push(`| 変数 | n | M | SD | Mdn | Min | Max | Skewness | Kurtosis |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    lines.push(apaDescRow("語数 (word_count)", wc));
+    lines.push(apaDescRow("時限ブロック総文字数", blockChars));
+    lines.push(apaDescRow("省察パート文字数", refChars));
+    lines.push("");
+
+    lines.push(`---`);
+    lines.push("");
+    lines.push(`## 注記`);
+    lines.push("");
+    lines.push(`- SD は不偏標準偏差 (分母 n-1) を用いた。`);
+    lines.push(`- Skewness は Fisher-Pearson の標本歪度 (g₁)、Kurtosis は超過尖度 (g₂; 正規分布で 0) を採用 (SciPy の \`bias=False\` 相当)。`);
+    lines.push(`- 欠損値は除外 (listwise deletion)。各変数の n はそれぞれ独立。`);
+    lines.push(`- AI 評価は journal_id ごとに最新の eval_type='ai' レコードを採用。`);
+    lines.push(`- 人間評価は評価者間で平均した値を 1 日誌の代表値として扱った。`);
+    lines.push("");
+
+    const md = lines.join("\n");
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "descriptive_stats_md",
+      visibleRecordCount: data.length,
+      scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
+      reason: `descriptive_stats_md | filters: student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""}`,
+    });
+    return new Response(md, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="journal-descriptive-stats-${csvTimestamp()}.md"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────
+// GET /export.correlation.csv - Pearson 相関行列 (AI 各因子 × 人間 各因子)
+// ────────────────────────────────────────────────────────────────
+journalImportsRouter.get(
+  "/export.correlation.csv",
+  requireAuth,
+  requireRoles(READ_ROLES),
+  async (c) => {
+    const db = c.env.DB as D1Database;
+    const user = c.get("user");
+    const studentId = c.req.query("student_id");
+    const fromDate = c.req.query("from");
+    const toDate = c.req.query("to");
+    const data = await gatherAnalysisData(db, user, { studentId, fromDate, toDate });
+
+    const vars: Array<{ key: keyof AnalysisDatum; label: string }> = [
+      { key: "ai_total", label: "AI_total" },
+      { key: "ai_f1", label: "AI_F1" },
+      { key: "ai_f2", label: "AI_F2" },
+      { key: "ai_f3", label: "AI_F3" },
+      { key: "ai_f4", label: "AI_F4" },
+      { key: "hu_total", label: "Human_total" },
+      { key: "hu_f1", label: "Human_F1" },
+      { key: "hu_f2", label: "Human_F2" },
+      { key: "hu_f3", label: "Human_F3" },
+      { key: "hu_f4", label: "Human_F4" },
+      { key: "scat_segments", label: "SCAT_segments" },
+      { key: "scat_concepts", label: "SCAT_concepts" },
+      { key: "scat_themes", label: "SCAT_themes" },
+      { key: "word_count", label: "WordCount" },
+    ];
+
+    const series = vars.map((v) =>
+      data.map((d) => (d[v.key] == null ? null : Number(d[v.key] as any))),
+    );
+
+    const rows: string[] = [];
+    // ヘッダ: 変数1, 変数2, n, r, t, df, p, p_sig, ci_lower, ci_upper
+    rows.push("variable_1,variable_2,n,r,t,df,p,p_sig,ci_lower_95,ci_upper_95");
+
+    for (let i = 0; i < vars.length; i++) {
+      for (let j = i + 1; j < vars.length; j++) {
+        const r = pearson(series[i], series[j]);
+        rows.push(
+          [
+            vars[i].label,
+            vars[j].label,
+            r.n,
+            r.r != null ? r.r.toFixed(4) : "",
+            r.t != null ? r.t.toFixed(4) : "",
+            r.df != null ? r.df : "",
+            r.p != null ? r.p.toFixed(6) : "",
+            pStars(r.p),
+            r.ci_lower != null ? r.ci_lower.toFixed(4) : "",
+            r.ci_upper != null ? r.ci_upper.toFixed(4) : "",
+          ]
+            .map(csvEscape)
+            .join(","),
+        );
+      }
+    }
+
+    const bom = "\uFEFF";
+    const csv = bom + rows.join("\r\n");
+
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "correlation_csv",
+      visibleRecordCount: rows.length - 1,
+      scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
+      reason: `correlation_csv | filters: student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""}`,
+    });
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="journal-correlation-${csvTimestamp()}.csv"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────
+// GET /export.t_test.md - t 検定結果 (週前半 vs 後半 / AI vs 人間 paired)
+// ────────────────────────────────────────────────────────────────
+journalImportsRouter.get(
+  "/export.t_test.md",
+  requireAuth,
+  requireRoles(READ_ROLES),
+  async (c) => {
+    const db = c.env.DB as D1Database;
+    const user = c.get("user");
+    const studentId = c.req.query("student_id");
+    const fromDate = c.req.query("from");
+    const toDate = c.req.query("to");
+    // 群分けの閾値 (デフォ: week_number <= 2 を前半、>= 3 を後半)
+    const splitWeek = parseInt(c.req.query("split_week") || "2", 10) || 2;
+
+    const data = await gatherAnalysisData(db, user, { studentId, fromDate, toDate });
+
+    // 週で 2 群分け
+    const firstHalf = data.filter((d) => d.week_number != null && d.week_number <= splitWeek);
+    const secondHalf = data.filter((d) => d.week_number != null && d.week_number > splitWeek);
+
+    const welchVars: Array<{ key: keyof AnalysisDatum; label: string }> = [
+      { key: "ai_total", label: "AI 合計スコア" },
+      { key: "ai_f1", label: "AI 因子1" },
+      { key: "ai_f2", label: "AI 因子2" },
+      { key: "ai_f3", label: "AI 因子3" },
+      { key: "ai_f4", label: "AI 因子4" },
+      { key: "hu_total", label: "人間 合計スコア (平均)" },
+      { key: "scat_concepts", label: "SCAT 概念数" },
+      { key: "scat_themes", label: "SCAT テーマ数" },
+      { key: "word_count", label: "語数" },
+      { key: "reflection_chars", label: "省察文字数" },
+    ];
+
+    const lines: string[] = [];
+    lines.push(`# t 検定結果 (Independent / Paired t-tests)`);
+    lines.push("");
+    lines.push(`- 生成日時: ${new Date().toISOString()}`);
+    lines.push(`- 全対象 N: ${data.length}`);
+    lines.push(`- フィルタ: student_id=${studentId ?? "(全件)"}, from=${fromDate ?? "(指定なし)"}, to=${toDate ?? "(指定なし)"}`);
+    lines.push(`- 群分け閾値: 前半 = week_number ≤ ${splitWeek}, 後半 = week_number > ${splitWeek}`);
+    lines.push(`- 検定: 群間比較は Welch の独立 t 検定 (等分散仮定なし)、AI vs 人間 は対応のある t 検定。`);
+    lines.push(`- 効果量: Welch は Cohen's d (プール SD)、Paired は Cohen's dz (差分の SD で標準化)。`);
+    lines.push("");
+
+    lines.push(`## 表1. 実習前半 vs 後半 (Welch's independent t-test)`);
+    lines.push("");
+    lines.push(`| 変数 | n₁ | M₁ (SD₁) | n₂ | M₂ (SD₂) | M差 | t | df | p | Cohen's d |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|---|`);
+    for (const v of welchVars) {
+      const g1 = firstHalf.map((d) => (d[v.key] == null ? null : Number(d[v.key] as any)));
+      const g2 = secondHalf.map((d) => (d[v.key] == null ? null : Number(d[v.key] as any)));
+      const t = welchTTest(g1, g2);
+      lines.push(
+        `| ${v.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${t.n2} | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${t.t != null ? fmt(t.t) : "-"} | ${t.df != null ? fmt(t.df, 1) : "-"} | ${fmtP(t.p)}${pStars(t.p)} | ${t.cohen_d != null ? fmt(t.cohen_d) : "-"} |`,
+      );
+    }
+    lines.push("");
+
+    lines.push(`## 表2. AI vs 人間 評価の差 (対応のある t 検定)`);
+    lines.push("");
+    lines.push(`*Note.* AI と人間 (評価者平均) が両方存在する日誌のみが対象。`);
+    lines.push("");
+    lines.push(`| 比較ペア | n | M_AI (SD) | M_人間 (SD) | M差 (AI−人間) | t | df | p | Cohen's dz |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|`);
+    const pairedPairs: Array<{ ai: keyof AnalysisDatum; hu: keyof AnalysisDatum; label: string }> = [
+      { ai: "ai_total", hu: "hu_total", label: "合計スコア" },
+      { ai: "ai_f1", hu: "hu_f1", label: "因子1" },
+      { ai: "ai_f2", hu: "hu_f2", label: "因子2" },
+      { ai: "ai_f3", hu: "hu_f3", label: "因子3" },
+      { ai: "ai_f4", hu: "hu_f4", label: "因子4" },
+    ];
+    for (const pp of pairedPairs) {
+      const xs = data.map((d) => (d[pp.ai] == null ? null : Number(d[pp.ai] as any)));
+      const ys = data.map((d) => (d[pp.hu] == null ? null : Number(d[pp.hu] as any)));
+      const t = pairedTTest(xs, ys);
+      lines.push(
+        `| ${pp.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${t.t != null ? fmt(t.t) : "-"} | ${t.df != null ? t.df : "-"} | ${fmtP(t.p)}${pStars(t.p)} | ${t.cohen_d != null ? fmt(t.cohen_d) : "-"} |`,
+      );
+    }
+    lines.push("");
+
+    lines.push(`---`);
+    lines.push("");
+    lines.push(`## 注記`);
+    lines.push("");
+    lines.push(`- 有意水準は * p < .05, ** p < .01, *** p < .001 を採用。`);
+    lines.push(`- Welch 自由度は Welch-Satterthwaite 近似で算出。`);
+    lines.push(`- 標本サイズが 2 未満の群は \`-\` 表示 (検定実行不可)。`);
+    lines.push(`- p 値は Student t 分布の両側確率を不完全ベータ関数 (Numerical Recipes 6.4) で計算。`);
+    lines.push(`- 結果はリッスンワイズ削除 (両群とも値がある日誌のみ paired 検定の対象)。`);
+    lines.push("");
+
+    const md = lines.join("\n");
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "t_test_md",
+      visibleRecordCount: data.length,
+      scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
+      reason: `t_test_md | split_week=${splitWeek} | filters: student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""}`,
+    });
+    return new Response(md, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="journal-t-test-${csvTimestamp()}.md"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  },
+);
+
+// ────────────────────────────────────────────────────────────────
+// GET /export.methods_section.md - 論文 Methods セクション 自動生成
+// ────────────────────────────────────────────────────────────────
+journalImportsRouter.get(
+  "/export.methods_section.md",
+  requireAuth,
+  requireRoles(READ_ROLES),
+  async (c) => {
+    const db = c.env.DB as D1Database;
+    const user = c.get("user");
+    const studentId = c.req.query("student_id");
+    const fromDate = c.req.query("from");
+    const toDate = c.req.query("to");
+    const data = await gatherAnalysisData(db, user, { studentId, fromDate, toDate });
+
+    // 軽い記述統計を取得 (Participants サマリ用)
+    const studentIds = new Set(data.map((d) => d.student_id).filter(Boolean));
+    const nJournals = data.length;
+    const nStudents = studentIds.size;
+    const aiCount = data.filter((d) => d.ai_total != null).length;
+    const humanCount = data.filter((d) => d.hu_total != null).length;
+    const scatCount = data.filter((d) => d.scat_segments > 0).length;
+    const weeks = data.map((d) => d.week_number).filter((w): w is number => w != null);
+    const minWeek = weeks.length > 0 ? Math.min(...weeks) : null;
+    const maxWeek = weeks.length > 0 ? Math.max(...weeks) : null;
+    const wc = describe(data.map((d) => d.word_count));
+
+    const now = new Date().toISOString();
+    const lines: string[] = [];
+    lines.push(`# Methods (論文用 自動生成下書き)`);
+    lines.push("");
+    lines.push(`> このセクションは本プラットフォームのエクスポート時点 (${now}) のデータと使用ツール情報から自動生成された下書きです。論文への記載前に内容を確認・校正してください。`);
+    lines.push("");
+
+    lines.push(`## Participants and Data`);
+    lines.push("");
+    lines.push(`本研究では、教育実習における学生の実習日誌を質的・量的に分析した。分析対象は、教育実習日誌評価プラットフォーム (本システム) に取り込まれた全 ${nJournals} 件の日誌である (${nStudents} 名の学生による記述; 実習週 ${minWeek ?? "n/a"} 週目から ${maxWeek ?? "n/a"} 週目まで)。`);
+    lines.push("");
+    lines.push(`各日誌の語数の平均は M = ${fmt(wc.mean)} (SD = ${fmt(wc.sd)}, Mdn = ${fmt(wc.median)}, 範囲 = ${fmt(wc.min, 0)}–${fmt(wc.max, 0)}) であった。`);
+    lines.push("");
+    lines.push(`日誌のうち AI 評価が付与されたものは ${aiCount} 件、人間評価者による評定が付与されたものは ${humanCount} 件、SCAT による質的コーディングが実施されたものは ${scatCount} 件であった。`);
+    lines.push("");
+    lines.push(`分析対象範囲: student_id=${studentId ?? "(全学生)"}, 期間=${fromDate ?? "(指定なし)"} 〜 ${toDate ?? "(指定なし)"}。`);
+    lines.push("");
+
+    lines.push(`## Materials and Instruments`);
+    lines.push("");
+    lines.push(`### 評価尺度`);
+    lines.push("");
+    lines.push(`日誌は 4 因子構造の評価ルーブリック (因子1〜因子4) に基づき、合計スコアおよび各因子スコアを 0–5 のリッカート尺度で評定した。`);
+    lines.push("");
+    lines.push(`### 質的分析手法`);
+    lines.push("");
+    lines.push(`質的データの分析には SCAT (Steps for Coding and Theorization; 大谷, 2008) を採用した。SCAT は (1) 着目語句の抽出、(2) 言い換え、(3) 説明 (概念化)、(4) テーマ・構成概念の生成、の 4 段階で進める手法であり、本研究では各日誌からセグメントを切り出し、step3 で概念、step4 でテーマを生成した。`);
+    lines.push("");
+
+    lines.push(`## AI Evaluation`);
+    lines.push("");
+    lines.push(`AI 評価は大規模言語モデル (LLM) を用いて行った。各日誌に対し、評価ルーブリックを与えたプロンプトを通じて自動評定を取得した。プロンプトのバージョン管理 (\`prompt_version\`) およびハロー効果検出 (\`halo_detected\`) のメタデータも併せて記録した。AI 評価と人間評価の一致度は、Pearson 相関係数と対応のある t 検定で検討した。`);
+    lines.push("");
+
+    lines.push(`## Statistical Analysis`);
+    lines.push("");
+    lines.push(`記述統計として、平均 (M)、不偏標準偏差 (SD, 分母 n−1)、中央値 (Mdn)、最小値・最大値、Fisher-Pearson の標本歪度 (g₁)、超過尖度 (g₂; 正規分布で 0) を算出した。`);
+    lines.push("");
+    lines.push(`群間比較には Welch の独立 t 検定 (等分散を仮定しない; Welch-Satterthwaite 近似による自由度) を、AI 評価と人間評価の一致比較には対応のある t 検定を用いた。効果量は Cohen's d (プール SD で標準化) および Cohen's dz (差分の SD で標準化) を併記した。相関分析には Pearson の積率相関係数を用い、Fisher の z 変換による 95% 信頼区間を算出した。`);
+    lines.push("");
+    lines.push(`有意水準は p < .05 を採用し、p 値は両側確率で報告した。多重比較補正は本研究では行わなかったが、相関行列および t 検定の結果は探索的解釈に留め、確証的検証は今後の研究課題とする。報告形式は APA 7th edition に準拠した。`);
+    lines.push("");
+
+    lines.push(`## Software and Tools`);
+    lines.push("");
+    lines.push(`データの取り込み、構造化、評価、分析、エクスポートには、本研究のために独自に構築した「教育実習日誌評価プラットフォーム」を用いた。プラットフォームは以下の技術スタックで実装されている:`);
+    lines.push("");
+    lines.push(`- **バックエンド**: Hono (TypeScript) on Cloudflare Workers / Cloudflare Pages`);
+    lines.push(`- **データベース**: Cloudflare D1 (SQLite 互換)`);
+    lines.push(`- **フロントエンド**: React + Material-UI`);
+    lines.push(`- **OCR / テキスト抽出**: Markdown 変換ツールチェーン および Google Cloud Vision API (OCR)`);
+    lines.push(`- **AI 評価**: OpenAI GPT 系大規模言語モデル`);
+    lines.push(`- **統計計算**: 本プラットフォーム内で TypeScript により実装 (Student t 分布 CDF は不完全ベータ関数 [Numerical Recipes 6.4] により計算; Lanczos 近似による log Γ; Pearson 相関の有意性検定は t 統計量 t = r√((n−2)/(1−r²)) と t 分布で算出)`);
+    lines.push("");
+    lines.push(`データの再現可能性のため、エクスポート時のデータ辞書 (codebook) およびエクスポートログ (監査ログ) を保存している。各エクスポートには \`exported_at\` (ISO 8601 UTC) と \`filters\` (適用フィルタ) が記録されており、論文 Methods 末尾または Supplementary Materials に引用することで再現可能性を担保できる。`);
+    lines.push("");
+
+    lines.push(`## Ethical Considerations`);
+    lines.push("");
+    lines.push(`本研究のデータは、参加者から研究使用の同意を得た上で収集された。データは個人を特定できない形で集計・分析され、論文公表時には学生 ID および個人名を匿名化した。本プラットフォームは役割ベースのアクセス制御 (role-based access control) と全データ読み出しの監査ログ (audit log) を実装しており、データへのアクセスは追跡可能である。`);
+    lines.push("");
+
+    lines.push(`---`);
+    lines.push("");
+    lines.push(`## 推奨される引用形式 (References セクション用)`);
+    lines.push("");
+    lines.push(`- 大谷尚 (2008). 4 ステップコーディングによる質的データ分析手法 SCAT の提案 ― 着手しやすく小規模データにも適用可能な理論化の手続き ―. *名古屋大学大学院教育発達科学研究科紀要 (教育科学)*, 54(2), 27–44.`);
+    lines.push(`- American Psychological Association. (2020). *Publication manual of the American Psychological Association* (7th ed.). American Psychological Association.`);
+    lines.push(`- Press, W. H., Teukolsky, S. A., Vetterling, W. T., & Flannery, B. P. (2007). *Numerical recipes: The art of scientific computing* (3rd ed.). Cambridge University Press.`);
+    lines.push("");
+
+    const md = lines.join("\n");
+    setAuditReadContext(c, {
+      resourceType: "journal_import_export",
+      resourceId: "methods_section_md",
+      visibleRecordCount: data.length,
+      scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
+      reason: `methods_section_md | filters: student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""}`,
+    });
+    return new Response(md, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="journal-methods-section-${csvTimestamp()}.md"`,
         "Cache-Control": "no-store",
       },
     });

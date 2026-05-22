@@ -1,13 +1,17 @@
 /**
- * エクスポートメニュー (6 形式)
+ * エクスポートメニュー (10 形式)
  *
  * 全形式とその用途:
- *   - summary_csv   : 取り込み一覧の基本メタ情報 19 列
- *   - detail_csv    : 質的分析向け詳細 (時限ブロック展開 + 抽出原文)
- *   - json          : 質的分析向けネスト構造
- *   - analysis_csv  : 量的分析向け統合 (日誌 + AI/人間評価 + SCAT)
- *   - codebook_md   : 論文 Appendix 用データ辞書 (Markdown)
- *   - codebook_json : 機械可読データ辞書 (JSON)
+ *   - summary_csv          : 取り込み一覧の基本メタ情報 19 列
+ *   - detail_csv           : 質的分析向け詳細 (時限ブロック展開 + 抽出原文)
+ *   - json                 : 質的分析向けネスト構造
+ *   - analysis_csv         : 量的分析向け統合 (日誌 + AI/人間評価 + SCAT)
+ *   - codebook_md          : 論文 Appendix 用データ辞書 (Markdown)
+ *   - codebook_json        : 機械可読データ辞書 (JSON)
+ *   - descriptive_stats_md : APA 記述統計テーブル (Phase 6-3)
+ *   - correlation_csv      : Pearson 相関行列 (Phase 6-3)
+ *   - t_test_md            : t 検定結果 (Phase 6-3)
+ *   - methods_md           : 論文 Methods 自動生成 (Phase 6-3)
  */
 import { Divider, ListItemIcon, ListItemText, Menu, MenuItem } from "@mui/material";
 import TableChartIcon from "@mui/icons-material/TableChart";
@@ -15,6 +19,10 @@ import DataObjectIcon from "@mui/icons-material/DataObject";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import CodeIcon from "@mui/icons-material/Code";
+import FunctionsIcon from "@mui/icons-material/Functions";
+import LinkIcon from "@mui/icons-material/Link";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import ArticleIcon from "@mui/icons-material/Article";
 
 export type ExportFormat =
   | "summary_csv"
@@ -22,7 +30,11 @@ export type ExportFormat =
   | "json"
   | "analysis_csv"
   | "codebook_md"
-  | "codebook_json";
+  | "codebook_json"
+  | "descriptive_stats_md"
+  | "correlation_csv"
+  | "t_test_md"
+  | "methods_md";
 
 export interface ExportMenuProps {
   anchorEl: HTMLElement | null;
@@ -69,6 +81,43 @@ export function ExportMenu({ anchorEl, onClose, onExport }: ExportMenuProps) {
         <ListItemText
           primary="統合分析 CSV (量的分析向け)"
           secondary="日誌 + AI評価 + 人間評価 + SCAT概念数 50 列"
+        />
+      </MenuItem>
+      <Divider />
+      <MenuItem onClick={() => handle("descriptive_stats_md")}>
+        <ListItemIcon>
+          <FunctionsIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText
+          primary="記述統計表 (APA / Markdown)"
+          secondary="M, SD, Mdn, Min, Max, 歪度, 尖度 / 論文 Results 用"
+        />
+      </MenuItem>
+      <MenuItem onClick={() => handle("correlation_csv")}>
+        <ListItemIcon>
+          <LinkIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText
+          primary="相関行列 CSV (Pearson)"
+          secondary="AI × 人間 × SCAT 14 変数 / r, p, 95% CI"
+        />
+      </MenuItem>
+      <MenuItem onClick={() => handle("t_test_md")}>
+        <ListItemIcon>
+          <CompareArrowsIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText
+          primary="t 検定結果 (Markdown)"
+          secondary="週前半 vs 後半 (Welch) + AI vs 人間 (Paired)"
+        />
+      </MenuItem>
+      <MenuItem onClick={() => handle("methods_md")}>
+        <ListItemIcon>
+          <ArticleIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText
+          primary="論文 Methods 自動生成 (Markdown)"
+          secondary="Participants / Statistical Analysis / Tools / References"
         />
       </MenuItem>
       <Divider />
@@ -147,6 +196,34 @@ export async function fetchExport(
       fallbackName = "journal-imports-codebook";
       ext = "json";
       ["q", "status", "from", "to"].forEach((k) => params.delete(k));
+      break;
+    case "descriptive_stats_md":
+      endpoint = "/api/data/journal-imports/export.descriptive_stats.md";
+      fallbackName = "journal-descriptive-stats";
+      ext = "md";
+      params.delete("q");
+      params.delete("status");
+      break;
+    case "correlation_csv":
+      endpoint = "/api/data/journal-imports/export.correlation.csv";
+      fallbackName = "journal-correlation";
+      ext = "csv";
+      params.delete("q");
+      params.delete("status");
+      break;
+    case "t_test_md":
+      endpoint = "/api/data/journal-imports/export.t_test.md";
+      fallbackName = "journal-t-test";
+      ext = "md";
+      params.delete("q");
+      params.delete("status");
+      break;
+    case "methods_md":
+      endpoint = "/api/data/journal-imports/export.methods_section.md";
+      fallbackName = "journal-methods-section";
+      ext = "md";
+      params.delete("q");
+      params.delete("status");
       break;
     case "summary_csv":
     default:
