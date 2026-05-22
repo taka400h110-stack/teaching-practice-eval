@@ -21,6 +21,7 @@ import { applyAnonymization } from "../services/anonymization";
 import { Hono } from "hono";
 import exportsRouter from "./exports";
 import analysisRouter from "./analysisState";
+import journalImportsRouter from "./journalImports";
 import { markScatDependentsDirty } from "../services/scatDerivedAnalysis";
 import { cors } from "hono/cors";
 import { requireRoles } from "../middleware/auth";
@@ -3985,3 +3986,4 @@ dataRouter.post("/auth/login", async (c) => {
 
 dataRouter.route("/exports", exportsRouter);
 dataRouter.route("/analysis", analysisRouter);
+dataRouter.route("/journal-imports", journalImportsRouter);

@@ -148,7 +148,7 @@ async function apiGet(token, path) {
     );
 
     // 7. board_observer は SCAT 書き込み不可 (403)
-    const boToken = await login("board_observer@teaching-eval.jp", "password");
+    const boToken = await login("observer@teaching-eval.jp", "password");
     const boWriteRes = await apiPost(boToken, "/api/data/scat/projects", {
       title: "board_observer should NOT create",
     });

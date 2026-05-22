@@ -50,6 +50,9 @@ const JournalISMPage          = lazy(() => import("./pages/analysis/JournalISMPa
 const JournalSPTablePage      = lazy(() => import("./pages/analysis/JournalSPTablePage"));
 const JournalTransmissionPage = lazy(() => import("./pages/analysis/JournalTransmissionPage"));
 
+// 研究者用ページ
+const JournalImportPage       = lazy(() => import("./pages/research/JournalImportPage"));
+
 // OCR
 const JournalOCRPage          = lazy(() => import("./pages/JournalOCRPage"));
 // 教員統計
@@ -155,8 +158,10 @@ export default function App() {
           <Route path="scat-batch"        element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATBatchAnalysisPage /></PrivateRoute>} />
           <Route path="scat-network"      element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATNetworkAnalysisPage /></PrivateRoute>} />
           <Route path="scat-timeline"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><SCATTimelinePage /></PrivateRoute>} />
-                              
-          
+
+          {/* 研究者用：過去日誌の取り込み (Word/PDF/画像) */}
+          <Route path="research/journal-import" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator"]}><JournalImportPage /></PrivateRoute>} />
+
           {/* エクスポート */}
           <Route path="exports"           element={<PrivateRoute allowedRoles={["researcher", "collaborator", "board_observer", "admin"]}><ExportsPage /></PrivateRoute>} />
           <Route path="admin/exports"     element={<PrivateRoute allowedRoles={["admin"]}><AdminExportsPage /></PrivateRoute>} />

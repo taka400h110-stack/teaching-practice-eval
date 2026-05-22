@@ -33,6 +33,7 @@ import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import AutoGraphIcon from "@mui/icons-material/AutoGraph";
 import DescriptionIcon from "@mui/icons-material/Description";
 import StorageIcon from "@mui/icons-material/Storage";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 
 import InsightsIcon from "@mui/icons-material/Insights";
 import apiClient from "../api/client";
@@ -163,6 +164,12 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
         ],
       },
       {
+        group: "データ取り込み",
+        items: [
+          { label: "過去日誌の取り込み", path: "/research/journal-import", icon: <CloudUploadIcon /> },
+        ],
+      },
+      {
         group: "データ管理・出力",
         items: [
           { label: "データエクスポート", path: "/exports", icon: <DownloadIcon /> },
@@ -182,6 +189,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "ユーザー登録", path: "/register", icon: <PersonAddIcon /> },
 
           { label: "エクスポート承認管理", path: "/admin/exports", icon: <VerifiedUserIcon /> },
+          { label: "過去日誌の取り込み", path: "/research/journal-import", icon: <CloudUploadIcon /> },
           { label: "データエクスポート", path: "/exports", icon: <DownloadIcon /> },
 
         ],
