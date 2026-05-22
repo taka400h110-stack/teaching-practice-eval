@@ -43,7 +43,7 @@ const NotificationBell: React.FC = () => {
     try {
       const res = await apiFetch("/api/data/notifications/unread-count", { headers: authHeaders() });
       if (!res.ok) return;
-      const data = await res.json();
+      const data = (await res.json()) as { unread_count?: number };
       setUnread(Number(data?.unread_count || 0));
     } catch {
       /* silent */
@@ -56,7 +56,7 @@ const NotificationBell: React.FC = () => {
     try {
       const res = await apiFetch("/api/data/notifications?limit=20", { headers: authHeaders() });
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as { notifications?: Notification[]; unread_count?: number };
         setItems(data?.notifications || []);
         setUnread(Number(data?.unread_count || 0));
       }

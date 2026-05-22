@@ -2089,6 +2089,7 @@ journalImportsRouter.get(
     const db = c.env.DB as D1Database;
     const user = c.get("user");
     const id = c.req.param("id");
+    if (!id) return c.json({ success: false, error: "missing_id" }, 400);
     const rec = await getImportRecord(db, id);
     if (!rec) return c.json({ success: false, error: "not_found" }, 404);
     if (user.role !== "admin" && rec.uploaded_by !== user.id) {
@@ -2217,6 +2218,7 @@ journalImportsRouter.post(
     const db = c.env.DB as D1Database;
     const user = c.get("user");
     const id = c.req.param("id");
+    if (!id) return c.json({ success: false, error: "missing_id" }, 400);
 
     const rec = await getImportRecord(db, id);
     if (!rec) return c.json({ success: false, error: "not_found" }, 404);
@@ -2278,6 +2280,7 @@ journalImportsRouter.patch(
     const db = c.env.DB as D1Database;
     const user = c.get("user");
     const id = c.req.param("id");
+    if (!id) return c.json({ success: false, error: "missing_id" }, 400);
 
     const rec = await getImportRecord(db, id);
     if (!rec) return c.json({ success: false, error: "not_found" }, 404);
@@ -2350,6 +2353,7 @@ journalImportsRouter.post(
     const db = c.env.DB as D1Database;
     const user = c.get("user");
     const id = c.req.param("id");
+    if (!id) return c.json({ success: false, error: "missing_id" }, 400);
 
     const rec = await getImportRecord(db, id);
     if (!rec) return c.json({ success: false, error: "not_found" }, 404);
@@ -2523,6 +2527,7 @@ journalImportsRouter.delete(
     const db = c.env.DB as D1Database;
     const user = c.get("user");
     const id = c.req.param("id");
+    if (!id) return c.json({ success: false, error: "missing_id" }, 400);
 
     const rec = await getImportRecord(db, id);
     if (!rec) return c.json({ success: false, error: "not_found" }, 404);

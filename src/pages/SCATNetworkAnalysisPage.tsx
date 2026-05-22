@@ -7,14 +7,19 @@ import { apiFetch } from '../api/client';
 export const SCATNetworkAnalysisPage: React.FC = () => {
   const [filterPeriod, setFilterPeriod] = useState('all');
 
-  const { data, isLoading } = useQuery({
+  type ScatNetworkNode = { id: string; name: string; val: number };
+  type ScatNetworkLink = { source: string; target: string; val: number };
+  type ScatNetworkGraph = { nodes: ScatNetworkNode[]; links: ScatNetworkLink[] };
+
+  const { data, isLoading } = useQuery<ScatNetworkGraph>({
     queryKey: ['scatNetwork', filterPeriod],
     queryFn: async () => {
-      return apiFetch('/api/data/scat/network');
+      const res = await apiFetch('/api/data/scat/network');
+      return (await res.json()) as ScatNetworkGraph;
     }
   });
 
-  const graphData = data?.nodes?.length > 0 ? data : {
+  const graphData: ScatNetworkGraph = data?.nodes?.length ? data : {
     nodes: [
       { id: '1', name: '生徒指導', val: 20 },
       { id: '2', name: '授業準備', val: 15 },

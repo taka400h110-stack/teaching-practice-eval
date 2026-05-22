@@ -6,7 +6,7 @@ const adminOperationalReadinessRouter = new Hono<{ Bindings: Env }>();
 
 adminOperationalReadinessRouter.get('/', async (c) => {
   // ロールチェック: admin / researcher / collaborator / board_observer のみ閲覧可
-  const user = c.get('user') as { role?: string; roles?: string[] } | undefined;
+  const user = c.get('user' as any) as { role?: string; roles?: string[] } | undefined;
   const allowedRoles = ['admin', 'researcher', 'collaborator', 'board_observer'];
   const userRoles = user?.roles && user.roles.length > 0
     ? user.roles

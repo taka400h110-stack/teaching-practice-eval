@@ -468,7 +468,7 @@ function MetaCell({
   warn?: boolean;
 }) {
   return (
-    <Grid item xs={12} sm={6} md={4} lg={3}>
+    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
       <Box>
         <Stack direction="row" spacing={0.5} alignItems="center" mb={0.25}>
           {icon}

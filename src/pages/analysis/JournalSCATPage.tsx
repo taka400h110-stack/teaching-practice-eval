@@ -23,7 +23,7 @@ export default function JournalSCATPage() {
   if (isLoading) return <Box p={3}><CircularProgress /></Box>;
   if (error) return <Box p={3}><Alert severity="error">{(error as Error).message}</Alert></Box>;
 
-  const { analysis, segments } = data || {};
+  const { analysis, segments } = (data || {}) as { analysis?: any; segments?: any[] };
 
   return (
     <Box>

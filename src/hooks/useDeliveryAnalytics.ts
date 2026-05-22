@@ -7,7 +7,7 @@ export function useDeliveryAnalytics(range: AnalyticsRange = '7d') {
     queryKey: ['admin', 'deliveryAnalytics', range],
     queryFn: async () => {
       const res = await apiFetch(`/api/admin/analytics/delivery?range=${range}`);
-      const data = await res.json();
+      const data = (await res.json()) as DeliveryAnalyticsResponse;
       return data;
     }
   });
