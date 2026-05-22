@@ -28,7 +28,12 @@ import {
   fmtCell,
   fmtPCell,
   formatSkipReason,
+  correctPValues,
+  parseCorrectionMethod,
+  formatCorrectionMethod,
   type DescriptiveStats,
+  type MultipleComparisonMethod,
+  type TTestResult,
 } from "../utils/stats";
 import { requireWeekNumber, validateWeekNumber } from "../utils/validation";
 import {
@@ -1704,6 +1709,10 @@ journalImportsRouter.get(
     const toDate = c.req.query("to");
     // 群分けの閾値 (デフォ: week_number <= 2 を前半、>= 3 を後半)
     const splitWeek = parseInt(c.req.query("split_week") || "2", 10) || 2;
+    // Phase 7-4: 多重比較補正の指定 (none / bonferroni / holm / fdr_bh)
+    //   Welch table と Paired table はそれぞれ独立した test family として補正する。
+    const correctionMethod: MultipleComparisonMethod = parseCorrectionMethod(c.req.query("correction"));
+    const showAdj = correctionMethod !== "none";
 
     const data = await gatherAnalysisData(db, user, { studentId, fromDate, toDate });
 
@@ -1733,20 +1742,40 @@ journalImportsRouter.get(
     lines.push(`- 群分け閾値: 前半 = week_number ≤ ${splitWeek}, 後半 = week_number > ${splitWeek}`);
     lines.push(`- 検定: 群間比較は Welch の独立 t 検定 (等分散仮定なし)、AI vs 人間 は対応のある t 検定。`);
     lines.push(`- 効果量: Welch は Cohen's d (プール SD)、Paired は Cohen's dz (差分の SD で標準化)。`);
+    lines.push(`- 多重比較補正: ${formatCorrectionMethod(correctionMethod)}` +
+      (showAdj ? ` (\`?correction=${correctionMethod}\`)` : ` (\`?correction=bonferroni|holm|fdr_bh\` で適用可能)`));
     lines.push("");
 
     lines.push(`## 表1. 実習前半 vs 後半 (Welch's independent t-test)`);
     lines.push("");
     // Phase 7-3: skip 理由を末尾列に表示
-    lines.push(`| 変数 | n₁ | M₁ (SD₁) | n₂ | M₂ (SD₂) | M差 | t | df | p | Cohen's d | 備考 |`);
-    lines.push(`|---|---|---|---|---|---|---|---|---|---|---|`);
-    for (const v of welchVars) {
+    // Phase 7-4: correction!=none のときのみ p_adj 列を表示 (Welch family = 同表内の検定群)
+    const welchHeader = showAdj
+      ? `| 変数 | n₁ | M₁ (SD₁) | n₂ | M₂ (SD₂) | M差 | t | df | p | p_adj | Cohen's d | 備考 |`
+      : `| 変数 | n₁ | M₁ (SD₁) | n₂ | M₂ (SD₂) | M差 | t | df | p | Cohen's d | 備考 |`;
+    const welchSep = showAdj
+      ? `|---|---|---|---|---|---|---|---|---|---|---|---|`
+      : `|---|---|---|---|---|---|---|---|---|---|---|`;
+    lines.push(welchHeader);
+    lines.push(welchSep);
+
+    // Phase 7-4: two-pass — first collect all welch results, then apply correction, then emit rows.
+    const welchResults: TTestResult[] = welchVars.map((v) => {
       const g1 = firstHalf.map((d) => (d[v.key] == null ? null : Number(d[v.key] as any)));
       const g2 = secondHalf.map((d) => (d[v.key] == null ? null : Number(d[v.key] as any)));
-      const t = welchTTest(g1, g2);
+      return welchTTest(g1, g2);
+    });
+    const welchPAdj = correctPValues(welchResults.map((r) => r.p), correctionMethod);
+    for (let i = 0; i < welchVars.length; i++) {
+      const v = welchVars[i];
+      const t = welchResults[i];
+      const pAdj = welchPAdj[i];
       const note = t.skipped ? formatSkipReason(t.skip_reason) : "";
+      const adjCell = showAdj
+        ? ` ${fmtPCell(pAdj, t)}${pStars(pAdj)} |`
+        : "";
       lines.push(
-        `| ${v.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${t.n2} | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${fmtCell(t.t, t)} | ${fmtCell(t.df, t, { digits: 1 })} | ${fmtPCell(t.p, t)}${pStars(t.p)} | ${fmtCell(t.cohen_d, t)} | ${note} |`,
+        `| ${v.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${t.n2} | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${fmtCell(t.t, t)} | ${fmtCell(t.df, t, { digits: 1 })} | ${fmtPCell(t.p, t)}${pStars(t.p)} |${adjCell} ${fmtCell(t.cohen_d, t)} | ${note} |`,
       );
     }
     lines.push("");
@@ -1756,8 +1785,15 @@ journalImportsRouter.get(
     lines.push(`*Note.* AI と人間 (評価者平均) が両方存在する日誌のみが対象。`);
     lines.push("");
     // Phase 7-3: skip 理由を末尾列に表示
-    lines.push(`| 比較ペア | n | M_AI (SD) | M_人間 (SD) | M差 (AI−人間) | t | df | p | Cohen's dz | 備考 |`);
-    lines.push(`|---|---|---|---|---|---|---|---|---|---|`);
+    // Phase 7-4: correction!=none のときのみ p_adj 列を表示 (Paired family = 5 pair の検定群)
+    const pairedHeader = showAdj
+      ? `| 比較ペア | n | M_AI (SD) | M_人間 (SD) | M差 (AI−人間) | t | df | p | p_adj | Cohen's dz | 備考 |`
+      : `| 比較ペア | n | M_AI (SD) | M_人間 (SD) | M差 (AI−人間) | t | df | p | Cohen's dz | 備考 |`;
+    const pairedSep = showAdj
+      ? `|---|---|---|---|---|---|---|---|---|---|---|`
+      : `|---|---|---|---|---|---|---|---|---|---|`;
+    lines.push(pairedHeader);
+    lines.push(pairedSep);
     const pairedPairs: Array<{ ai: keyof AnalysisDatum; hu: keyof AnalysisDatum; label: string }> = [
       { ai: "ai_total", hu: "hu_total", label: "合計スコア" },
       { ai: "ai_f1", hu: "hu_f1", label: "因子1" },
@@ -1765,13 +1801,23 @@ journalImportsRouter.get(
       { ai: "ai_f3", hu: "hu_f3", label: "因子3" },
       { ai: "ai_f4", hu: "hu_f4", label: "因子4" },
     ];
-    for (const pp of pairedPairs) {
+    // Phase 7-4: two-pass — first collect, correct, then emit.
+    const pairedResults: TTestResult[] = pairedPairs.map((pp) => {
       const xs = data.map((d) => (d[pp.ai] == null ? null : Number(d[pp.ai] as any)));
       const ys = data.map((d) => (d[pp.hu] == null ? null : Number(d[pp.hu] as any)));
-      const t = pairedTTest(xs, ys);
+      return pairedTTest(xs, ys);
+    });
+    const pairedPAdj = correctPValues(pairedResults.map((r) => r.p), correctionMethod);
+    for (let i = 0; i < pairedPairs.length; i++) {
+      const pp = pairedPairs[i];
+      const t = pairedResults[i];
+      const pAdj = pairedPAdj[i];
       const note = t.skipped ? formatSkipReason(t.skip_reason) : "";
+      const adjCell = showAdj
+        ? ` ${fmtPCell(pAdj, t)}${pStars(pAdj)} |`
+        : "";
       lines.push(
-        `| ${pp.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${fmtCell(t.t, t)} | ${t.df != null ? t.df : (t.skipped ? `— (${formatSkipReason(t.skip_reason)})` : "—")} | ${fmtPCell(t.p, t)}${pStars(t.p)} | ${fmtCell(t.cohen_d, t)} | ${note} |`,
+        `| ${pp.label} | ${t.n1} | ${fmt(t.mean1)} (${fmt(t.sd1)}) | ${fmt(t.mean2)} (${fmt(t.sd2)}) | ${fmt(t.mean_diff)} | ${fmtCell(t.t, t)} | ${t.df != null ? t.df : (t.skipped ? `— (${formatSkipReason(t.skip_reason)})` : "—")} | ${fmtPCell(t.p, t)}${pStars(t.p)} |${adjCell} ${fmtCell(t.cohen_d, t)} | ${note} |`,
       );
     }
     lines.push("");
@@ -1788,6 +1834,20 @@ journalImportsRouter.get(
     lines.push(`    - \`${formatSkipReason("insufficient_n")}\` : Welch は n₁<2 または n₂<2、Paired は n<2。`);
     lines.push(`    - \`${formatSkipReason("no_variance")}\` : Welch は両群とも分散ゼロ、Paired は AI と人間が全 pair で完全一致 (差分の SD=0)。`);
     lines.push(`    - 備考列が空の場合は通常推定が可能であったことを示す。`);
+    if (showAdj) {
+      lines.push(`- **p_adj** 列 (Phase 7-4) は ${formatCorrectionMethod(correctionMethod)} による多重比較補正後の p 値:`);
+      if (correctionMethod === "bonferroni") {
+        lines.push(`    - Bonferroni: \`p_adj = min(p × m, 1)\` (family-wise error rate 制御、最も保守的)。`);
+      } else if (correctionMethod === "holm") {
+        lines.push(`    - Holm step-down: 昇順にソートし \`p_adj[i] = max(prev, min(p[i] × (m - i), 1))\` (family-wise error rate 制御、Bonferroni より検出力が高い)。`);
+      } else if (correctionMethod === "fdr_bh") {
+        lines.push(`    - Benjamini-Hochberg: 昇順にソートし \`p_adj[i] = min_{k ≥ i}(p[k] × m / (k+1))\` で 1 に clamp (false discovery rate 制御、最も検出力が高い)。`);
+      }
+      lines.push(`    - test family は表ごとに独立 (表1 = ${welchVars.length} 検定, 表2 = ${pairedPairs.length} 検定)。`);
+      lines.push(`    - 備考列に理由が表示された行 (p=null) は test family の m から除外される。`);
+    } else {
+      lines.push(`- 多重比較補正は適用していません。\`?correction=bonferroni\` / \`holm\` / \`fdr_bh\` で適用可能 (Phase 7-4)。`);
+    }
     lines.push("");
 
     const md = lines.join("\n");
@@ -1796,7 +1856,7 @@ journalImportsRouter.get(
       resourceId: "t_test_md",
       visibleRecordCount: data.length,
       scopeBasis: user.role === "admin" ? "admin_all" : "uploader_own",
-      reason: `t_test_md | split_week=${splitWeek} | filters: student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""}`,
+      reason: `t_test_md | split_week=${splitWeek} | correction=${correctionMethod} | filters: student=${studentId ?? ""},from=${fromDate ?? ""},to=${toDate ?? ""}`,
     });
     return new Response(md, {
       status: 200,
