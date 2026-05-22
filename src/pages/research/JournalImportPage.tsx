@@ -2,12 +2,14 @@
  * 研究者用：過去の実習日誌取り込みページ
  *
  * 機能:
- *   - ドラッグ&ドロップ または ファイル選択で複数アップロード
+ *   - ドラッグ&ドロップ または ファイル選択で複数アップロード (並列度 3)
  *   - Word (.doc/.docx) / PDF / 画像 (JPG/PNG/WEBP/HEIC) 対応
  *   - toMarkdown でテキスト抽出 → GPT-4 で日誌スキーマに構造化
- *   - 抽出結果を編集 + 学生紐付け → 一括コミット
+ *   - 学生ごと → 週順 にグルーピングして表示
+ *   - 抽出結果を編集 / 閲覧 + 学生紐付け → 一括コミット
+ *   - 詳細ページ (/research/journal-import/:id) への遷移
  */
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -36,17 +38,31 @@ import {
   Tooltip,
   Divider,
   Snackbar,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Avatar,
+  Pagination,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DescriptionIcon from "@mui/icons-material/Description";
 import EditIcon from "@mui/icons-material/Edit";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import PersonIcon from "@mui/icons-material/Person";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import ViewModuleIcon from "@mui/icons-material/ViewModule";
+import ViewListIcon from "@mui/icons-material/ViewList";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../api/client";
 
@@ -124,11 +140,44 @@ const STATUS_LABELS: Record<string, string> = {
   failed: "✗ 失敗",
 };
 
+const UPLOAD_CONCURRENCY = 3;
+const ITEMS_PER_PAGE = 200;
+
 function humanFileSize(bytes: number | null): string {
   if (bytes == null) return "—";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/**
+ * 並列度を制限してファイルを順次アップロード
+ */
+async function uploadWithConcurrency(
+  files: File[],
+  concurrency: number,
+  uploadFn: (file: File) => Promise<{ ok: boolean; error?: string }>,
+  onProgress: (done: number, total: number, errors: string[]) => void,
+) {
+  const total = files.length;
+  let done = 0;
+  const errors: string[] = [];
+  const queue = [...files];
+
+  async function worker() {
+    while (queue.length > 0) {
+      const file = queue.shift();
+      if (!file) break;
+      const r = await uploadFn(file);
+      done += 1;
+      if (!r.ok && r.error) errors.push(`${file.name}: ${r.error}`);
+      onProgress(done, total, [...errors]);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, total) }, () => worker());
+  await Promise.all(workers);
+  return errors;
 }
 
 export default function JournalImportPage() {
@@ -137,9 +186,13 @@ export default function JournalImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [dragOver, setDragOver] = useState(false);
-  const [uploadingCount, setUploadingCount] = useState(0);
+  const [uploadTotal, setUploadTotal] = useState(0);
+  const [uploadDone, setUploadDone] = useState(0);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [editingItem, setEditingItem] = useState<ImportItem | null>(null);
+  const [viewingItem, setViewingItem] = useState<ImportItem | null>(null);
+  const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<"grouped" | "flat">("grouped");
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "info" | "warning" | "error" }>({
     open: false,
     message: "",
@@ -147,14 +200,23 @@ export default function JournalImportPage() {
   });
 
   // 一覧
-  const listQ = useQuery<{ success: boolean; items: ImportItem[] }>({
-    queryKey: ["journal-imports"],
-    queryFn: () =>
-      apiFetch("/api/data/journal-imports").then((r) => r.json()),
+  const listQ = useQuery<{
+    success: boolean;
+    items: ImportItem[];
+    total: number;
+    limit: number;
+    offset: number;
+  }>({
+    queryKey: ["journal-imports", page],
+    queryFn: () => {
+      const offset = (page - 1) * ITEMS_PER_PAGE;
+      return apiFetch(
+        `/api/data/journal-imports?limit=${ITEMS_PER_PAGE}&offset=${offset}`,
+      ).then((r) => r.json());
+    },
     refetchInterval: (q: any) => {
       const data = q?.state?.data as { items?: ImportItem[] } | undefined;
       const items = data?.items || [];
-      // 処理中のものがあれば 2 秒ごとにポーリング
       const hasPending = items.some((it: ImportItem) =>
         ["extracting", "structuring", "committing"].includes(it.status),
       );
@@ -246,10 +308,62 @@ export default function JournalImportPage() {
   });
 
   const items = listQ.data?.items || [];
+  const totalCount = listQ.data?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const readyToCommit = items.filter(
     (it) =>
       it.status === "structured" && it.student_id && it.entry_date && it.structured_json,
   );
+
+  // ────────────────────────────────────────────────────────────
+  // 学生ごとにまとめる (グルーピング)
+  // ────────────────────────────────────────────────────────────
+  const groupedByStudent = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        studentId: string | null;
+        studentName: string;
+        items: ImportItem[];
+        stats: { total: number; committed: number; structured: number; failed: number; pending: number };
+      }
+    >();
+    for (const it of items) {
+      const key = it.student_id || "__unassigned__";
+      if (!groups.has(key)) {
+        groups.set(key, {
+          studentId: it.student_id,
+          studentName: it.student_name || (it.student_id ? `(ID: ${it.student_id})` : "未指定"),
+          items: [],
+          stats: { total: 0, committed: 0, structured: 0, failed: 0, pending: 0 },
+        });
+      }
+      const g = groups.get(key)!;
+      g.items.push(it);
+      g.stats.total += 1;
+      if (it.status === "committed") g.stats.committed += 1;
+      else if (it.status === "structured") g.stats.structured += 1;
+      else if (it.status === "failed") g.stats.failed += 1;
+      else g.stats.pending += 1;
+    }
+    // 各グループ内を 週 → 日付 でソート
+    for (const g of groups.values()) {
+      g.items.sort((a, b) => {
+        const wa = a.week_number ?? 9999;
+        const wb = b.week_number ?? 9999;
+        if (wa !== wb) return wa - wb;
+        const da = a.entry_date || "9999-12-31";
+        const db = b.entry_date || "9999-12-31";
+        return da.localeCompare(db);
+      });
+    }
+    // 未指定を末尾に
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.studentId === null) return 1;
+      if (b.studentId === null) return -1;
+      return a.studentName.localeCompare(b.studentName);
+    });
+  }, [items]);
 
   // ────────────────────────────────────────────────────────────
   // アップロード
@@ -257,34 +371,51 @@ export default function JournalImportPage() {
   const uploadFiles = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return;
-      setUploadingCount(files.length);
+      setUploadTotal(files.length);
+      setUploadDone(0);
       setUploadErrors([]);
-      const errors: string[] = [];
 
-      for (const file of files) {
-        try {
-          const fd = new FormData();
-          fd.append("file", file);
-          const r = await apiFetch("/api/data/journal-imports/upload", {
-            method: "POST",
-            body: fd,
-          });
-          const json: any = await r.json();
-          if (!r.ok || !json?.success) {
-            errors.push(`${file.name}: ${json?.message || r.statusText}`);
+      const errors = await uploadWithConcurrency(
+        files,
+        UPLOAD_CONCURRENCY,
+        async (file) => {
+          try {
+            const fd = new FormData();
+            fd.append("file", file);
+            const r = await apiFetch("/api/data/journal-imports/upload", {
+              method: "POST",
+              body: fd,
+            });
+            const json: any = await r.json();
+            if (!r.ok || !json?.success) {
+              return { ok: false, error: json?.message || r.statusText };
+            }
+            return { ok: true };
+          } catch (e: any) {
+            return { ok: false, error: e?.message || String(e) };
+          } finally {
+            qc.invalidateQueries({ queryKey: ["journal-imports"] });
           }
-        } catch (e: any) {
-          errors.push(`${file.name}: ${e?.message || e}`);
-        }
-        qc.invalidateQueries({ queryKey: ["journal-imports"] });
-      }
-      setUploadingCount(0);
-      setUploadErrors(errors);
+        },
+        (done, _total, errs) => {
+          setUploadDone(done);
+          setUploadErrors(errs);
+        },
+      );
+
+      setUploadTotal(0);
+      setUploadDone(0);
       if (errors.length === 0) {
         setSnackbar({
           open: true,
           message: `${files.length} ファイルをアップロードしました`,
           severity: "success",
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: `${files.length - errors.length}/${files.length} 件成功 (${errors.length} 件失敗)`,
+          severity: errors.length === files.length ? "error" : "warning",
         });
       }
     },
@@ -351,7 +482,24 @@ export default function JournalImportPage() {
             Word (.doc / .docx) / PDF / 画像 から実習日誌をデータ化します
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <ToggleButtonGroup
+            size="small"
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
+          >
+            <ToggleButton value="grouped">
+              <Tooltip title="学生ごとにまとめる">
+                <ViewModuleIcon fontSize="small" />
+              </Tooltip>
+            </ToggleButton>
+            <ToggleButton value="flat">
+              <Tooltip title="フラット表示">
+                <ViewListIcon fontSize="small" />
+              </Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
           <Tooltip title="一覧を更新">
             <IconButton onClick={() => listQ.refetch()} disabled={listQ.isFetching}>
               <RefreshIcon />
@@ -365,7 +513,7 @@ export default function JournalImportPage() {
         対応形式: <strong>PDF / Word (.docx 推奨, .doc も試行) / 画像 (JPG/PNG/WEBP/HEIC)</strong>。
         Cloudflare Workers AI の <code>toMarkdown</code> でテキスト抽出 →
         GPT-4 で <strong>日付・週・時限ブロック・省察</strong> に自動構造化します。
-        構造化結果を確認・編集後、学生を指定して <strong>journal_entries</strong> に確定してください。
+        <strong>同時 {UPLOAD_CONCURRENCY} 並列</strong>、最大 {ITEMS_PER_PAGE} 件/ページで表示します。
       </Alert>
 
       {/* アップロード領域 */}
@@ -395,7 +543,7 @@ export default function JournalImportPage() {
               ファイルをドラッグ&ドロップ
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              または クリックして選択 (複数選択可)
+              または クリックして選択 (複数選択可・数百件まで対応)
             </Typography>
             <Button variant="contained" startIcon={<CloudUploadIcon />}>
               ファイルを選択
@@ -413,22 +561,32 @@ export default function JournalImportPage() {
             </Typography>
           </Paper>
 
-          {uploadingCount > 0 && (
+          {uploadTotal > 0 && (
             <Box mt={2}>
-              <Typography variant="body2" gutterBottom>
-                アップロード中… ({uploadingCount} 件)
-              </Typography>
-              <LinearProgress />
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
+                <Typography variant="body2">
+                  アップロード中… <strong>{uploadDone}</strong> / {uploadTotal} 件 (並列 {UPLOAD_CONCURRENCY})
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {Math.round((uploadDone / uploadTotal) * 100)}%
+                </Typography>
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={(uploadDone / uploadTotal) * 100}
+              />
             </Box>
           )}
-          {uploadErrors.length > 0 && (
+          {uploadErrors.length > 0 && uploadTotal === 0 && (
             <Alert severity="error" sx={{ mt: 2 }} onClose={() => setUploadErrors([])}>
-              <Typography variant="subtitle2">アップロードに失敗:</Typography>
-              {uploadErrors.map((e, i) => (
-                <Typography key={i} variant="body2">
-                  • {e}
-                </Typography>
-              ))}
+              <Typography variant="subtitle2">{uploadErrors.length} 件のアップロードに失敗:</Typography>
+              <Box sx={{ maxHeight: 160, overflowY: "auto", mt: 0.5 }}>
+                {uploadErrors.map((e, i) => (
+                  <Typography key={i} variant="caption" display="block">
+                    • {e}
+                  </Typography>
+                ))}
+              </Box>
             </Alert>
           )}
         </CardContent>
@@ -440,7 +598,7 @@ export default function JournalImportPage() {
           <CardContent sx={{ py: 1.5 }}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
               <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
-                合計 {items.length} 件
+                ページ表示 {items.length} 件 / 全 {totalCount} 件
               </Typography>
               <Button
                 size="small"
@@ -469,185 +627,69 @@ export default function JournalImportPage() {
         </Card>
       )}
 
-      {/* 一覧テーブル */}
-      <Card>
-        <CardContent>
-          {listQ.isLoading ? (
-            <Box display="flex" justifyContent="center" p={4}>
-              <CircularProgress />
-            </Box>
-          ) : items.length === 0 ? (
-            <Alert severity="info">まだ取り込みはありません。上のエリアからファイルをアップロードしてください。</Alert>
-          ) : (
-            <Box sx={{ overflowX: "auto" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ファイル</TableCell>
-                    <TableCell>サイズ</TableCell>
-                    <TableCell>抽出元</TableCell>
-                    <TableCell>状態</TableCell>
-                    <TableCell>学生</TableCell>
-                    <TableCell>日付</TableCell>
-                    <TableCell>週</TableCell>
-                    <TableCell>文字数</TableCell>
-                    <TableCell align="right">操作</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {items.map((it) => (
-                    <TableRow key={it.id} hover>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <DescriptionIcon fontSize="small" color="action" />
-                          <Tooltip title={it.filename}>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                maxWidth: 180,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {it.filename}
-                            </Typography>
-                          </Tooltip>
-                        </Stack>
-                        {it.error_message && (
-                          <Tooltip title={it.error_message}>
-                            <Chip
-                              size="small"
-                              color="error"
-                              icon={<ErrorOutlineIcon />}
-                              label="エラー詳細"
-                              sx={{ mt: 0.5 }}
-                            />
-                          </Tooltip>
-                        )}
-                      </TableCell>
-                      <TableCell>{humanFileSize(it.file_size)}</TableCell>
-                      <TableCell>
-                        {it.extract_source ? (
-                          <Chip
-                            size="small"
-                            label={it.extract_source}
-                            variant="outlined"
-                          />
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          color={STATUS_COLORS[it.status] || "default"}
-                          label={STATUS_LABELS[it.status] || it.status}
-                          icon={
-                            ["extracting", "structuring", "committing"].includes(it.status) ? (
-                              <HourglassEmptyIcon sx={{ fontSize: 14 }} />
-                            ) : undefined
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {it.student_name || (
-                          <Typography variant="caption" color="text.secondary">
-                            未指定
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>{it.entry_date || "—"}</TableCell>
-                      <TableCell>{it.week_number ?? "—"}</TableCell>
-                      <TableCell>{it.word_count ?? "—"}</TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          {it.status === "extracted" && (
-                            <Tooltip title="GPT-4 で構造化">
-                              <IconButton
-                                size="small"
-                                onClick={() => structureMut.mutate(it.id)}
-                                disabled={structureMut.isPending}
-                              >
-                                <AutoFixHighIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {["structured", "extracted", "failed"].includes(it.status) && (
-                            <Tooltip title="編集">
-                              <IconButton
-                                size="small"
-                                onClick={() => setEditingItem(it)}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {it.status === "structured" && (
-                            <Tooltip
-                              title={
-                                !it.student_id
-                                  ? "学生を指定してください"
-                                  : !it.entry_date
-                                    ? "日付を指定してください"
-                                    : "journal_entries にコミット"
-                              }
-                            >
-                              <span>
-                                <IconButton
-                                  size="small"
-                                  color="success"
-                                  onClick={() => commitMut.mutate(it.id)}
-                                  disabled={
-                                    !it.student_id ||
-                                    !it.entry_date ||
-                                    commitMut.isPending
-                                  }
-                                >
-                                  <CheckCircleIcon fontSize="small" />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                          )}
-                          {it.status === "committed" && it.journal_id && (
-                            <Tooltip title="日誌を開く">
-                              <IconButton
-                                size="small"
-                                onClick={() => navigate(`/journals/${it.journal_id}`)}
-                              >
-                                <CheckCircleIcon fontSize="small" color="success" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          <Tooltip title="削除 (取り込み記録のみ)">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => {
-                                if (confirm(`取り込み記録 "${it.filename}" を削除しますか?`)) {
-                                  deleteMut.mutate(it.id);
-                                }
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+      {/* 一覧 */}
+      {listQ.isLoading ? (
+        <Box display="flex" justifyContent="center" p={4}>
+          <CircularProgress />
+        </Box>
+      ) : items.length === 0 ? (
+        <Alert severity="info">まだ取り込みはありません。上のエリアからファイルをアップロードしてください。</Alert>
+      ) : viewMode === "grouped" ? (
+        <GroupedView
+          groups={groupedByStudent}
+          onView={(it) => setViewingItem(it)}
+          onEdit={(it) => setEditingItem(it)}
+          onDetail={(it) => navigate(`/research/journal-import/${it.id}`)}
+          onStructure={(id) => structureMut.mutate(id)}
+          onCommit={(id) => commitMut.mutate(id)}
+          onDelete={(it) => {
+            if (confirm(`取り込み記録 "${it.filename}" を削除しますか?`)) {
+              deleteMut.mutate(it.id);
+            }
+          }}
+          onOpenJournal={(jid) => navigate(`/journals/${jid}`)}
+          structurePending={structureMut.isPending}
+          commitPending={commitMut.isPending}
+        />
+      ) : (
+        <FlatView
+          items={items}
+          onView={(it) => setViewingItem(it)}
+          onEdit={(it) => setEditingItem(it)}
+          onDetail={(it) => navigate(`/research/journal-import/${it.id}`)}
+          onStructure={(id) => structureMut.mutate(id)}
+          onCommit={(id) => commitMut.mutate(id)}
+          onDelete={(it) => {
+            if (confirm(`取り込み記録 "${it.filename}" を削除しますか?`)) {
+              deleteMut.mutate(it.id);
+            }
+          }}
+          onOpenJournal={(jid) => navigate(`/journals/${jid}`)}
+          structurePending={structureMut.isPending}
+          commitPending={commitMut.isPending}
+        />
+      )}
+
+      {/* ページング */}
+      {totalPages > 1 && (
+        <Box display="flex" justifyContent="center" mt={3}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(_, p) => setPage(p)}
+            color="primary"
+            showFirstButton
+            showLastButton
+          />
+        </Box>
+      )}
 
       {/* 編集ダイアログ */}
       {editingItem && (
         <EditDialog
           item={editingItem}
           students={students}
+          viewOnly={false}
           onClose={() => setEditingItem(null)}
           onSave={async (patch) => {
             await patchMut.mutateAsync({ id: editingItem.id, body: patch });
@@ -656,13 +698,26 @@ export default function JournalImportPage() {
           }}
           onRestructure={async () => {
             await structureMut.mutateAsync(editingItem.id);
-            // 構造化後の最新値を読み込む
             const r = await apiFetch(`/api/data/journal-imports/${editingItem.id}`);
             const j: any = await r.json();
             if (j?.item) setEditingItem(j.item);
           }}
           isSaving={patchMut.isPending}
           isRestructuring={structureMut.isPending}
+        />
+      )}
+
+      {/* 閲覧ダイアログ */}
+      {viewingItem && (
+        <EditDialog
+          item={viewingItem}
+          students={students}
+          viewOnly
+          onClose={() => setViewingItem(null)}
+          onSave={async () => {}}
+          onRestructure={async () => {}}
+          isSaving={false}
+          isRestructuring={false}
         />
       )}
 
@@ -677,11 +732,358 @@ export default function JournalImportPage() {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// 編集ダイアログ
+// 学生ごとグルーピング表示
+// ──────────────────────────────────────────────────────────────────
+function GroupedView(props: {
+  groups: Array<{
+    studentId: string | null;
+    studentName: string;
+    items: ImportItem[];
+    stats: { total: number; committed: number; structured: number; failed: number; pending: number };
+  }>;
+  onView: (it: ImportItem) => void;
+  onEdit: (it: ImportItem) => void;
+  onDetail: (it: ImportItem) => void;
+  onStructure: (id: string) => void;
+  onCommit: (id: string) => void;
+  onDelete: (it: ImportItem) => void;
+  onOpenJournal: (jid: string) => void;
+  structurePending: boolean;
+  commitPending: boolean;
+}) {
+  const { groups } = props;
+  return (
+    <Stack spacing={1.5}>
+      {groups.map((g) => (
+        <Accordion key={g.studentId || "__unassigned__"} defaultExpanded={groups.length <= 5}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.5}
+              sx={{ width: "100%" }}
+              flexWrap="wrap"
+              useFlexGap
+            >
+              <Avatar
+                sx={{
+                  width: 32,
+                  height: 32,
+                  bgcolor: g.studentId ? "primary.main" : "grey.400",
+                }}
+              >
+                {g.studentId ? <PersonIcon fontSize="small" /> : <HelpOutlineIcon fontSize="small" />}
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 200 }}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  {g.studentName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {g.items.length} 件の取り込み
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                {g.stats.committed > 0 && (
+                  <Chip
+                    size="small"
+                    color="success"
+                    label={`確定 ${g.stats.committed}`}
+                  />
+                )}
+                {g.stats.structured > 0 && (
+                  <Chip size="small" color="warning" label={`編集待 ${g.stats.structured}`} />
+                )}
+                {g.stats.pending > 0 && (
+                  <Chip size="small" color="info" label={`処理中 ${g.stats.pending}`} />
+                )}
+                {g.stats.failed > 0 && (
+                  <Chip size="small" color="error" label={`失敗 ${g.stats.failed}`} />
+                )}
+              </Stack>
+            </Stack>
+          </AccordionSummary>
+          <AccordionDetails sx={{ p: 0 }}>
+            <WeekSubGroups items={g.items} {...props} />
+          </AccordionDetails>
+        </Accordion>
+      ))}
+    </Stack>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 学生グループ内で「週」ごとにサブグルーピング
+// ──────────────────────────────────────────────────────────────────
+function WeekSubGroups(props: {
+  items: ImportItem[];
+  onView: (it: ImportItem) => void;
+  onEdit: (it: ImportItem) => void;
+  onDetail: (it: ImportItem) => void;
+  onStructure: (id: string) => void;
+  onCommit: (id: string) => void;
+  onDelete: (it: ImportItem) => void;
+  onOpenJournal: (jid: string) => void;
+  structurePending: boolean;
+  commitPending: boolean;
+}) {
+  const { items } = props;
+  const weeks = useMemo(() => {
+    const map = new Map<string, ImportItem[]>();
+    for (const it of items) {
+      const key = it.week_number != null ? `第${it.week_number}週` : "週未設定";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(it);
+    }
+    return Array.from(map.entries());
+  }, [items]);
+
+  return (
+    <Box>
+      {weeks.map(([weekKey, weekItems]) => (
+        <Box key={weekKey}>
+          <Box
+            sx={{
+              px: 2,
+              py: 0.75,
+              bgcolor: "grey.100",
+              borderTop: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography variant="body2" fontWeight="bold" color="text.secondary">
+              {weekKey} ({weekItems.length})
+            </Typography>
+          </Box>
+          <ItemTable items={weekItems} {...props} />
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// フラットビュー
+// ──────────────────────────────────────────────────────────────────
+function FlatView(props: {
+  items: ImportItem[];
+  onView: (it: ImportItem) => void;
+  onEdit: (it: ImportItem) => void;
+  onDetail: (it: ImportItem) => void;
+  onStructure: (id: string) => void;
+  onCommit: (id: string) => void;
+  onDelete: (it: ImportItem) => void;
+  onOpenJournal: (jid: string) => void;
+  structurePending: boolean;
+  commitPending: boolean;
+}) {
+  return (
+    <Card>
+      <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
+        <ItemTable {...props} showStudent />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 行テーブル (共通)
+// ──────────────────────────────────────────────────────────────────
+function ItemTable(props: {
+  items: ImportItem[];
+  showStudent?: boolean;
+  onView: (it: ImportItem) => void;
+  onEdit: (it: ImportItem) => void;
+  onDetail: (it: ImportItem) => void;
+  onStructure: (id: string) => void;
+  onCommit: (id: string) => void;
+  onDelete: (it: ImportItem) => void;
+  onOpenJournal: (jid: string) => void;
+  structurePending: boolean;
+  commitPending: boolean;
+}) {
+  const {
+    items,
+    showStudent,
+    onView,
+    onEdit,
+    onDetail,
+    onStructure,
+    onCommit,
+    onDelete,
+    onOpenJournal,
+    structurePending,
+    commitPending,
+  } = props;
+
+  return (
+    <Box sx={{ overflowX: "auto" }}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>ファイル</TableCell>
+            {showStudent && <TableCell>学生</TableCell>}
+            <TableCell>日付</TableCell>
+            <TableCell>週</TableCell>
+            <TableCell>状態</TableCell>
+            <TableCell>抽出元</TableCell>
+            <TableCell>サイズ</TableCell>
+            <TableCell>文字数</TableCell>
+            <TableCell align="right">操作</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {items.map((it) => (
+            <TableRow key={it.id} hover>
+              <TableCell>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <DescriptionIcon fontSize="small" color="action" />
+                  <Tooltip title={it.filename}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        maxWidth: 200,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => onDetail(it)}
+                    >
+                      {it.filename}
+                    </Typography>
+                  </Tooltip>
+                </Stack>
+                {it.error_message && (
+                  <Tooltip title={it.error_message}>
+                    <Chip
+                      size="small"
+                      color="error"
+                      icon={<ErrorOutlineIcon />}
+                      label="エラー詳細"
+                      sx={{ mt: 0.5 }}
+                    />
+                  </Tooltip>
+                )}
+              </TableCell>
+              {showStudent && (
+                <TableCell>
+                  {it.student_name || (
+                    <Typography variant="caption" color="text.secondary">
+                      未指定
+                    </Typography>
+                  )}
+                </TableCell>
+              )}
+              <TableCell>{it.entry_date || "—"}</TableCell>
+              <TableCell>{it.week_number != null ? `第${it.week_number}週` : "—"}</TableCell>
+              <TableCell>
+                <Chip
+                  size="small"
+                  color={STATUS_COLORS[it.status] || "default"}
+                  label={STATUS_LABELS[it.status] || it.status}
+                  icon={
+                    ["extracting", "structuring", "committing"].includes(it.status) ? (
+                      <HourglassEmptyIcon sx={{ fontSize: 14 }} />
+                    ) : undefined
+                  }
+                />
+              </TableCell>
+              <TableCell>
+                {it.extract_source ? (
+                  <Chip size="small" label={it.extract_source} variant="outlined" />
+                ) : (
+                  "—"
+                )}
+              </TableCell>
+              <TableCell>{humanFileSize(it.file_size)}</TableCell>
+              <TableCell>{it.word_count ?? "—"}</TableCell>
+              <TableCell align="right">
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                  <Tooltip title="詳細ページを開く">
+                    <IconButton size="small" onClick={() => onDetail(it)}>
+                      <OpenInNewIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="閲覧 (読み取り専用)">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => onView(it)}
+                        disabled={!it.structured_json && !it.raw_text}
+                      >
+                        <VisibilityIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  {it.status === "extracted" && (
+                    <Tooltip title="GPT-4 で構造化">
+                      <IconButton
+                        size="small"
+                        onClick={() => onStructure(it.id)}
+                        disabled={structurePending}
+                      >
+                        <AutoFixHighIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {["structured", "extracted", "failed"].includes(it.status) && (
+                    <Tooltip title="編集">
+                      <IconButton size="small" onClick={() => onEdit(it)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {it.status === "structured" && (
+                    <Tooltip
+                      title={
+                        !it.student_id
+                          ? "学生を指定してください"
+                          : !it.entry_date
+                            ? "日付を指定してください"
+                            : "journal_entries にコミット"
+                      }
+                    >
+                      <span>
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => onCommit(it.id)}
+                          disabled={!it.student_id || !it.entry_date || commitPending}
+                        >
+                          <CheckCircleIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
+                  {it.status === "committed" && it.journal_id && (
+                    <Tooltip title="日誌を開く">
+                      <IconButton size="small" onClick={() => onOpenJournal(it.journal_id!)}>
+                        <CheckCircleIcon fontSize="small" color="success" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  <Tooltip title="削除 (取り込み記録のみ)">
+                    <IconButton size="small" color="error" onClick={() => onDelete(it)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 編集/閲覧ダイアログ (viewOnly フラグで切替)
 // ──────────────────────────────────────────────────────────────────
 function EditDialog({
   item,
   students,
+  viewOnly,
   onClose,
   onSave,
   onRestructure,
@@ -690,6 +1092,7 @@ function EditDialog({
 }: {
   item: ImportItem;
   students: Student[];
+  viewOnly: boolean;
   onClose: () => void;
   onSave: (patch: any) => Promise<void>;
   onRestructure: () => Promise<void>;
@@ -706,7 +1109,9 @@ function EditDialog({
     item.week_number != null ? String(item.week_number) : initialStructured.week_number != null ? String(initialStructured.week_number) : "",
   );
   const [structured, setStructured] = useState<StructuredJournal>(initialStructured);
-  const [showRawText, setShowRawText] = useState(false);
+  const [showRawText, setShowRawText] = useState(viewOnly);
+
+  const readOnly = viewOnly;
 
   const updateBlock = (key: string, value: string) => {
     setStructured((s) => ({
@@ -734,24 +1139,33 @@ function EditDialog({
       <DialogTitle>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Box>
-            <Typography variant="h6">取り込み内容の編集</Typography>
+            <Typography variant="h6">
+              {viewOnly ? "取り込み内容の閲覧" : "取り込み内容の編集"}
+            </Typography>
             <Typography variant="caption" color="text.secondary">
               {item.filename}
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1}>
-            <Button
-              size="small"
-              startIcon={isRestructuring ? <CircularProgress size={14} /> : <AutoFixHighIcon />}
-              onClick={onRestructure}
-              disabled={isRestructuring || !item.raw_text}
-            >
-              GPT-4 で再構造化
-            </Button>
+          {!viewOnly && (
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                startIcon={isRestructuring ? <CircularProgress size={14} /> : <AutoFixHighIcon />}
+                onClick={onRestructure}
+                disabled={isRestructuring || !item.raw_text}
+              >
+                GPT-4 で再構造化
+              </Button>
+              <Button size="small" onClick={() => setShowRawText((s) => !s)}>
+                {showRawText ? "抽出原文を隠す" : "抽出原文を表示"}
+              </Button>
+            </Stack>
+          )}
+          {viewOnly && (
             <Button size="small" onClick={() => setShowRawText((s) => !s)}>
               {showRawText ? "抽出原文を隠す" : "抽出原文を表示"}
             </Button>
-          </Stack>
+          )}
         </Stack>
       </DialogTitle>
       <DialogContent dividers>
@@ -800,6 +1214,7 @@ function EditDialog({
               size="small"
               sx={{ minWidth: 240 }}
               required
+              disabled={readOnly}
             >
               <MenuItem value="">— 選択してください —</MenuItem>
               {students.map((s) => (
@@ -816,6 +1231,7 @@ function EditDialog({
               size="small"
               InputLabelProps={{ shrink: true }}
               required
+              disabled={readOnly}
             />
             <TextField
               type="number"
@@ -824,6 +1240,7 @@ function EditDialog({
               onChange={(e) => setWeekNumber(e.target.value)}
               size="small"
               sx={{ width: 120 }}
+              disabled={readOnly}
             />
             <TextField
               label="タイトル"
@@ -831,6 +1248,7 @@ function EditDialog({
               onChange={(e) => setStructured({ ...structured, title: e.target.value })}
               size="small"
               sx={{ flex: 1, minWidth: 200 }}
+              disabled={readOnly}
             />
           </Stack>
 
@@ -847,6 +1265,7 @@ function EditDialog({
               maxRows={4}
               size="small"
               fullWidth
+              disabled={readOnly}
             />
           ))}
 
@@ -860,19 +1279,22 @@ function EditDialog({
             minRows={3}
             maxRows={10}
             fullWidth
+            disabled={readOnly}
           />
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>キャンセル</Button>
-        <Button
-          variant="contained"
-          onClick={handleSave}
-          disabled={isSaving}
-          startIcon={isSaving ? <CircularProgress size={16} /> : undefined}
-        >
-          保存
-        </Button>
+        <Button onClick={onClose}>{viewOnly ? "閉じる" : "キャンセル"}</Button>
+        {!viewOnly && (
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={isSaving}
+            startIcon={isSaving ? <CircularProgress size={16} /> : undefined}
+          >
+            保存
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

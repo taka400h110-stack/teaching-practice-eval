@@ -52,6 +52,7 @@ const JournalTransmissionPage = lazy(() => import("./pages/analysis/JournalTrans
 
 // 研究者用ページ
 const JournalImportPage       = lazy(() => import("./pages/research/JournalImportPage"));
+const JournalImportDetailPage = lazy(() => import("./pages/research/JournalImportDetailPage"));
 
 // OCR
 const JournalOCRPage          = lazy(() => import("./pages/JournalOCRPage"));
@@ -161,6 +162,7 @@ export default function App() {
 
           {/* 研究者用：過去日誌の取り込み (Word/PDF/画像) */}
           <Route path="research/journal-import" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator"]}><JournalImportPage /></PrivateRoute>} />
+          <Route path="research/journal-import/:id" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator"]}><JournalImportDetailPage /></PrivateRoute>} />
 
           {/* エクスポート */}
           <Route path="exports"           element={<PrivateRoute allowedRoles={["researcher", "collaborator", "board_observer", "admin"]}><ExportsPage /></PrivateRoute>} />

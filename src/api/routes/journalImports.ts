@@ -91,8 +91,15 @@ journalImportsRouter.get(
     const db = c.env.DB as D1Database;
     const user = c.get("user");
     const status = c.req.query("status");
-    const limit = Math.min(parseInt(c.req.query("limit") || "100", 10) || 100, 500);
+    const studentId = c.req.query("student_id");
+    const limit = Math.min(
+      parseInt(c.req.query("limit") || "200", 10) || 200,
+      1000,
+    );
+    const offset = Math.max(parseInt(c.req.query("offset") || "0", 10) || 0, 0);
 
+    // 件数カウント (UI のページング用)
+    let countSql = `SELECT COUNT(*) AS cnt FROM journal_imports ji WHERE 1=1`;
     let sql = `SELECT ji.*, u.name AS student_name
                FROM journal_imports ji
                LEFT JOIN users u ON u.id = ji.student_id
@@ -101,21 +108,49 @@ journalImportsRouter.get(
 
     // researcher は自分の取り込みのみ。admin は全件。
     if (user.role !== "admin") {
+      countSql += ` AND ji.uploaded_by = ?`;
       sql += ` AND ji.uploaded_by = ?`;
       params.push(user.id);
     }
     if (status) {
+      countSql += ` AND ji.status = ?`;
       sql += ` AND ji.status = ?`;
       params.push(status);
     }
-    sql += ` ORDER BY ji.created_at DESC LIMIT ?`;
-    params.push(limit);
+    if (studentId) {
+      countSql += ` AND ji.student_id = ?`;
+      sql += ` AND ji.student_id = ?`;
+      params.push(studentId);
+    }
+    // ソート: 学生ごとにまとめて → 週・日付の昇順 (グルーピング用)
+    sql += ` ORDER BY
+              CASE WHEN ji.student_id IS NULL THEN 1 ELSE 0 END,
+              ji.student_id ASC,
+              CASE WHEN ji.week_number IS NULL THEN 1 ELSE 0 END,
+              ji.week_number ASC,
+              CASE WHEN ji.entry_date IS NULL THEN 1 ELSE 0 END,
+              ji.entry_date ASC,
+              ji.created_at DESC
+            LIMIT ? OFFSET ?`;
 
+    const countRow = await db
+      .prepare(countSql)
+      .bind(...params)
+      .first<{ cnt: number }>();
+    const total = Number(countRow?.cnt || 0);
+
+    const dataParams = [...params, limit, offset];
     const res = await db
       .prepare(sql)
-      .bind(...params)
+      .bind(...dataParams)
       .all();
-    return c.json({ success: true, items: res.results || [] });
+    return c.json({
+      success: true,
+      items: res.results || [],
+      total,
+      limit,
+      offset,
+    });
   },
 );
 
