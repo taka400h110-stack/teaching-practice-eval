@@ -193,7 +193,7 @@ function WeekSubGroups(
               {weekKey} ({weekItems.length})
             </Typography>
           </Box>
-          <ItemTable items={weekItems} {...props} />
+          <ItemTable {...props} items={weekItems} />
         </Box>
       ))}
     </Box>

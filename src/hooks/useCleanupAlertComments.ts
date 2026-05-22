@@ -9,7 +9,7 @@ export function useCleanupAlertComments(fingerprint: string | null) {
     queryFn: async () => {
       if (!fingerprint) return [];
       const res = await apiFetch(`/api/admin/alerts/cleanup-failure/comments?fingerprint=${encodeURIComponent(fingerprint)}`);
-      const data = await res.json();
+      const data = (await res.json()) as { comments?: any[] };
       return data.comments;
     },
     enabled: !!fingerprint,

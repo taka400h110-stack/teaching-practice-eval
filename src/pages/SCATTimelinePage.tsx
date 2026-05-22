@@ -6,15 +6,19 @@ import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client';
 
 export const SCATTimelinePage: React.FC = () => {
-  const { data, isLoading } = useQuery({
+  type TimelineRow = Record<string, string | number>;
+  type ScatTimelineResp = { timeline?: TimelineRow[] };
+
+  const { data, isLoading } = useQuery<ScatTimelineResp>({
     queryKey: ['scatTimeline'],
     queryFn: async () => {
-      return apiFetch('/api/data/scat/network/timeline');
+      const res = await apiFetch('/api/data/scat/network/timeline');
+      return (await res.json()) as ScatTimelineResp;
     }
   });
 
   // Mock timeline data if API returns empty
-  const timelineData = data?.timeline?.length > 0 ? data.timeline : [
+  const timelineData: TimelineRow[] = (data?.timeline && data.timeline.length > 0) ? data.timeline : [
     { week: 'Week 1', '生徒指導': 10, '授業準備': 5, '時間管理': 20, '振り返り': 5, '教材研究': 8 },
     { week: 'Week 2', '生徒指導': 15, '授業準備': 10, '時間管理': 15, '振り返り': 12, '教材研究': 15 },
     { week: 'Week 3', '生徒指導': 18, '授業準備': 20, '時間管理': 10, '振り返り': 18, '教材研究': 22 },

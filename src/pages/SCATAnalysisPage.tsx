@@ -259,7 +259,7 @@ export default function SCATAnalysisPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
       });
-      const data = await res.json();
+      const data = (await res.json()) as any;
       if (!data.success) throw new Error(data.error || "AI Analysis failed");
       
       // Save theorization
@@ -281,13 +281,13 @@ export default function SCATAnalysisPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ segments: [{ text_content: seg.raw_text }] })
           });
-          const segData = await segRes.json();
+          const segData = (await segRes.json()) as any;
           // Wait briefly
           await new Promise(r => setTimeout(r, 200));
           
           // Re-fetch segments to get the new segment id
           const segListRes = await apiFetch(`/api/data/scat/segments/${selectedProjectId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
-          const segListData = await segListRes.json();
+          const segListData = (await segListRes.json()) as any;
           const newSeg = segListData.segments[segListData.segments.length - 1];
           
           if (newSeg) {
