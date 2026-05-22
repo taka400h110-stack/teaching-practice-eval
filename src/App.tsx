@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { CircularProgress, Box, Typography } from "@mui/material";
 import AppLayout from "./components/AppLayout";
 import apiClient from "./api/client";
@@ -95,18 +95,32 @@ function RoleBasedHomeRedirect() {
 }
 
 function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
+  const location = useLocation();
   if (!apiClient.isAuthenticated()) return <Navigate to="/login" replace />;
-    
+
+  const user = apiClient.getCurrentUser();
+  const userRoles = (user as any)?.roles || [(user as any)?.role || "student"];
+
+  // ── Onboarding ガード ──
+  // student かつオンボーディング未完了 (pending_onboarding=true) の場合、
+  // /onboarding 以外のルートへの遷移を強制的に /onboarding にリダイレクト。
+  // 教員・管理者・研究者は onboarding 不要 (E2E: role-ui-audit.not-onboarded.spec.ts 参照)。
+  if (typeof window !== "undefined") {
+    const pendingOnboarding = window.localStorage.getItem("pending_onboarding") === "true";
+    const isStudent = userRoles.includes("student");
+    const isOnOnboardingPage = location.pathname.startsWith("/onboarding");
+    if (pendingOnboarding && isStudent && !isOnOnboardingPage) {
+      return <Navigate to="/onboarding" replace />;
+    }
+  }
+
   if (allowedRoles && allowedRoles.length > 0) {
-    const user = apiClient.getCurrentUser();
-    // 下位互換対応
-    const userRoles = (user as any)?.roles || [(user as any)?.role || "student"];
     const hasRole = userRoles.some((r: string) => allowedRoles.includes(r));
     if (!user || !hasRole) {
       return <Navigate to="/unauthorized" replace />;
     }
   }
-  
+
   return <>{children}</>;
 }
 
@@ -168,7 +182,6 @@ export default function App() {
           <Route path="exports"           element={<PrivateRoute allowedRoles={["researcher", "collaborator", "board_observer", "admin"]}><ExportsPage /></PrivateRoute>} />
           <Route path="admin/exports"     element={<PrivateRoute allowedRoles={["admin"]}><AdminExportsPage /></PrivateRoute>} />
 
-          
           {/* Analysis Pages */}
           <Route path="research/journals/:journalId/scat" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalSCATPage /></PrivateRoute>} />
           <Route path="research/journals/:journalId/ism" element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><JournalISMPage /></PrivateRoute>} />

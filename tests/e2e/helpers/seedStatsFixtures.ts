@@ -1,45 +1,60 @@
 import { Page } from '@playwright/test';
 
+// 共通シードデータ: TeacherStatisticsPage / 縦断 / 信頼性 などで共用
+const COMMON_COHORT_PAYLOAD = {
+  cohorts: [
+    {
+      id: 'u1',
+      student_number: '2023A001',
+      name: '山田 太郎',
+      grade: 3,
+      gender: 'M',
+      school_type: '中学校',
+      internship_type: 'intensive',
+      weeks: 4,
+      school_name: 'テスト中学校',
+      supervisor: '佐藤',
+      final_total: 16,
+      final_factor1: 4,
+      final_factor2: 4,
+      final_factor3: 4,
+      final_factor4: 4,
+      growth_delta: 2,
+      self_eval_gap: -0.5,
+      lps: 3.5,
+      big_five: {
+        extraversion: 3,
+        agreeableness: 4,
+        conscientiousness: 4,
+        neuroticism: 2,
+        openness: 4,
+      },
+      weekly_scores: [
+        { week: 1, factor1: 3, factor2: 3, factor3: 3, factor4: 3, total: 12 },
+        { week: 2, factor1: 4, factor2: 4, factor3: 4, factor4: 4, total: 16 },
+      ],
+    },
+  ],
+};
+
 export async function seedStatsFixtures(page: Page) {
+  // ① 一般 cohorts エンドポイント (StatisticsPage / LongitudinalAnalysisPage 等)
   await page.route('**/api/data/cohorts', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        cohorts: [
-          {
-            id: 'u1',
-            student_number: '2023A001',
-            name: '山田 太郎',
-            grade: 3,
-            gender: 'M',
-            school_type: '中学校',
-            internship_type: 'intensive',
-            weeks: 4,
-            school_name: 'テスト中学校',
-            supervisor: '佐藤',
-            final_total: 16,
-            final_factor1: 4,
-            final_factor2: 4,
-            final_factor3: 4,
-            final_factor4: 4,
-            growth_delta: 2,
-            self_eval_gap: -0.5,
-            lps: 3.5,
-            big_five: {
-              extraversion: 3,
-              agreeableness: 4,
-              conscientiousness: 4,
-              neuroticism: 2,
-              openness: 4
-            },
-            weekly_scores: [
-              { week: 1, factor1: 3, factor2: 3, factor3: 3, factor4: 3, total: 12 },
-              { week: 2, factor1: 4, factor2: 4, factor3: 4, factor4: 4, total: 16 }
-            ]
-          }
-        ]
-      })
+      body: JSON.stringify(COMMON_COHORT_PAYLOAD),
+    });
+  });
+
+  // ② 教員ダッシュボード用エンドポイント (TeacherStatisticsPage → apiClient.getCohortProfiles)
+  //    元実装は /api/data/teacher/profiles を叩いているため、こちらも mock しないと
+  //    CSV エクスポートで本物の elementary レスポンスが返り E2E が失敗する。
+  await page.route('**/api/data/teacher/profiles', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(COMMON_COHORT_PAYLOAD),
     });
   });
 
