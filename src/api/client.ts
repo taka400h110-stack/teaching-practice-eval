@@ -253,8 +253,19 @@ const apiClient = {
     }
   },
 
-  requiresOnboarding: () => false,
-  completeOnboarding: (userId: string) => {},
+  requiresOnboarding: () => {
+    // pending_onboarding="true" が残っているなら未完了
+    return localStorage.getItem("pending_onboarding") === "true";
+  },
+  completeOnboarding: (userId: string) => {
+    // オンボーディング完了マーク。
+    // - ユーザー単位の完了フラグを localStorage に保存
+    // - pending_onboarding を必ずクリアして /onboarding 強制リダイレクトを解除
+    if (userId) {
+      localStorage.setItem(`onboarding_done_${userId}`, "true");
+    }
+    localStorage.removeItem("pending_onboarding");
+  },
 
   // ── 日誌 ──
   // studentId を渡せば対象学生で絞り込み (教員・指導教員などが「特定の学生の日誌一覧」を見るために使用)
