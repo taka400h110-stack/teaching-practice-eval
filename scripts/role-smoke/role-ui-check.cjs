@@ -1,7 +1,7 @@
 // 各ロールでログイン → 主要画面を巡回してコンソールエラーを収集
 const { chromium } = require('playwright');
 
-const BASE = 'http://localhost:3000';
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 
 // ロール × 巡回する画面パス
 const ROLE_PATHS = {

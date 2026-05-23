@@ -1,7 +1,7 @@
 // オンボーディング完了済みのユーザーが再ログインしたとき、
 // /onboarding に強制リダイレクトされず /dashboard に直行するか確認
 const { chromium } = require('playwright');
-const BASE = 'http://localhost:3000';
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 
 (async () => {
   const browser = await chromium.launch();

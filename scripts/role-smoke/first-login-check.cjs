@@ -4,7 +4,7 @@
 // - 学生はオンボーディングが出るはず、その他はダッシュボード直行のはず
 const { chromium } = require('playwright');
 
-const BASE = 'http://localhost:3000';
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 
 const ROLES = [
   { role: 'student', email: 'student@teaching-eval.jp', label: '教育実習生', expectsOnboarding: true },
@@ -54,17 +54,23 @@ const ROLES = [
       await page.locator('input[name="password"]').fill('password');
       await page.locator('button[type="submit"]').click();
 
-      // 遷移を待つ
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(3000);
+      // 遷移を待つ (本番は login API のレートリミットで遅延することがあるため最大15秒)
+      try {
+        await page.waitForURL(u => !u.pathname.endsWith('/login'), { timeout: 15000 });
+      } catch (_e) { /* fallthrough */ }
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(1500);
 
       const result = await page.evaluate(() => {
+        const path = location.pathname;
+        // URL ベースのダッシュボード判定 (data-testid 未設定でも検出できるように)
+        const dashboardPathRe = /\/(dashboard|teacher-dashboard|admin|statistics|advanced-analytics)(\/|$)/;
         return {
-          url: location.pathname,
+          url: path,
           h1: document.querySelector('h1, h2, h5')?.textContent?.trim() || '',
           bodyLen: document.body.innerText.length,
-          hasOnboardingRoot: !!document.querySelector('[data-testid="onboarding-page-root"]'),
-          hasDashboardRoot: !!document.querySelector('[data-testid="admin-dashboard-root"], [data-testid="teacher-dashboard-root"], [data-testid="student-dashboard-root"]'),
+          hasOnboardingRoot: path.startsWith('/onboarding') || !!document.querySelector('[data-testid="onboarding-page-root"]'),
+          hasDashboardRoot: dashboardPathRe.test(path) || !!document.querySelector('[data-testid="admin-dashboard-root"], [data-testid="teacher-dashboard-root"], [data-testid="student-dashboard-root"]'),
           pendingOnboarding: localStorage.getItem('pending_onboarding'),
           // オンボーディングが表示されているなら最初のステップの中身を取得
           stepLabel: Array.from(document.querySelectorAll('.MuiStepLabel-label.Mui-active')).map(e => e.textContent?.trim()),
@@ -96,6 +102,9 @@ const ROLES = [
       totalIssues++;
     }
     await context.close();
+    // 本番では login API のレートリミット (連続呼び出しで一時的に拒否) があるため、
+    // ロール間に短いウェイトを挟む。
+    await new Promise(r => setTimeout(r, 2000));
   }
 
   console.log('=============================================');
