@@ -458,7 +458,7 @@ export default function SCATAnalysisPage() {
         <Box display="flex" alignItems="center" gap={1}>
           <PsychologyIcon color="primary" sx={{ fontSize: 32 }} />
           <Box>
-            <Typography variant="h5" fontWeight={700}>SCAT質的分析 (Project: {projectsData?.find?.((p:any) => p.id === selectedProjectId)?.title || "未選択"})</Typography>
+            <Typography variant="h5" component="h1" fontWeight={700}>SCAT質的分析 (Project: {projectsData?.find?.((p:any) => p.id === selectedProjectId)?.title || "未選択"})</Typography>
             <Typography variant="body2" color="text.secondary">
               Steps for Coding and Theorization — コーダー間一致率（Cohen's κ）付き
             </Typography>
