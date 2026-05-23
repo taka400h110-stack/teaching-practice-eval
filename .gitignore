@@ -42,6 +42,7 @@ test_*.cjs
 debug_*.cjs
 take_screenshots*.cjs
 verify_prod.cjs
+mentor_*.cjs
 ss_*.png
 prod_ss_*.png
 ui_*.png

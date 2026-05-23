@@ -89,7 +89,11 @@ export default function OnboardingPage() {
 
   const STEPS = isStudent ? STUDENT_STEPS : STAFF_STEPS;
 
-  const [activeStep, setActiveStep] = useState(3);
+  // 必ず Step 0 (研究倫理同意) から開始する。
+  // 以前は useState(3) になっており、学生が BigFive アンケート画面から
+  // 開始されてしまい、研究倫理同意・プロフィール・実習情報の3ステップを
+  // スキップする重大バグがあった。
+  const [activeStep, setActiveStep] = useState(0);
 
   // ── Step 0: 倫理同意 ──
   const [consentChecks, setConsentChecks] = useState({
