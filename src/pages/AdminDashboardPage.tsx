@@ -20,6 +20,10 @@ import { useCleanupFailureAlert } from "../hooks/useCleanupFailureAlert";
 
 export default function AdminDashboardPage() {
   const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+  // SRE 用の運用監視パネル群は admin のみに表示。
+  // 研究者・研究協力者・委員会は同じ /admin を共有するが、
+  // 外部通報プロバイダや Cleanup 失敗バナーは業務外なので非表示にする。
+  const isSreAdmin = user?.role === "admin";
   const { data: alertData } = useCleanupFailureAlert();
 
   const handleDownload = async (url: string, filename: string) => {
@@ -102,8 +106,8 @@ export default function AdminDashboardPage() {
     <Box data-testid="admin-dashboard-root" sx={{ maxWidth: "100vw", overflowX: "hidden" }}>
       <Typography variant="h5" fontWeight="bold" mb={3}>管理者ダッシュボード</Typography>
 
-      {/* Cleanup Alert Banner */}
-      {alertData && (
+      {/* Cleanup Alert Banner — SRE admin 専用 */}
+      {isSreAdmin && alertData && (
         <CleanupFailureAlertBanner alert={alertData as any} adminUserId={user?.id || "unknown"} />
       )}
 
@@ -128,10 +132,15 @@ export default function AdminDashboardPage() {
         システム稼働中 — 最終同期: {new Date().toLocaleString("ja-JP")}
       </Alert>
 
-            <CleanupMetricsPanel />
-      <ProviderHealthPanel />
-        <DeliveryAnalyticsPanel />
-        <AlertHistoryPanel />
+      {/* SRE 専用パネル群 — admin 以外は非表示 */}
+      {isSreAdmin && (
+        <>
+          <CleanupMetricsPanel />
+          <ProviderHealthPanel />
+          <DeliveryAnalyticsPanel />
+          <AlertHistoryPanel />
+        </>
+      )}
       <Box sx={{ mt: 4 }} />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
         <Tab label="学校種別統計" />
