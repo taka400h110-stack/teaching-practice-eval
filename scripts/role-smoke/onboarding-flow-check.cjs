@@ -1,7 +1,8 @@
 // 学生のオンボーディング全ステップを通しで検証
-// Step0 倫理同意 → Step1 プロフィール → Step2 実習情報 → Step3 BigFive → Step4 目標 → Step5 完了 → /dashboard
+// Step0 プロフィール → Step1 実習情報 → Step2 BigFive → Step3 SMART → Step4 完了 → /dashboard
+// 備考: 研究倫理同意はシステム外で別途取得するため、オンボーディングからは除外されている。
 const { chromium } = require('playwright');
-const BASE = 'http://localhost:3000';
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 
 (async () => {
   const browser = await chromium.launch();
@@ -26,32 +27,16 @@ const BASE = 'http://localhost:3000';
   await page.waitForURL(/\/onboarding/, { timeout: 15000 });
   await page.waitForTimeout(2000);
 
+  // Step0: プロフィール設定
   const step0 = await page.evaluate(() => ({
     url: location.pathname,
     activeStep: Array.from(document.querySelectorAll('.MuiStepLabel-label.Mui-active')).map(e => e.textContent?.trim()).join(','),
-    consentVisible: document.body.innerText.includes('研究参加同意書'),
-  }));
-  console.log(`Step0: アクティブ=${step0.activeStep} | 同意書=${step0.consentVisible ? '✅' : '❌'}`);
-
-  // Step0: 5つのチェックボックスを全てON
-  const checkboxes = await page.locator('input[type="checkbox"]').all();
-  console.log(`  チェックボックス数: ${checkboxes.length}`);
-  for (const cb of checkboxes) await cb.check();
-  await page.waitForTimeout(500);
-
-  // 「次へ」押下
-  await page.locator('button', { hasText: '次へ' }).click();
-  await page.waitForTimeout(1500);
-
-  const step1 = await page.evaluate(() => ({
-    activeStep: Array.from(document.querySelectorAll('.MuiStepLabel-label.Mui-active')).map(e => e.textContent?.trim()).join(','),
     hasStudentId: !!Array.from(document.querySelectorAll('label')).find(l => l.textContent?.includes('学籍番号')),
   }));
-  console.log(`Step1: アクティブ=${step1.activeStep} | 学籍番号フィールド=${step1.hasStudentId ? '✅' : '❌'}`);
+  console.log(`Step0: アクティブ=${step0.activeStep} | 学籍番号フィールド=${step0.hasStudentId ? '✅' : '❌'}`);
 
-  // 学籍番号と氏名を入力 (プレースホルダで識別)
+  // 学籍番号と氏名を入力
   await page.locator('input[placeholder*="2024A001"]').fill('2024TEST001');
-  // 氏名は実名フィールド (required かつ helper に「実名」を含む)
   const nameField = page.locator('input[required]').nth(1);
   await nameField.fill('テスト 太郎');
   await page.waitForTimeout(500);
@@ -59,40 +44,43 @@ const BASE = 'http://localhost:3000';
   await page.locator('button', { hasText: '次へ' }).click();
   await page.waitForTimeout(1500);
 
-  const step2 = await page.evaluate(() => ({
+  // Step1: 実習情報
+  const step1 = await page.evaluate(() => ({
     activeStep: Array.from(document.querySelectorAll('.MuiStepLabel-label.Mui-active')).map(e => e.textContent?.trim()).join(','),
     hasSchoolType: !!Array.from(document.querySelectorAll('label')).find(l => l.textContent?.includes('実習校種別')),
   }));
-  console.log(`Step2: アクティブ=${step2.activeStep} | 実習校種別=${step2.hasSchoolType ? '✅' : '❌'}`);
+  console.log(`Step1: アクティブ=${step1.activeStep} | 実習校種別=${step1.hasSchoolType ? '✅' : '❌'}`);
 
   await page.locator('button', { hasText: '次へ' }).click();
   await page.waitForTimeout(1500);
 
-  const step3 = await page.evaluate(() => ({
+  // Step2: BigFive
+  const step2 = await page.evaluate(() => ({
     activeStep: Array.from(document.querySelectorAll('.MuiStepLabel-label.Mui-active')).map(e => e.textContent?.trim()).join(','),
     hasBigFive: document.body.innerText.includes('BigFive') || document.body.innerText.includes('並川'),
     sliderCount: document.querySelectorAll('[role="slider"]').length,
   }));
-  console.log(`Step3: アクティブ=${step3.activeStep} | BigFive=${step3.hasBigFive ? '✅' : '❌'} | スライダー数=${step3.sliderCount}`);
+  console.log(`Step2: アクティブ=${step2.activeStep} | BigFive=${step2.hasBigFive ? '✅' : '❌'} | スライダー数=${step2.sliderCount}`);
 
   await page.locator('button', { hasText: '次へ' }).click();
   await page.waitForTimeout(1500);
 
-  const step4 = await page.evaluate(() => ({
+  // Step3: SMART
+  const step3 = await page.evaluate(() => ({
     activeStep: Array.from(document.querySelectorAll('.MuiStepLabel-label.Mui-active')).map(e => e.textContent?.trim()).join(','),
     hasSmart: document.body.innerText.includes('SMART'),
   }));
-  console.log(`Step4: アクティブ=${step4.activeStep} | SMART目標=${step4.hasSmart ? '✅' : '❌'}`);
+  console.log(`Step3: アクティブ=${step3.activeStep} | SMART目標=${step3.hasSmart ? '✅' : '❌'}`);
 
   await page.locator('button', { hasText: '次へ' }).click();
   await page.waitForTimeout(1500);
 
-  const step5 = await page.evaluate(() => ({
+  // Step4: 完了
+  const step4 = await page.evaluate(() => ({
     activeStep: Array.from(document.querySelectorAll('.MuiStepLabel-label.Mui-active')).map(e => e.textContent?.trim()).join(','),
     completeVisible: document.body.innerText.includes('設定完了'),
-    buttonText: document.querySelector('button[type="button"]:not([disabled])')?.textContent?.trim(),
   }));
-  console.log(`Step5: アクティブ=${step5.activeStep} | 完了画面=${step5.completeVisible ? '✅' : '❌'}`);
+  console.log(`Step4: アクティブ=${step4.activeStep} | 完了画面=${step4.completeVisible ? '✅' : '❌'}`);
 
   // 「ダッシュボードへ」をクリック
   await page.locator('button', { hasText: 'ダッシュボードへ' }).click();
@@ -114,4 +102,5 @@ const BASE = 'http://localhost:3000';
 
   await context.close();
   await browser.close();
+  process.exit(issues.length > 0 ? 1 : 0);
 })();

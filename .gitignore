@@ -50,3 +50,5 @@ screenshot_results*.json
 
 # 本番投入済みデモシード SQL (内容は demo_seed_prod.sql として保持するが必要に応じて除外)
 # demo_seed_prod.sql は repo に含めて構わないため除外しない
+playwright-report/
+test-results/

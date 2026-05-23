@@ -32,7 +32,7 @@ const AdvancedAnalyticsPage: React.FC = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" component="h1" gutterBottom>
         Advanced Analytics
       </Typography>
 

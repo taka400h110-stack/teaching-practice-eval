@@ -68,7 +68,7 @@ const ROLES = [
           pendingOnboarding: localStorage.getItem('pending_onboarding'),
           // オンボーディングが表示されているなら最初のステップの中身を取得
           stepLabel: Array.from(document.querySelectorAll('.MuiStepLabel-label.Mui-active')).map(e => e.textContent?.trim()),
-          consentVisible: document.body.innerText.includes('研究参加同意書'),
+          profileVisible: document.body.innerText.includes('あなたの基本情報') || document.body.innerText.includes('プロフィール設定'),
         };
       });
 
@@ -79,7 +79,7 @@ const ROLES = [
       console.log(`  ダッシュボード画面: ${result.hasDashboardRoot ? 'あり' : 'なし'}`);
       if (result.hasOnboardingRoot) {
         console.log(`  アクティブステップ: ${result.stepLabel.join(', ') || '(取得不可)'}`);
-        console.log(`  研究参加同意書表示: ${result.consentVisible ? '✅' : '⚠️ 表示されていない'}`);
+        console.log(`  プロフィール入力欄表示: ${result.profileVisible ? '✅' : '⚠️ 表示されていない'}`);
       }
       console.log(`  期待: ${t.expectsOnboarding ? 'オンボーディング画面' : 'ダッシュボード'}`);
       const expectMatch = t.expectsOnboarding ? result.hasOnboardingRoot : result.hasDashboardRoot;

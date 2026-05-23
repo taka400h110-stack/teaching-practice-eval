@@ -3,33 +3,32 @@
  * 初回ログイン時の基本情報入力（役割別ステップ）
  *
  * 【学生（student）】
- *   Step0: 研究倫理同意
- *   Step1: プロフィール（氏名・性別・学年・学籍番号）
- *   Step2: 実習情報（校種・実習形態・週数・学校名・指導教員）
- *   Step3: BigFive パーソナリティ測定
- *   Step4: 目標設定（SMART）
- *   Step5: 完了
+ *   Step0: プロフィール（氏名・性別・学年・学籍番号）
+ *   Step1: 実習情報（校種・実習形態・週数・学校名・指導教員）
+ *   Step2: BigFive パーソナリティ測定
+ *   Step3: 目標設定（SMART）
+ *   Step4: 完了
  *
  * 【学生以外の全役割】
- *   Step0: 研究倫理同意
- *   Step1: プロフィール（氏名・所属機関・役職）
- *   Step2: 完了
+ *   Step0: プロフィール（氏名・所属機関・役職）
+ *   Step1: 完了
+ *
+ * 備考: 研究倫理同意はシステム外で別途取得するため、本オンボーディングからは除外。
  */
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Button, Card, CardContent, Chip, Step, StepLabel, Stepper,
   TextField, Typography, FormControl, InputLabel, Select, MenuItem,
-  Alert, Slider, LinearProgress, Checkbox, FormControlLabel,
-  Table, TableBody, TableCell, TableHead, TableRow, Paper,
+  Alert, Slider, LinearProgress, Paper,
   Accordion, AccordionSummary, AccordionDetails, Divider,
+  Table, TableBody, TableCell, TableHead, TableRow,
 } from "@mui/material";
 import SchoolIcon          from "@mui/icons-material/School";
 import PersonIcon          from "@mui/icons-material/Person";
 import CheckCircleIcon     from "@mui/icons-material/CheckCircle";
 import KeyboardArrowLeft   from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardArrowRight  from "@mui/icons-material/KeyboardArrowRight";
-import GavelIcon           from "@mui/icons-material/Gavel";
 import PsychologyIcon      from "@mui/icons-material/Psychology";
 import TrackChangesIcon    from "@mui/icons-material/TrackChanges";
 import ExpandMoreIcon      from "@mui/icons-material/ExpandMore";
@@ -52,7 +51,6 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 // ── 学生用ステップ ──
 const STUDENT_STEPS = [
-  "研究倫理同意",
   "プロフィール設定",
   "実習情報入力",
   "性格特性アンケート（並川ら, 2012）",
@@ -62,22 +60,12 @@ const STUDENT_STEPS = [
 
 // ── 学生以外用ステップ ──
 const STAFF_STEPS = [
-  "研究倫理同意",
   "プロフィール設定",
   "完了",
 ];
 
 import { NAMIKAWA_29_ITEMS, BIG_FIVE_FACTORS, LIKERT_5_MARKS } from "../constants/bigFive";
 
-
-// 同意確認項目（全役割共通）
-const CONSENT_ITEMS = [
-  { key: "purpose"   as const, label: "研究の目的・内容について説明を受け、理解しました" },
-  { key: "voluntary" as const, label: "参加は自由意志であり、辞退しても不利益を被らないことを理解しました" },
-  { key: "privacy"   as const, label: "個人情報は匿名化処理され、研究目的以外に使用されないことを理解しました" },
-  { key: "withdraw"  as const, label: "研究期間中いつでも参加を撤回できることを理解しました" },
-  { key: "storage"   as const, label: "データは研究終了後5年間保管されることを理解しました" },
-];
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
@@ -89,47 +77,36 @@ export default function OnboardingPage() {
 
   const STEPS = isStudent ? STUDENT_STEPS : STAFF_STEPS;
 
-  // 必ず Step 0 (研究倫理同意) から開始する。
-  // 以前は useState(3) になっており、学生が BigFive アンケート画面から
-  // 開始されてしまい、研究倫理同意・プロフィール・実習情報の3ステップを
-  // スキップする重大バグがあった。
+  // 必ず Step 0 (プロフィール設定) から開始する。
   const [activeStep, setActiveStep] = useState(0);
 
-  // ── Step 0: 倫理同意 ──
-  const [consentChecks, setConsentChecks] = useState({
-    purpose: false, voluntary: false, privacy: false, withdraw: false, storage: false,
-  });
-
-  // ── Step 1 (学生): プロフィール ──
+  // ── Step 0 (学生): プロフィール ──
   const [studentProfile, setStudentProfile] = useState({
     student_id: "", name: "", grade: "2", gender: "male",
   });
 
-  // ── Step 1 (学生以外): プロフィール ──
+  // ── Step 0 (学生以外): プロフィール ──
   const [staffProfile, setStaffProfile] = useState({
     name: "", organization: "", position: "",
   });
 
-  // ── Step 2 (学生): 実習情報 ──
+  // ── Step 1 (学生): 実習情報 ──
   const [internship, setInternship] = useState({
     school_type: "elementary", internship_type: "intensive",
     weeks: "10", school_name: "", supervisor: "",
   });
 
-  // ── Step 3 (学生): BigFive ──
+  // ── Step 2 (学生): BigFive ──
   const [bigFiveScores, setBigFiveScores] = useState<Record<string, number>>(
     Object.fromEntries(NAMIKAWA_29_ITEMS.map((i) => [i.id, 3]))
   );
 
-  // ── Step 4 (学生): 目標 ──
+  // ── Step 3 (学生): 目標 ──
   const [goals, setGoals] = useState(["", "", ""]);
-
-  const allConsentChecked = Object.values(consentChecks).every(Boolean);
 
   // ── 進行可否判定 ──
   const canProceed = (): boolean => {
-    if (activeStep === 0) return allConsentChecked;
-    if (activeStep === 1) {
+    if (activeStep === 0) {
       if (isStudent) return studentProfile.name.trim() !== "" && studentProfile.student_id.trim() !== "";
       return staffProfile.name.trim() !== "";
     }
@@ -138,13 +115,13 @@ export default function OnboardingPage() {
 
   const handleNext = () => {
     const user = apiClient.getCurrentUser();
-    if (user && isStudent && activeStep === 3) {
+    if (user && isStudent && activeStep === 2) {
       bfiApi.saveResponses(user.id, bigFiveScores);
     }
     if (activeStep === STEPS.length - 1) {
       const user = apiClient.getCurrentUser();
       if (user) apiClient.completeOnboarding(user.id);
-      if (user.role === "student") {
+      if (user && user.role === "student") {
         bfiApi.saveResponses(user.id, bigFiveScores);
       }
       navigate("/dashboard");
@@ -195,7 +172,7 @@ export default function OnboardingPage() {
           <Box display="flex" alignItems="center" gap={1.5} mb={3}>
             <SchoolIcon color="primary" sx={{ fontSize: 36 }} />
             <Box>
-              <Typography variant="h5" fontWeight="bold" color="primary">初期設定</Typography>
+              <Typography variant="h5" component="h1" fontWeight="bold" color="primary">初期設定</Typography>
               <Typography variant="caption" color="text.secondary">
                 教育実習評価システム — 初回ログイン設定
                 {" "}
@@ -213,61 +190,8 @@ export default function OnboardingPage() {
             ))}
           </Stepper>
 
-          {/* ═══════════════════ Step 0: 研究倫理同意（全役割共通） ═══════════════════ */}
-          {activeStep === 0 && (
-            <Box>
-              <Box display="flex" alignItems="center" gap={1} mb={2}>
-                <GavelIcon color="warning" />
-                <Typography variant="subtitle1" fontWeight="bold">研究参加同意書</Typography>
-              </Box>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                本研究はXX大学倫理審査委員会の承認を得て実施します（承認番号：〇〇〇）。
-                以下の項目をご確認のうえ、同意される場合はチェックを入れてください。
-              </Alert>
-
-              <Accordion defaultExpanded>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="subtitle2" fontWeight="bold">研究の概要</Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8 }}>
-                    本研究は、AIを活用した教育実習評価システムの有効性を検証することを目的とします。
-                    {isStudent
-                      ? "実習生の日誌記録、AI評価結果、週次自己評価データ、チャットBot対話ログ、およびパーソナリティデータを研究データとして収集・分析します。"
-                      : "システムへのログイン履歴、入力データ（コメント・評価値等）を研究データとして収集・分析します。"}
-                    収集されたデータは匿名化処理のうえ、博士論文および学術論文の執筆に使用されます。
-                  </Typography>
-                </AccordionDetails>
-              </Accordion>
-
-              <Box sx={{ mt: 2, p: 2, bgcolor: "grey.50", borderRadius: 2 }}>
-                <Typography variant="subtitle2" fontWeight="bold" mb={1}>同意確認事項</Typography>
-                {CONSENT_ITEMS.map(({ key, label }) => (
-                  <FormControlLabel
-                    key={key}
-                    control={
-                      <Checkbox
-                        checked={consentChecks[key]}
-                        onChange={(e) => setConsentChecks((p) => ({ ...p, [key]: e.target.checked }))}
-                        color="primary"
-                      />
-                    }
-                    label={<Typography variant="body2">{label}</Typography>}
-                    sx={{ display: "block", mb: 0.5 }}
-                  />
-                ))}
-              </Box>
-
-              {!allConsentChecked && (
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  すべての項目に同意していただく必要があります。
-                </Alert>
-              )}
-            </Box>
-          )}
-
-          {/* ═══════════════════ Step 1: プロフィール（学生） ═══════════════════ */}
-          {activeStep === 1 && isStudent && (
+          {/* ═══════════════════ Step 0: プロフィール（学生） ═══════════════════ */}
+          {activeStep === 0 && isStudent && (
             <Box>
               <Box display="flex" alignItems="center" gap={1} mb={2}>
                 <PersonIcon color="primary" />
@@ -286,7 +210,7 @@ export default function OnboardingPage() {
                 value={studentProfile.name}
                 onChange={(e) => setStudentProfile({ ...studentProfile, name: e.target.value })}
                 fullWidth size="small" sx={{ mb: 2 }} required
-                helperText="実名で入力してください（研究データとして使用する場合は匿名化されます）"
+                helperText="実名で入力してください"
               />
               <Box display="flex" gap={2}>
                 <FormControl fullWidth size="small">
@@ -311,8 +235,8 @@ export default function OnboardingPage() {
             </Box>
           )}
 
-          {/* ═══════════════════ Step 1: プロフィール（学生以外） ═══════════════════ */}
-          {activeStep === 1 && !isStudent && (
+          {/* ═══════════════════ Step 0: プロフィール（学生以外） ═══════════════════ */}
+          {activeStep === 0 && !isStudent && (
             <Box>
               <Box display="flex" alignItems="center" gap={1} mb={2}>
                 <PersonIcon color="secondary" />
@@ -361,8 +285,8 @@ export default function OnboardingPage() {
             </Box>
           )}
 
-          {/* ═══════════════════ Step 2 (学生): 実習情報 ═══════════════════ */}
-          {activeStep === 2 && isStudent && (
+          {/* ═══════════════════ Step 1 (学生): 実習情報 ═══════════════════ */}
+          {activeStep === 1 && isStudent && (
             <Box>
               <Box display="flex" alignItems="center" gap={1} mb={2}>
                 <SchoolIcon color="primary" />
@@ -413,8 +337,8 @@ export default function OnboardingPage() {
             </Box>
           )}
 
-          {/* ═══════════════════ Step 3 (学生): BigFive ═══════════════════ */}
-          {activeStep === 3 && isStudent && (
+          {/* ═══════════════════ Step 2 (学生): BigFive ═══════════════════ */}
+          {activeStep === 2 && isStudent && (
             <Box>
               <Box display="flex" alignItems="center" gap={1} mb={1}>
                 <PsychologyIcon color="secondary" />
@@ -423,7 +347,7 @@ export default function OnboardingPage() {
                 </Typography>
               </Box>
               <Paper sx={{ p: 2, mb: 2, bgcolor: "info.50", borderLeft: "4px solid #0288d1" }}>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>性格に合ったフィードバックができるようにするために行うために必要な調査です。ご協力をお願いします。。</Typography>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>性格に合ったフィードバックができるようにするために必要な調査です。ご協力をお願いします。</Typography>
                 <Typography variant="body2"><b>【出典・根拠】</b>並川ら（2012）のBigFive尺度短縮版を用いて行う。5段階リッカート（1＝全くそう思わない〜5＝強くそう思う）。逆転項目は【逆転項目】と明記。</Typography>
               </Paper>
               <Alert severity="info" sx={{ mb: 2 }}>
@@ -510,8 +434,8 @@ export default function OnboardingPage() {
             </Box>
           )}
 
-          {/* ═══════════════════ Step 4 (学生): 目標設定 ═══════════════════ */}
-          {activeStep === 4 && isStudent && (
+          {/* ═══════════════════ Step 3 (学生): 目標設定 ═══════════════════ */}
+          {activeStep === 3 && isStudent && (
             <Box>
               <Box display="flex" alignItems="center" gap={1} mb={1}>
                 <TrackChangesIcon color="success" />
@@ -544,7 +468,7 @@ export default function OnboardingPage() {
             </Box>
           )}
 
-          {/* ═══════════════════ 完了ステップ（学生: Step5 / 学生以外: Step2） ═══════════════════ */}
+          {/* ═══════════════════ 完了ステップ（学生: Step4 / 学生以外: Step1） ═══════════════════ */}
           {activeStep === STEPS.length - 1 && (
             <Box textAlign="center" py={2}>
               <CheckCircleIcon sx={{ fontSize: 72, color: "success.main", mb: 2 }} />
@@ -558,11 +482,11 @@ export default function OnboardingPage() {
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, justifyContent: "center", mb: 2 }}>
                 {completionChips.filter(Boolean)}
               </Box>
-              <Alert severity="info">
-                {isStudent
-                  ? "BigFiveデータは保存されました。研究分析（RQ3）に使用されます。倫理同意書は電子記録として保管されます。"
-                  : "倫理同意書は電子記録として保管されます。"}
-              </Alert>
+              {isStudent && (
+                <Alert severity="info">
+                  BigFiveデータは保存されました。研究分析に使用されます。
+                </Alert>
+              )}
             </Box>
           )}
 
@@ -581,7 +505,7 @@ export default function OnboardingPage() {
               onClick={handleNext}
               disabled={!canProceed()}
               endIcon={activeStep < STEPS.length - 1 ? <KeyboardArrowRight /> : undefined}
-              color={activeStep === 0 && !allConsentChecked ? "inherit" : "primary"}
+              color="primary"
             >
               {activeStep === STEPS.length - 1 ? "ダッシュボードへ" : "次へ"}
             </Button>

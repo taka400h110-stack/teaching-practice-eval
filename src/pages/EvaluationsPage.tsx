@@ -125,7 +125,7 @@ export default function EvaluationsPage() {
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" gap={1} mb={3}>
         <AssessmentIcon color="primary" />
-        <Typography variant="h5" fontWeight={700}>評価一覧</Typography>
+        <Typography variant="h5" component="h1" fontWeight={700}>評価一覧</Typography>
         <Chip label={`${evalResults.length}件`} size="small" color="primary" />
       </Box>
 
