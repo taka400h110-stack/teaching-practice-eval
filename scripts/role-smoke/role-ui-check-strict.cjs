@@ -2,7 +2,7 @@
 // 検出対象: console.error / console.warn / pageerror / API 4xx・5xx / 画面の空レンダ
 const { chromium } = require('playwright');
 
-const BASE = 'http://localhost:3000';
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 
 const ROLE_PATHS = {
   student: {

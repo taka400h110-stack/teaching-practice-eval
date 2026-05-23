@@ -4,7 +4,7 @@
 // - エラーバナーらしき要素の検出
 const { chromium } = require('playwright');
 
-const BASE = 'http://localhost:3000';
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 
 const TARGETS = [
   { role: 'student', email: 'student@teaching-eval.jp', label: '教育実習生', path: '/dashboard' },
