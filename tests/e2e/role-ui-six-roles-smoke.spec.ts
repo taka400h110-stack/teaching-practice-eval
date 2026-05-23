@@ -225,9 +225,10 @@ test.describe('Six-role UI smoke - 主要 6 ロール × 主要画面巡回', ()
 
 test.describe('Six-role initial login flow - 初回ログイン挙動', () => {
   // localStorage が空の状態で /login から実際にログインし、
-  // - 学生は /onboarding (Step0 = 研究倫理同意) に遷移
+  // - 学生は /onboarding (Step0 = プロフィール設定) に遷移
   // - その他は各自のダッシュボードに直行
   // することを検証
+  // 研究倫理同意はシステム外で別途取得するためオンボーディングからは除外。
 
   const FLOW_CASES = [
     {
@@ -235,7 +236,7 @@ test.describe('Six-role initial login flow - 初回ログイン挙動', () => {
       label: '教育実習生',
       email: 'student@teaching-eval.jp',
       expectUrl: /\/onboarding/,
-      expectText: '研究参加同意書',
+      expectText: 'あなたの基本情報',
     },
     {
       role: 'univ_teacher',
