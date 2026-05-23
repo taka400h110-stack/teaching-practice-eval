@@ -33,7 +33,7 @@ export default function TeacherDashboardPage() {
 
   return (
     <Box data-testid="teacher-dashboard-root" sx={{ maxWidth: "100vw", overflowX: "hidden" }}>
-      <Typography variant="h5" fontWeight="bold" mb={3}>教員ダッシュボード</Typography>
+      <Typography variant="h5" component="h1" fontWeight="bold" mb={3}>教員ダッシュボード</Typography>
 
       {/* サマリ */}
       <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>

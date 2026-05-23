@@ -54,7 +54,7 @@ export default function ExportsPage() {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4">Data Exports</Typography>
+        <Typography variant="h4" component="h1">Data Exports</Typography>
         <Button 
           variant="contained" 
           startIcon={<AddIcon />}

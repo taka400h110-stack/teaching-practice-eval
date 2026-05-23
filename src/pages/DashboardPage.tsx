@@ -127,7 +127,7 @@ export default function DashboardPage() {
         }}
       >
         <Box>
-          <Typography variant="h6" fontWeight="bold">
+          <Typography variant="h6" component="h1" fontWeight="bold">
             おかえりなさい、{user?.name ?? "ユーザー"} さん
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.85 }}>

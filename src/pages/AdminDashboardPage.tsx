@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
 
   return (
     <Box data-testid="admin-dashboard-root" sx={{ maxWidth: "100vw", overflowX: "hidden" }}>
-      <Typography variant="h5" fontWeight="bold" mb={3}>管理者ダッシュボード</Typography>
+      <Typography variant="h5" component="h1" fontWeight="bold" mb={3}>管理者ダッシュボード</Typography>
 
       {/* Cleanup Alert Banner — SRE admin 専用 */}
       {isSreAdmin && alertData && (

@@ -234,7 +234,7 @@ export default function StatisticsPage() {
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" gap={1} mb={3} flexWrap="wrap">
         <EqualizerIcon color="primary" />
-        <Typography variant="h5" fontWeight={700}>統計ダッシュボード</Typography>
+        <Typography variant="h5" component="h1" fontWeight={700}>統計ダッシュボード</Typography>
         <Chip label={`N = ${cohorts.length}`} size="small" color="primary" />
         <Box sx={{ ml: "auto" }}>
           <Tooltip title="研究用データをエクスポート（研究者・管理者のみ）">
