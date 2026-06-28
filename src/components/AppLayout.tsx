@@ -107,6 +107,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
         group: "実習生指導",
         items: [
           { label: "提出された日誌一覧", path: "/journals", icon: <GroupsIcon /> },
+          { label: "学生別 AI対話ログ", path: "/student-chat-logs", icon: <ChatIcon /> },
         ],
       },
       {
@@ -155,6 +156,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "SCAT時系列分析", path: "/scat-timeline", icon: <DescriptionIcon /> },
           { label: "統計サマリー", path: "/statistics", icon: <AnalyticsIcon /> },
           { label: "高度分析 (Beta)", path: "/advanced-analytics", icon: <InsightsIcon /> },
+          { label: "学生別 AI対話ログ", path: "/student-chat-logs", icon: <ChatIcon /> },
         ],
       },
       {
@@ -185,6 +187,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
           { label: "エクスポート承認管理", path: "/admin/exports", icon: <VerifiedUserIcon /> },
           { label: "過去日誌の取り込み", path: "/research/journal-import", icon: <CloudUploadIcon /> },
           { label: "データエクスポート", path: "/exports", icon: <DownloadIcon /> },
+          { label: "学生別 AI対話ログ", path: "/student-chat-logs", icon: <ChatIcon /> },
 
         ],
       },

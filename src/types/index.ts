@@ -184,11 +184,20 @@ export interface ChatMessage {
 }
 
 export interface ChatSession {
-  id:          string;
-  journal_id:  string;
-  phase:       ChatPhase;
-  messages:    ChatMessage[];
-  created_at:  string;
+  id:             string;
+  journal_id:     string;
+  phase:          ChatPhase | string;
+  messages:       ChatMessage[];
+  created_at:     string;
+  // 閲覧UI用（一覧エンドポイントが付加）
+  student_id?:    string;
+  student_name?:  string;
+  student_email?: string;
+  message_count?: number;
+  total_turns?:   number;
+  current_state?: string;
+  phase_reached?: string;
+  updated_at?:    string;
 }
 
 // ──────────────────────────────────────────────

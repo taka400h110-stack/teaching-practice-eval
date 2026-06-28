@@ -2662,13 +2662,27 @@ dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", 
     if (!session) return c.json({ error: "見つかりません" }, 404);
     
     const messages = await db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY message_order ASC").bind((session as any)?.id).all();
-    
+    const s = session as any;
+    const mapped = (messages.results || []).map((m: any) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      phase: m.phase,
+      reflection_depth: m.reflection_depth,
+      timestamp: m.created_at,
+    }));
+
     return c.json({
-      id: (session as any)?.id,
-      journal_id: (session as any)?.journal_id,
-      student_id: (session as any)?.student_id,
-      phase: (session as any)?.phase,
-      messages: messages.results || []
+      id: s?.id,
+      journal_id: s?.journal_id,
+      student_id: s?.student_id,
+      // 実テーブルは current_state / phase_reached（phase列は無い）
+      phase: s?.current_state || s?.phase_reached || "phase1",
+      current_state: s?.current_state,
+      phase_reached: s?.phase_reached,
+      total_turns: s?.total_turns,
+      created_at: s?.created_at,
+      messages: mapped
     });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -2678,38 +2692,53 @@ dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", 
 dataRouter.post("/chat-sessions/:journalId/messages", requireRoles(["student"] as UserRole[]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 503);
-  
+
+  const jwtUser = c.get("user") as any;
   const journalId = c.req.param("journalId");
   const body = await c.req.json();
-  
+
+  // role / content は必須。role は user(=学生) / assistant(=生成AI) のみ許可。
+  const role = body.role === "assistant" ? "assistant" : body.role === "user" ? "user" : null;
+  if (!role || typeof body.content !== "string" || body.content.trim() === "") {
+    return c.json({ error: "role(user|assistant) と content は必須です" }, 400);
+  }
+  // student_id は JWT を信頼源とする (なりすまし防止)。
+  const studentId = jwtUser?.id || body.student_id || "user-001";
+  const phase = typeof body.phase === "string" && body.phase ? body.phase : "phase1";
+
   try {
-    // Session取得か作成
+    // Session取得か作成。1日誌=1セッション。
     let session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
     if (!session) {
-      const sessionId = "chat-" + Date.now();
-      await db.prepare("INSERT INTO chat_sessions (id, journal_id, student_id, phase, created_at) VALUES (?, ?, ?, ?, ?)")
-        .bind(sessionId, journalId, body.student_id || "user-001", "phase1", new Date().toISOString())
-        .run();
+      const sessionId = "chat-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+      // 実スキーマ: current_state / phase_reached を使用 (phase カラムは存在しない)
+      await db.prepare(
+        "INSERT INTO chat_sessions (id, journal_id, student_id, current_state, phase_reached, total_turns, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))"
+      ).bind(sessionId, journalId, studentId, phase, phase).run();
       session = await db.prepare("SELECT * FROM chat_sessions WHERE id = ?").bind(sessionId).first();
     }
-    
-    // メッセージ挿入
-    const msgId = "msg-" + Date.now();
-    const order = await db.prepare("SELECT COUNT(*) as c FROM chat_messages WHERE session_id = ?").bind((session as any)?.id).first();
-    
+
+    const sid = (session as any)?.id;
+
+    // メッセージ挿入 (message_order は現在の件数+1)
+    const msgId = "msg-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+    const order = await db.prepare("SELECT COUNT(*) as c FROM chat_messages WHERE session_id = ?").bind(sid).first();
+    const nextOrder = ((order as any)?.c || 0) + 1;
+
     await db.prepare(`
-      INSERT INTO chat_messages (id, session_id, role, content, message_order, phase, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO chat_messages (id, session_id, message_order, phase, role, content, reflection_depth, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).bind(
-      msgId, (session as any)?.id, body.role, body.content, ((order as any)?.c || 0) + 1, (session as any)?.phase, new Date().toISOString()
+      msgId, sid, nextOrder, phase, role, body.content,
+      typeof body.reflection_depth === "number" ? body.reflection_depth : null
     ).run();
-    
-    // セッション更新（必要なら）
-    if (body.phase && body.phase !== (session as any)?.phase) {
-      await db.prepare("UPDATE chat_sessions SET phase = ? WHERE id = ?").bind(body.phase, (session as any)?.id).run();
-    }
-    
-    return c.json({ success: true, message_id: msgId });
+
+    // セッション集計更新 (turn 数 / phase / RD 最大値)。total_turns は assistant 応答完了を1ターンとみなし user/assistant 両方で加算。
+    await db.prepare(
+      "UPDATE chat_sessions SET total_turns = total_turns + 1, current_state = ?, phase_reached = ?, max_rd_chat_level = MAX(max_rd_chat_level, ?), updated_at = datetime('now') WHERE id = ?"
+    ).bind(phase, phase, typeof body.reflection_depth === "number" ? body.reflection_depth : 0, sid).run();
+
+    return c.json({ success: true, message_id: msgId, session_id: sid });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -2750,22 +2779,34 @@ dataRouter.get("/chat-sessions", requireRoles(["student", "teacher", "univ_teach
   const studentId = c.req.query("student_id");
   try {
     let sessions;
-    
-    // For students, enforce their own ID
+
+    // 学生は自分のセッションのみ（JWTのidを強制）
     let targetStudentId = studentId;
     if (user.role === "student") {
       targetStudentId = user.id;
     }
-    
+
+    // 各セッションに学生名・メッセージ数を付加して返す
+    const baseSelect = `
+      SELECT cs.*,
+             u.name  AS student_name,
+             u.email AS student_email,
+             (SELECT COUNT(*) FROM chat_messages cm WHERE cm.session_id = cs.id) AS message_count
+      FROM chat_sessions cs
+      LEFT JOIN users u ON u.id = cs.student_id
+    `;
+
     if (targetStudentId) {
-      // Access check? For simplicity, if they specify an ID, they should have access (handled elsewhere or assume they just query their own)
-      sessions = await db.prepare("SELECT * FROM chat_sessions WHERE student_id = ? ORDER BY created_at DESC").bind(targetStudentId).all();
+      // 指定学生（または学生本人）のセッション
+      sessions = await db.prepare(
+        `${baseSelect} WHERE cs.student_id = ? ORDER BY cs.updated_at DESC, cs.created_at DESC`
+      ).bind(targetStudentId).all();
     } else {
-      // Only researchers/admins should be able to get ALL sessions without student_id
-      if (['student', 'teacher', 'univ_teacher', 'school_mentor'].includes(user.role)) {
-        return c.json({ error: 'student_id is required' }, 400);
-      }
-      sessions = await db.prepare("SELECT * FROM chat_sessions ORDER BY created_at DESC").all();
+      // student_id 未指定で全件取得できるのは特権ロールのみ
+      // 教員・メンター・研究者・管理者・委員会は全学生のログを閲覧可能
+      sessions = await db.prepare(
+        `${baseSelect} ORDER BY cs.student_id ASC, cs.updated_at DESC, cs.created_at DESC`
+      ).all();
     }
     return c.json({ sessions: sessions.results || [] });
   } catch (err) {

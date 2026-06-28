@@ -40,6 +40,7 @@ const AdvancedAnalyticsPage   = lazy(() => import("./pages/AdvancedAnalyticsPage
 const SelfEvaluationPage      = lazy(() => import("./pages/SelfEvaluationPage"));
 const GoalHistoryPage         = lazy(() => import("./pages/GoalHistoryPage"));
 const ChatBotPage             = lazy(() => import("./pages/ChatBotPage"));
+const StudentChatLogsPage     = lazy(() => import("./pages/StudentChatLogsPage"));
 // ユーザー登録
 const UserRegistrationPage    = lazy(() => import("./pages/UserRegistrationPage"));
 // Analysis Pages
@@ -186,6 +187,9 @@ export default function App() {
           <Route path="self-evaluation"   element={<PrivateRoute allowedRoles={["student"]}><SelfEvaluationPage /></PrivateRoute>} />
           <Route path="goals"             element={<PrivateRoute allowedRoles={["student"]}><GoalHistoryPage /></PrivateRoute>} />
           <Route path="chat"              element={<PrivateRoute allowedRoles={["student"]}><ChatBotPage /></PrivateRoute>} />
+
+          {/* 学生別 AI対話ログ閲覧（他ロール向け） */}
+          <Route path="student-chat-logs" element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><StudentChatLogsPage /></PrivateRoute>} />
 
           {/* ユーザー登録 */}
           <Route path="register"          element={<PrivateRoute allowedRoles={["admin"]}><UserRegistrationPage /></PrivateRoute>} />
