@@ -1,6 +1,41 @@
 // @ts-nocheck
 import { UserRole } from "../../types";
 import { applyAnonymization } from "../services/anonymization";
+import { getFactorKeyByItemNum, RUBRIC_ITEMS } from "../../constants/rubric";
+
+/**
+ * 6因子40項目ルーブリックに基づき、AI/人間評価のitem配列から
+ * 総合スコア・各因子平均（factor1〜factor6）・評価済み項目数を算出する。
+ * 因子割り当ては getFactorKeyByItemNum で項目番号から決定する。
+ */
+function computeFactorAverages(
+  items: Array<{ item_number: number; score?: number | null; is_na?: boolean }>,
+) {
+  const buckets: Record<string, number[]> = {
+    factor1: [], factor2: [], factor3: [], factor4: [], factor5: [], factor6: [],
+  };
+  for (const it of items) {
+    if (it.is_na || it.score == null || !it.score) continue;
+    const fk = getFactorKeyByItemNum(it.item_number);
+    buckets[fk].push(it.score as number);
+  }
+  const avg = (arr: number[]) =>
+    arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
+  const all = ([] as number[]).concat(
+    buckets.factor1, buckets.factor2, buckets.factor3,
+    buckets.factor4, buckets.factor5, buckets.factor6,
+  );
+  return {
+    total: avg(all) ?? 0,
+    f1: avg(buckets.factor1),
+    f2: avg(buckets.factor2),
+    f3: avg(buckets.factor3),
+    f4: avg(buckets.factor4),
+    f5: avg(buckets.factor5),
+    f6: avg(buckets.factor6),
+    evaluatedCount: all.length,
+  };
+}
 
 /**
  * src/api/routes/data.ts
@@ -106,6 +141,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       factor2_score REAL,
       factor3_score REAL,
       factor4_score REAL,
+      factor5_score REAL,
+      factor6_score REAL,
       overall_comment TEXT,
       reasoning TEXT,
       halo_effect_detected INTEGER DEFAULT 0,
@@ -136,6 +173,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       factor2_score REAL,
       factor3_score REAL,
       factor4_score REAL,
+      factor5_score REAL,
+      factor6_score REAL,
       comment TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (journal_id) REFERENCES journal_entries(id)
@@ -172,6 +211,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       factor2_score REAL,
       factor3_score REAL,
       factor4_score REAL,
+      factor5_score REAL,
+      factor6_score REAL,
       total_score REAL,
       rd_journal_level INTEGER,
       comment TEXT,
@@ -329,6 +370,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       factor2_score REAL,
       factor3_score REAL,
       factor4_score REAL,
+      factor5_score REAL,
+      factor6_score REAL,
       total_score REAL,
       rd_journal_level INTEGER,
       ga_self INTEGER DEFAULT 0,
@@ -606,24 +649,16 @@ async function runJournalAutoPipeline(
       const aiResult = JSON.parse(raw);
 
       if (aiResult.items && Array.isArray(aiResult.items)) {
-        const scoresF: Record<string, number[]> = { f1: [], f2: [], f3: [], f4: [] };
-        aiResult.items.forEach((it: any) => {
-          if (it.is_na || !it.score) return;
-          if (it.item_number <= 7) scoresF.f1.push(it.score);
-          else if (it.item_number <= 13) scoresF.f2.push(it.score);
-          else if (it.item_number <= 17) scoresF.f3.push(it.score);
-          else scoresF.f4.push(it.score);
-        });
-        const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
-        const totalScore = avg([...scoresF.f1, ...scoresF.f2, ...scoresF.f3, ...scoresF.f4]) ?? 0;
-        const f1 = avg(scoresF.f1), f2 = avg(scoresF.f2), f3 = avg(scoresF.f3), f4 = avg(scoresF.f4);
+        const fa = computeFactorAverages(aiResult.items);
+        const totalScore = fa.total;
+        const f1 = fa.f1, f2 = fa.f2, f3 = fa.f3, f4 = fa.f4, f5 = fa.f5, f6 = fa.f6;
 
         const evalId = "auto-eval-" + journalId + "-" + Date.now();
         await db.prepare(`
-          INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, overall_comment, reasoning, token_count, duration_ms, created_at)
-          VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
+          INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, overall_comment, reasoning, token_count, duration_ms, created_at)
+          VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
         `).bind(
-          evalId, journalId, "gpt-4o", "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4,
+          evalId, journalId, "gpt-4o", "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4, f5, f6,
           String((aiResult as any).overall_comment || ""),
           String(aiResult.reasoning || "")
         ).run();
@@ -1003,33 +1038,22 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
   }
 
   try {
-    const scores = { f1: [] as number[], f2: [] as number[], f3: [] as number[], f4: [] as number[] };
-    body.evaluation.items.forEach((item: any) => {
-      if (item.is_na || !item.score) return;
-      if (item.item_number <= 7) scores.f1.push(item.score);
-      else if (item.item_number <= 13) scores.f2.push(item.score);
-      else if (item.item_number <= 17) scores.f3.push(item.score);
-      else scores.f4.push(item.score);
-    });
-
-    const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
-    const allScores = [...scores.f1, ...scores.f2, ...scores.f3, ...scores.f4];
-    
-    const computedTotal = avg(allScores);
+    const fa = computeFactorAverages(body.evaluation.items);
+    const computedTotal = fa.total;
     const evalId = genId();
     
     await db.prepare(`
       INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature,
-        total_score, factor1_score, factor2_score, factor3_score, factor4_score,
+        total_score, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score,
         overall_comment, reasoning, halo_effect_detected, token_count, duration_ms, created_at)
-      VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       evalId, body.journal_id,
       body.model_name ?? "gpt-4o",
       body.prompt_version ?? "CoT-A-v1.0",
       body.temperature ?? 0.2,
       computedTotal,
-      avg(scores.f1), avg(scores.f2), avg(scores.f3), avg(scores.f4),
+      fa.f1, fa.f2, fa.f3, fa.f4, fa.f5, fa.f6,
       body.evaluation.overall_comment,
       body.evaluation.reasoning,
       body.evaluation.halo_effect_detected ? 1 : 0,
@@ -1173,17 +1197,7 @@ dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin"
   }
 
   try {
-    const scores = { f1: [] as number[], f2: [] as number[], f3: [] as number[], f4: [] as number[] };
-    body.items.forEach((item) => {
-      if (item.is_na || !item.score) return;
-      if (item.item_number <= 7) scores.f1.push(item.score);
-      else if (item.item_number <= 13) scores.f2.push(item.score);
-      else if (item.item_number <= 17) scores.f3.push(item.score);
-      else scores.f4.push(item.score);
-    });
-
-    const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
-    const allScores = [...scores.f1, ...scores.f2, ...scores.f3, ...scores.f4];
+    const fa = computeFactorAverages(body.items);
 
     // 既存の同一評価者のデータがあれば削除（アイテムも含む）
     const oldEvals = await db.prepare("SELECT id FROM human_evaluations WHERE journal_id = ? AND evaluator_id = ?").bind(body.journal_id, body.evaluator_id).all();
@@ -1197,11 +1211,11 @@ dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin"
     const id = genId();
     await db.prepare(`
       INSERT INTO human_evaluations (id, journal_id, evaluator_id, evaluator_name,
-        total_score, factor1_score, factor2_score, factor3_score, factor4_score, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        total_score, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id, body.journal_id, body.evaluator_id, body.evaluator_name,
-      avg(allScores), avg(scores.f1), avg(scores.f2), avg(scores.f3), avg(scores.f4),
+      fa.total, fa.f1, fa.f2, fa.f3, fa.f4, fa.f5, fa.f6,
       nowISO()
     ).run();
 
@@ -1280,6 +1294,8 @@ dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c
     factor2_score: number;
     factor3_score: number;
     factor4_score: number;
+    factor5_score?: number;
+    factor6_score?: number;
     rd_journal_level?: number;
     comment?: string;
   };
@@ -1289,17 +1305,24 @@ dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c
   if (validatedWeek instanceof Response) return validatedWeek;
 
   try {
-    const total = (body.factor1_score * 7 + body.factor2_score * 6 + body.factor3_score * 4 + body.factor4_score * 6) / 23;
+    // 6因子40項目 加重平均（各因子項目数 [11,8,5,7,5,4] / 40）
+    const f5 = body.factor5_score ?? 0;
+    const f6 = body.factor6_score ?? 0;
+    const total = (
+      body.factor1_score * 11 + body.factor2_score * 8 + body.factor3_score * 5 +
+      body.factor4_score * 7 + f5 * 5 + f6 * 4
+    ) / 40;
     const id = genId();
 
     await db.prepare(`
       INSERT OR REPLACE INTO self_evaluations
         (id, student_id, week_number, journal_id, factor1_score, factor2_score, factor3_score, factor4_score,
-         total_score, rd_journal_level, comment, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         factor5_score, factor6_score, total_score, rd_journal_level, comment, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id, body.student_id, validatedWeek, body.journal_id ?? null,
       body.factor1_score, body.factor2_score, body.factor3_score, body.factor4_score,
+      f5, f6,
       Math.round(total * 100) / 100,
       body.rd_journal_level ?? null, body.comment ?? null, nowISO()
     ).run();
@@ -1326,6 +1349,8 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
         AVG(e.factor2_score) as factor2,
         AVG(e.factor3_score) as factor3,
         AVG(e.factor4_score) as factor4,
+        AVG(e.factor5_score) as factor5,
+        AVG(e.factor6_score) as factor6,
         AVG(e.total_score) as ai_total,
         MAX(j.id) as journal_id
       FROM journal_entries j
@@ -1343,6 +1368,8 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
         AVG(factor2_score) as self_f2,
         AVG(factor3_score) as self_f3,
         AVG(factor4_score) as self_f4,
+        AVG(factor5_score) as self_f5,
+        AVG(factor6_score) as self_f6,
         AVG(total_score) as self_total
       FROM self_evaluations
       WHERE student_id = ?
@@ -1367,6 +1394,8 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
           factor2: row.factor2 || 0,
           factor3: row.factor3 || 0,
           factor4: row.factor4 || 0,
+          factor5: row.factor5 || 0,
+          factor6: row.factor6 || 0,
           total: row.ai_total || 0,    // 互換: total = AI 評価 (歴史的キー)
           ai_total: row.ai_total || 0,
           self_total: self ? (self.self_total || 0) : null,
@@ -1374,6 +1403,8 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
           self_factor2: self ? (self.self_f2 || 0) : null,
           self_factor3: self ? (self.self_f3 || 0) : null,
           self_factor4: self ? (self.self_f4 || 0) : null,
+          self_factor5: self ? (self.self_f5 || 0) : null,
+          self_factor6: self ? (self.self_f6 || 0) : null,
           gap: self && row.ai_total ? Math.round(((row.ai_total - (self.self_total || 0)) * 100)) / 100 : null,
           journal_id: row.journal_id || ""
         };
@@ -1561,14 +1592,14 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
     // 各学生の週次スコアを取得
     const profiles = await Promise.all(students.map(async (s: any) => {
       const scoresResult = await db.prepare(`
-        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, total_score
+        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, total_score
         FROM learning_progress_scores
         WHERE student_id = ?
         ORDER BY week_number ASC
       `).bind(s.id).all();
       const scores = scoresResult.results as any[];
 
-      // フロントは weekly_scores を { week, factor1, factor2, factor3, factor4, total } の
+      // フロントは weekly_scores を { week, factor1..factor6, total } の
       // オブジェクト配列として扱う (LongitudinalAnalysisPage / StatisticsPage 等)。
       const weeklyScores = scores.map((r: any) => ({
         week: r.week_number,
@@ -1576,6 +1607,8 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
         factor2: r.factor2_score,
         factor3: r.factor3_score,
         factor4: r.factor4_score,
+        factor5: r.factor5_score,
+        factor6: r.factor6_score,
         total: r.total_score,
       }));
       const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
@@ -1585,6 +1618,8 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
       const finalFactor2 = lastScore ? lastScore.factor2_score : 0;
       const finalFactor3 = lastScore ? lastScore.factor3_score : 0;
       const finalFactor4 = lastScore ? lastScore.factor4_score : 0;
+      const finalFactor5 = lastScore ? lastScore.factor5_score : 0;
+      const finalFactor6 = lastScore ? lastScore.factor6_score : 0;
       const growthDelta = (lastScore && firstScore)
         ? parseFloat((lastScore.total_score - firstScore.total_score).toFixed(2))
         : 0;
@@ -1614,6 +1649,8 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
         final_factor2: finalFactor2,
         final_factor3: finalFactor3,
         final_factor4: finalFactor4,
+        final_factor5: finalFactor5,
+        final_factor6: finalFactor6,
         growth_delta: growthDelta,
       };
     }));
@@ -1650,7 +1687,7 @@ dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_ment
 
     const profiles = await Promise.all(students.map(async (s: any) => {
       const scoresResult = await db.prepare(`
-        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, total_score
+        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, total_score
         FROM learning_progress_scores
         WHERE student_id = ?
         ORDER BY week_number ASC
@@ -1663,6 +1700,8 @@ dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_ment
         factor2: r.factor2_score,
         factor3: r.factor3_score,
         factor4: r.factor4_score,
+        factor5: r.factor5_score,
+        factor6: r.factor6_score,
         total: r.total_score,
       }));
       const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
@@ -1696,6 +1735,8 @@ dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_ment
         final_factor2: lastScore ? lastScore.factor2_score : 0,
         final_factor3: lastScore ? lastScore.factor3_score : 0,
         final_factor4: lastScore ? lastScore.factor4_score : 0,
+        final_factor5: lastScore ? lastScore.factor5_score : 0,
+        final_factor6: lastScore ? lastScore.factor6_score : 0,
         growth_delta: growthDelta,
       };
     }));
@@ -1790,7 +1831,7 @@ dataRouter.get("/export/evaluations-csv", requireRoles(["researcher", "admin", "
     const { results } = await db.prepare(`
       SELECT
         je.student_id, je.week_number, je.entry_date,
-        e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score,
+        e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score, e.factor5_score, e.factor6_score,
         e.halo_effect_detected, e.overall_comment, e.model_name
       FROM evaluations e
       JOIN journal_entries je ON e.journal_id = je.id
@@ -1800,7 +1841,7 @@ dataRouter.get("/export/evaluations-csv", requireRoles(["researcher", "admin", "
 
     const headers = [
       "student_id", "week_number", "entry_date",
-      "total_score", "factor1_score", "factor2_score", "factor3_score", "factor4_score",
+      "total_score", "factor1_score", "factor2_score", "factor3_score", "factor4_score", "factor5_score", "factor6_score",
       "halo_effect_detected", "overall_comment", "model_name"
     ];
 
@@ -2363,9 +2404,9 @@ dataRouter.get("/export/joint-display-csv", requireRoles(["researcher", "admin",
         ss.text_content,
         je.student_id, je.week_number, je.id as journal_id,
         e.total_score as ai_total_score,
-        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4,
+        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4, e.factor5_score as ai_f5, e.factor6_score as ai_f6,
         se.total_score as self_total_score,
-        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4
+        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4, se.factor5_score as self_f5, se.factor6_score as self_f6
       FROM scat_codes sc
       JOIN scat_segments ss ON sc.segment_id = ss.id
       LEFT JOIN journal_entries je ON ss.source_journal_id = je.id
@@ -2482,9 +2523,9 @@ dataRouter.get("/joint-display", requireRoles(["researcher", "admin", "collabora
         ss.text_content,
         je.student_id, je.week_number, je.id as journal_id,
         e.total_score as ai_total_score,
-        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4,
+        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4, e.factor5_score as ai_f5, e.factor6_score as ai_f6,
         se.total_score as self_total_score,
-        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4
+        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4, se.factor5_score as self_f5, se.factor6_score as self_f6
       FROM scat_codes sc
       JOIN scat_segments ss ON sc.segment_id = ss.id
       LEFT JOIN journal_entries je ON ss.source_journal_id = je.id
@@ -3701,7 +3742,7 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
     let evaluations: any[] = [];
     try {
       const evalRes = await db.prepare(`
-        SELECT e.id as eval_id, e.journal_id, e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score,
+        SELECT e.id as eval_id, e.journal_id, e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score, e.factor5_score, e.factor6_score,
                j.week_number, j.entry_date
         FROM evaluations e
         INNER JOIN journals j ON j.id = e.journal_id
@@ -3735,20 +3776,24 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
     const avgRdScore = rdScores.length > 0 ? rdScores.reduce((s, v) => s + v, 0) / rdScores.length : 0;
 
     // ⑤ AI評価4因子平均
-    const factorAverages: Record<string, number> = { f1: 0, f2: 0, f3: 0, f4: 0 };
+    const factorAverages: Record<string, number> = { f1: 0, f2: 0, f3: 0, f4: 0, f5: 0, f6: 0 };
     if (evaluations.length > 0) {
-      let cnt1 = 0, cnt2 = 0, cnt3 = 0, cnt4 = 0;
-      let sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0;
+      let cnt1 = 0, cnt2 = 0, cnt3 = 0, cnt4 = 0, cnt5 = 0, cnt6 = 0;
+      let sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0, sum5 = 0, sum6 = 0;
       for (const ev of evaluations) {
         if (typeof ev.factor1_score === "number") { sum1 += ev.factor1_score; cnt1++; }
         if (typeof ev.factor2_score === "number") { sum2 += ev.factor2_score; cnt2++; }
         if (typeof ev.factor3_score === "number") { sum3 += ev.factor3_score; cnt3++; }
         if (typeof ev.factor4_score === "number") { sum4 += ev.factor4_score; cnt4++; }
+        if (typeof ev.factor5_score === "number") { sum5 += ev.factor5_score; cnt5++; }
+        if (typeof ev.factor6_score === "number") { sum6 += ev.factor6_score; cnt6++; }
       }
       factorAverages.f1 = cnt1 > 0 ? sum1 / cnt1 : 0;
       factorAverages.f2 = cnt2 > 0 ? sum2 / cnt2 : 0;
       factorAverages.f3 = cnt3 > 0 ? sum3 / cnt3 : 0;
       factorAverages.f4 = cnt4 > 0 ? sum4 / cnt4 : 0;
+      factorAverages.f5 = cnt5 > 0 ? sum5 / cnt5 : 0;
+      factorAverages.f6 = cnt6 > 0 ? sum6 / cnt6 : 0;
     }
 
     // ⑥ SCAT 直近テーマ取得 (テーブル不在も許容)
@@ -3784,7 +3829,8 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
       const allEvalRows = await db.prepare(`
         SELECT j.student_id, AVG(e.total_score) AS avg_total,
                AVG(e.factor1_score) AS avg_f1, AVG(e.factor2_score) AS avg_f2,
-               AVG(e.factor3_score) AS avg_f3, AVG(e.factor4_score) AS avg_f4
+               AVG(e.factor3_score) AS avg_f3, AVG(e.factor4_score) AS avg_f4,
+               AVG(e.factor5_score) AS avg_f5, AVG(e.factor6_score) AS avg_f6
         FROM evaluations e
         INNER JOIN journals j ON j.id = e.journal_id
         WHERE e.eval_type = 'ai'

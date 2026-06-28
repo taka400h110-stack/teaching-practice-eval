@@ -14,10 +14,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { SelfEvaluation } from "../types";
 import { computeFactorWeightedTotal } from "../utils/score";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 
-const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
-const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"];
-const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
+// 6因子40項目ルーブリックを単一の真実の源として導出
+const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
+const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key) as readonly ("factor1" | "factor2" | "factor3" | "factor4" | "factor5" | "factor6")[];
 
 const SCORE_MARKS = [
   { value: 1, label: "1" },
@@ -100,7 +102,7 @@ function MiniRadar({ scores, size = 120 }: { scores: number[]; size?: number }) 
 
 export default function SelfEvaluationPage() {
   const [scores, setScores] = useState<Record<string, number>>({
-    factor1: 3.0, factor2: 3.0, factor3: 3.0, factor4: 3.0,
+    factor1: 3.0, factor2: 3.0, factor3: 3.0, factor4: 3.0, factor5: 3.0, factor6: 3.0,
   });
   const [snack, setSnack] = useState(false);
 
@@ -114,7 +116,9 @@ export default function SelfEvaluationPage() {
   });
 
   const aiLatest = (aiGrowth?.weekly_scores ?? []).slice(-1)[0];
-  const total = computeFactorWeightedTotal(scores.factor1, scores.factor2, scores.factor3, scores.factor4);
+  const total = computeFactorWeightedTotal(
+    scores.factor1, scores.factor2, scores.factor3, scores.factor4, scores.factor5, scores.factor6,
+  );
   const historyLatest: SelfEvaluation | undefined = history[history.length - 1];
 
   const queryClient = useQueryClient();
@@ -125,6 +129,8 @@ export default function SelfEvaluationPage() {
       factor2: scores.factor2,
       factor3: scores.factor3,
       factor4: scores.factor4,
+      factor5: scores.factor5,
+      factor6: scores.factor6,
       total,
     }),
     onSuccess: () => {
