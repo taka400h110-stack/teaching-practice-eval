@@ -17,6 +17,11 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import type { StudentProfile } from "../types";
 import { apiFetch } from "../api/client";
+import { RUBRIC_FACTORS } from "../constants/rubric";
+
+const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
+const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_ROMAN  = RUBRIC_FACTORS.map((f) => f.roman);
 
 const SCHOOL_TYPE_LABELS: Record<string, string> = {
   elementary: "小学校", middle: "中学校", high: "高校", special: "特別支援",
@@ -80,6 +85,8 @@ export default function CohortsManagementPage() {
       f2: avg("final_factor2"),
       f3: avg("final_factor3"),
       f4: avg("final_factor4"),
+      f5: avg("final_factor5"),
+      f6: avg("final_factor6"),
     };
   }, [filtered]);
 
@@ -99,10 +106,10 @@ export default function CohortsManagementPage() {
   }, [profiles]);
 
   const radarData = stats ? [
-    { factor: "指導技術(F1)", value: stats.f1 },
-    { factor: "自己評価(F2)", value: stats.f2 },
-    { factor: "学級経営(F3)", value: stats.f3 },
-    { factor: "学習者理解(F4)", value: stats.f4 },
+    ...FACTOR_KEYS.map((_, i) => ({
+      factor: `${FACTOR_LABELS[i]}(${FACTOR_ROMAN[i]})`,
+      value: (stats as any)[`f${i + 1}`],
+    })),
   ] : [];
 
   if (isLoading) return <LinearProgress />;
@@ -181,7 +188,7 @@ export default function CohortsManagementPage() {
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#e3f2fd" }}>
-                    {["氏名", "学校", "形態", "F1", "F2", "F3", "F4", "総合", "成長量"].map((h) => (
+                    {["氏名", "学校", "形態", ...FACTOR_KEYS.map((_, i) => `F${i + 1}`), "総合", "成長量"].map((h) => (
                       <TableCell key={h} sx={{ fontWeight: 700 }}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -200,10 +207,9 @@ export default function CohortsManagementPage() {
                       </TableCell>
                       <TableCell><Typography variant="caption">{SCHOOL_TYPE_LABELS[p.school_type]}</Typography></TableCell>
                       <TableCell><Chip label={INTERNSHIP_LABELS[p.internship_type]} size="small" variant="outlined" /></TableCell>
-                      <TableCell>{p.final_factor1}</TableCell>
-                      <TableCell>{p.final_factor2}</TableCell>
-                      <TableCell>{p.final_factor3}</TableCell>
-                      <TableCell>{p.final_factor4}</TableCell>
+                      {FACTOR_KEYS.map((fk) => (
+                        <TableCell key={fk}>{(p as any)[`final_${fk}`]}</TableCell>
+                      ))}
                       <TableCell><b>{p.final_total}</b></TableCell>
                       <TableCell>
                         <Chip label={`+${p.growth_delta}`} size="small"
@@ -233,12 +239,10 @@ export default function CohortsManagementPage() {
                       </Typography>
                     </Box>
                   </Box>
-                  {[
-                    { label: "因子I（指導技術）", value: selectedStudent.final_factor1 },
-                    { label: "因子II（自己評価）", value: selectedStudent.final_factor2 },
-                    { label: "因子III（学級経営）", value: selectedStudent.final_factor3 },
-                    { label: "因子IV（学習者理解）", value: selectedStudent.final_factor4 },
-                  ].map((f) => (
+                  {FACTOR_KEYS.map((fk, i) => ({
+                    label: `因子${FACTOR_ROMAN[i]}（${FACTOR_LABELS[i]}）`,
+                    value: (selectedStudent as any)[`final_${fk}`],
+                  })).map((f) => (
                     <Box key={f.label} mb={1}>
                       <Typography variant="caption">{f.label}</Typography>
                       <ScoreBar value={f.value} />
@@ -246,12 +250,10 @@ export default function CohortsManagementPage() {
                   ))}
                   <Box mt={2}>
                     <ResponsiveContainer width="100%" height={200}>
-                      <RadarChart data={[
-                        { factor: "F1", value: selectedStudent.final_factor1 },
-                        { factor: "F2", value: selectedStudent.final_factor2 },
-                        { factor: "F3", value: selectedStudent.final_factor3 },
-                        { factor: "F4", value: selectedStudent.final_factor4 },
-                      ]}>
+                      <RadarChart data={FACTOR_KEYS.map((fk, i) => ({
+                        factor: `F${i + 1}`,
+                        value: (selectedStudent as any)[`final_${fk}`],
+                      }))}>
                         <PolarGrid />
                         <PolarAngleAxis dataKey="factor" />
                         <Radar dataKey="value" stroke="#1976d2" fill="#1976d2" fillOpacity={0.4} />
