@@ -15,7 +15,6 @@ import ChatIcon               from "@mui/icons-material/Chat";
 import LogoutIcon             from "@mui/icons-material/Logout";
 import AssessmentIcon         from "@mui/icons-material/Assessment";
 import GroupsIcon             from "@mui/icons-material/Groups";
-import CompareArrowsIcon      from "@mui/icons-material/CompareArrows";
 import PsychologyIcon         from "@mui/icons-material/Psychology";
 import EqualizerIcon          from "@mui/icons-material/Equalizer";
 import SchoolIcon             from "@mui/icons-material/School";
@@ -26,7 +25,6 @@ import VerifiedUserIcon       from "@mui/icons-material/VerifiedUser";
 import PersonAddIcon          from "@mui/icons-material/PersonAdd";
 import DownloadIcon           from "@mui/icons-material/Download";
 import AccountBalanceIcon     from "@mui/icons-material/AccountBalance";
-import ScienceIcon from "@mui/icons-material/Science";
 import AnalyticsIcon from "@mui/icons-material/Analytics";
 import NotificationBell from "./NotificationBell";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
@@ -127,8 +125,6 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
         group: "評価業務（RQ2）",
         items: [
           { label: "評価一覧", path: "/evaluations", icon: <AssignmentTurnedInIcon /> },
-          { label: "AI vs 人間比較", path: "/comparison", icon: <CompareArrowsIcon /> },
-          { label: "信頼性分析（ICC）", path: "/reliability", icon: <ScienceIcon /> },
         ],
       },
     ];
@@ -143,11 +139,9 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
         ],
       },
       {
-        group: "AI評価信頼性",
+        group: "評価業務",
         items: [
           { label: "評価一覧", path: "/evaluations", icon: <AssignmentTurnedInIcon /> },
-          { label: "AI vs 人間比較", path: "/comparison", icon: <CompareArrowsIcon /> },
-          { label: "信頼性分析（ICC）", path: "/reliability", icon: <ScienceIcon /> },
         ],
       },
       {
