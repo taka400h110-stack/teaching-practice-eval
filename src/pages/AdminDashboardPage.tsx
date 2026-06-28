@@ -50,6 +50,15 @@ export default function AdminDashboardPage() {
   const [tab, setTab] = useState(0);
   const { data: profilesData } = useQuery({ queryKey: ["cohort"], queryFn: () => apiClient.getCohortProfiles() });
   const { data: journalsData } = useQuery({ queryKey: ["journals"], queryFn: () => apiClient.getJournals() });
+  // /api/data/users は admin / researcher のみ許可。
+  // 同じ /admin を共有する collaborator / board_observer では 403 になるため、
+  // それらのロールでは取得をスキップし、学生プロフィール件数にフォールバックする。
+  const canListUsers = user?.role === "admin" || user?.role === "researcher";
+  const { data: registeredUsersData } = useQuery({
+    queryKey: ["registered-users"],
+    queryFn: () => apiClient.getRegisteredUsers(),
+    enabled: canListUsers,
+  });
 
   const profiles = Array.isArray(profilesData) ? profilesData : [];
   const journals = Array.isArray(journalsData) ? journalsData : [];
@@ -80,6 +89,9 @@ export default function AdminDashboardPage() {
 
   const safeProfiles = Array.isArray(profiles) ? profiles : [];
   const safeJournals = Array.isArray(journals) ? journals : [];
+  const registeredUsers = Array.isArray(registeredUsersData) ? registeredUsersData : [];
+  // 実際の登録ユーザー数（DB の users テーブル）。取得できない場合は学生プロフィール数にフォールバック。
+  const totalUserCount = registeredUsers.length > 0 ? registeredUsers.length : safeProfiles.length;
 
   const bySchoolType = ["elementary","middle","high","special"].map((t) => {
     const matched = safeProfiles.filter((p: any) => p.school_type === t);
@@ -96,10 +108,10 @@ export default function AdminDashboardPage() {
   });
 
   const stats = [
-    { label: "総ユーザー数",   value: safeProfiles.length + 5,  icon: <PeopleIcon />,    color: "primary.main" },
+    { label: "総ユーザー数",   value: totalUserCount,           icon: <PeopleIcon />,    color: "primary.main" },
     { label: "日誌総数",       value: safeJournals.length,      icon: <MenuBookIcon />,  color: "success.main" },
     { label: "AI評価実施済み", value: safeJournals.filter((j: any) => j.status === "evaluated").length, icon: <AssessmentIcon />, color: "warning.main" },
-    { label: "DBレコード数",   value: safeJournals.length * 3 + safeProfiles.length * 5 + 150,              icon: <StorageIcon />,   color: "error.main" },
+    { label: "学生数",         value: safeProfiles.length,      icon: <StorageIcon />,   color: "error.main" },
   ];
 
   return (

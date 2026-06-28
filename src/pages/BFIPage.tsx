@@ -46,10 +46,12 @@ const CORRELATION_LABEL = (key: string): string => {
   };
   const edMap: Record<string, string> = {
     total: "総合スコア",
-    f1: "因子1 (学習指導)",
-    f2: "因子2 (生徒指導)",
-    f3: "因子3 (学級経営)",
-    f4: "因子4 (省察)",
+    f1: "因子Ⅰ (教科指導力)",
+    f2: "因子Ⅱ (職務理解力)",
+    f3: "因子Ⅲ (保護者・外部連携力)",
+    f4: "因子Ⅳ (児童理解力)",
+    f5: "因子Ⅴ (学級経営力)",
+    f6: "因子Ⅵ (授業改善力)",
   };
   return `${pfMap[pf] || pf} × ${edMap[ed] || ed}`;
 };

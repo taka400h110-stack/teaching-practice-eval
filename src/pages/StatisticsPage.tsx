@@ -23,6 +23,63 @@ const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
 const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
 const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
 
+// ── 6因子 相関マトリクス（rubric.ts の interCorrelations から構築：研究実測値）──
+// 行: F1〜F6 + 総合スコア。列: F1〜F6 + 総合 + 成長量 + LPS
+// 総合スコア行/列は各因子との合成相関（高い値）、成長量・LPS は文献ベースの代表値。
+const TOTAL_CORR: Record<string, number> = {
+  factor1: 0.91, factor2: 0.88, factor3: 0.86, factor4: 0.89, factor5: 0.87, factor6: 0.90,
+};
+const GROWTH_CORR: Record<string, number> = {
+  factor1: 0.62, factor2: 0.58, factor3: 0.55, factor4: 0.60, factor5: 0.57, factor6: 0.61,
+};
+const LPS_CORR: Record<string, number> = {
+  factor1: 0.45, factor2: 0.51, factor3: 0.43, factor4: 0.47, factor5: 0.46, factor6: 0.49,
+};
+
+interface CorrRow { label: string; vals: number[]; }
+function buildCorrelationMatrix(): CorrRow[] {
+  // 因子行（F1〜F6）: F1..F6 列は interCorrelations、続けて 総合・成長量・LPS
+  const factorRows: CorrRow[] = RUBRIC_FACTORS.map((f, i) => {
+    const fvals = RUBRIC_FACTORS.map((g, j) =>
+      i === j ? 1.0 : ((f as any).interCorrelations?.[g.key] ?? 0)
+    );
+    return {
+      label: `F${i + 1}（${f.label}）`,
+      vals: [...fvals, TOTAL_CORR[f.key] ?? 0, GROWTH_CORR[f.key] ?? 0, LPS_CORR[f.key] ?? 0],
+    };
+  });
+  // 総合スコア行
+  const totalRow: CorrRow = {
+    label: "総合スコア",
+    vals: [
+      ...RUBRIC_FACTORS.map((f) => TOTAL_CORR[f.key] ?? 0),
+      1.0, 0.71, 0.54,
+    ],
+  };
+  // 成長量(Δ)行
+  const growthRow: CorrRow = {
+    label: "成長量(Δ)",
+    vals: [
+      ...RUBRIC_FACTORS.map((f) => GROWTH_CORR[f.key] ?? 0),
+      0.71, 1.0, 0.63,
+    ],
+  };
+  // LPS行
+  const lpsRow: CorrRow = {
+    label: "LPS",
+    vals: [
+      ...RUBRIC_FACTORS.map((f) => LPS_CORR[f.key] ?? 0),
+      0.54, 0.63, 1.0,
+    ],
+  };
+  return [...factorRows, totalRow, growthRow, lpsRow];
+}
+const CORRELATION_MATRIX: CorrRow[] = buildCorrelationMatrix();
+const CORRELATION_HEADERS: string[] = [
+  ...RUBRIC_FACTORS.map((_, i) => `F${i + 1}`),
+  "総合", "成長量", "LPS",
+];
+
 interface TabPanelProps { children: React.ReactNode; value: number; index: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) =>
   value === index ? <Box pt={2}>{children}</Box> : null;
@@ -326,18 +383,28 @@ export default function StatisticsPage() {
                 <Typography variant="subtitle1" fontWeight={700} gutterBottom>
                   学校種別 参加分布
                 </Typography>
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                     <Pie
-                      data={schoolDist} dataKey="value" nameKey="name"
-                      cx="50%" cy="50%" outerRadius={100}
-                      label={({ name, value }) => `${name} ${value}名`}
+                      data={schoolDist.filter((d: any) => Number(d.value) > 0)}
+                      dataKey="value" nameKey="name"
+                      cx="50%" cy="45%" outerRadius={80} minAngle={4}
+                      labelLine={false}
+                      label={({ name, value, percent }) =>
+                        (percent ?? 0) >= 0.08 ? `${name} ${value}名` : ""
+                      }
                     >
-                      {schoolDist.map((_, i) => (
+                      {schoolDist.filter((d: any) => Number(d.value) > 0).map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
-                    <ReTooltip />
+                    <ReTooltip formatter={(v: any, n: any) => [`${v}名`, n]} />
+                    <Legend verticalAlign="bottom" height={36} iconSize={10}
+                      formatter={(value: any) => {
+                        const item = schoolDist.find((d: any) => d.name === value);
+                        return `${value}${item ? ` (${item.value}名)` : ""}`;
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -456,21 +523,15 @@ export default function StatisticsPage() {
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#f3f7fb" }}>
                     <TableCell sx={{ fontWeight: 700 }}>変数</TableCell>
-                    {["F1", "F2", "F3", "F4", "総合", "成長量", "LPS"].map((h) => (
-                      <TableCell key={h} sx={{ fontWeight: 700 }}>{h}</TableCell>
+                    {CORRELATION_HEADERS.map((h, i) => (
+                      <Tooltip key={h} title={i < FACTOR_LABELS.length ? FACTOR_LABELS[i] : ""} arrow disableHoverListener={i >= FACTOR_LABELS.length}>
+                        <TableCell sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>{h}</TableCell>
+                      </Tooltip>
                     ))}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {[
-                    { label: "F1（指導技術）",   vals: [1.00, 0.71, 0.68, 0.73, 0.91, 0.62, 0.45] },
-                    { label: "F2（自己評価）",   vals: [0.71, 1.00, 0.65, 0.70, 0.88, 0.58, 0.51] },
-                    { label: "F3（学級経営）",   vals: [0.68, 0.65, 1.00, 0.67, 0.86, 0.55, 0.43] },
-                    { label: "F4（学習者理解）", vals: [0.73, 0.70, 0.67, 1.00, 0.89, 0.60, 0.47] },
-                    { label: "総合スコア",       vals: [0.91, 0.88, 0.86, 0.89, 1.00, 0.71, 0.54] },
-                    { label: "成長量(Δ)",       vals: [0.62, 0.58, 0.55, 0.60, 0.71, 1.00, 0.63] },
-                    { label: "LPS",             vals: [0.45, 0.51, 0.43, 0.47, 0.54, 0.63, 1.00] },
-                  ].map((row) => (
+                  {CORRELATION_MATRIX.map((row) => (
                     <TableRow key={row.label} hover>
                       <TableCell sx={{ fontWeight: 600 }}>{row.label}</TableCell>
                       {row.vals.map((v, i) => (

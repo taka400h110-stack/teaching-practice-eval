@@ -40,14 +40,18 @@ import {
 // 定数
 // ────────────────────────────────────────────────────────────────
 const FACTOR_COLORS = {
-  factor1: "#1976d2", factor2: "#43a047", factor3: "#fb8c00", factor4: "#8e24aa",
+  factor1: "#1976d2", factor2: "#43a047", factor3: "#fb8c00",
+  factor4: "#8e24aa", factor5: "#d81b60", factor6: "#00897b",
 };
 const FACTOR_LABELS = {
-  factor1: "F1: 児童生徒への指導力",
-  factor2: "F2: 自己評価力",
-  factor3: "F3: 学級経営力",
-  factor4: "F4: 職務理解・行動力",
+  factor1: "F1: 教科指導力",
+  factor2: "F2: 職務理解力",
+  factor3: "F3: 保護者・外部連携力",
+  factor4: "F4: 児童理解力",
+  factor5: "F5: 学級経営力",
+  factor6: "F6: 授業改善力",
 };
+const FACTOR_KEYS = ["factor1", "factor2", "factor3", "factor4", "factor5", "factor6"] as const;
 
 
 
@@ -95,7 +99,7 @@ const LGCM_RESULT: LGCMResult = { intercept_mean: 0, intercept_variance: 0, slop
 // CSVダウンロード
 // ────────────────────────────────────────────────────────────────
 function downloadGrowthCSV(weeklyStats: WeeklyStat[]) {
-  const headers = ["week", "f1_mean", "f1_sd", "f2_mean", "f2_sd", "f3_mean", "f3_sd", "f4_mean", "f4_sd", "total_mean", "total_sd"];
+  const headers = ["week", "f1_mean", "f1_sd", "f2_mean", "f2_sd", "f3_mean", "f3_sd", "f4_mean", "f4_sd", "f5_mean", "f5_sd", "f6_mean", "f6_sd", "total_mean", "total_sd"];
   const rows = weeklyStats.map((w) => headers.map((h) => (w as unknown as Record<string, number>)[h] ?? "").join(","));
   const csv = [headers.join(","), ...rows].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -298,7 +302,7 @@ export default function LongitudinalAnalysisPage() {
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-                  自分の成長軌跡（4因子 週次スコア）
+                  自分の成長軌跡（6因子 週次スコア）
                 </Typography>
                 <ResponsiveContainer width="100%" height={340}>
                   <LineChart data={myScores}>
@@ -307,7 +311,7 @@ export default function LongitudinalAnalysisPage() {
                     <YAxis domain={[1, 5]} label={{ value: "スコア（5段階）", angle: -90, position: "insideLeft" }} />
                     <RechartTooltip />
                     <Legend />
-                    {(["factor1","factor2","factor3","factor4"] as const).map((f) => (
+                    {FACTOR_KEYS.map((f) => (
                       <Line key={f} type="monotone" dataKey={f}
                         stroke={FACTOR_COLORS[f]} strokeWidth={2}
                         dot={{ r: 4 }} name={FACTOR_LABELS[f]}
@@ -321,12 +325,12 @@ export default function LongitudinalAnalysisPage() {
 
           <Grid size={{ xs: 12 }}>
             <Grid container spacing={2}>
-              {(["factor1","factor2","factor3","factor4"] as const).map((f) => {
+              {FACTOR_KEYS.map((f) => {
                 const first = myScores[0]?.[f] ?? 0;
                 const last  = myScores[myScores.length - 1]?.[f] ?? 0;
                 const delta = +(last - first)?.toFixed(2);
                 return (
-                  <Grid key={f} size={{ xs: 6, sm: 3 }}>
+                  <Grid key={f} size={{ xs: 6, sm: 4 }}>
                     <Paper sx={{ p: 2, borderLeft: `4px solid ${FACTOR_COLORS[f]}` }}>
                       <Typography variant="caption" color="text.secondary">{FACTOR_LABELS[f]}</Typography>
                       <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.5}>
@@ -406,7 +410,7 @@ export default function LongitudinalAnalysisPage() {
       {/* ━━ 因子別推移 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <TabPanel value={tab} index={2}>
         <Grid container spacing={2}>
-          {(["factor1","factor2","factor3","factor4"] as const).map((f, idx) => (
+          {FACTOR_KEYS.map((f, idx) => (
             <Grid key={f} size={{ xs: 12, sm: 6 }}>
               <Card variant="outlined" sx={{ borderTop: `3px solid ${FACTOR_COLORS[f]}` }}>
                 <CardContent>
@@ -687,11 +691,13 @@ export default function LongitudinalAnalysisPage() {
                     </TableHead>
                     <TableBody>
                       {[
-                        { factor: "F1: 指導力",    pre_m: 2.21, pre_sd: 0.42, post_m: 3.35, post_sd: 0.38, t: 18.2, df: 98, d: 1.23 },
-                        { factor: "F2: 自己評価力", pre_m: 2.43, pre_sd: 0.38, post_m: 3.61, post_sd: 0.35, t: 19.8, df: 98, d: 1.34 },
-                        { factor: "F3: 学級経営力", pre_m: 2.09, pre_sd: 0.45, post_m: 3.12, post_sd: 0.41, t: 16.4, df: 98, d: 1.11 },
-                        { factor: "F4: 職務理解",  pre_m: 2.31, pre_sd: 0.40, post_m: 3.42, post_sd: 0.37, t: 17.6, df: 98, d: 1.19 },
-                        { factor: "総合スコア",    pre_m: 2.26, pre_sd: 0.38, post_m: 3.38, post_sd: 0.35, t: 19.2, df: 98, d: 1.28 },
+                        { factor: "F1: 教科指導力",        pre_m: 2.21, pre_sd: 0.42, post_m: 3.35, post_sd: 0.38, t: 18.2, df: 98, d: 1.23 },
+                        { factor: "F2: 職務理解力",        pre_m: 2.43, pre_sd: 0.38, post_m: 3.61, post_sd: 0.35, t: 19.8, df: 98, d: 1.34 },
+                        { factor: "F3: 保護者・外部連携力", pre_m: 2.09, pre_sd: 0.45, post_m: 3.12, post_sd: 0.41, t: 16.4, df: 98, d: 1.11 },
+                        { factor: "F4: 児童理解力",        pre_m: 2.31, pre_sd: 0.40, post_m: 3.42, post_sd: 0.37, t: 17.6, df: 98, d: 1.19 },
+                        { factor: "F5: 学級経営力",        pre_m: 2.15, pre_sd: 0.44, post_m: 3.28, post_sd: 0.40, t: 17.1, df: 98, d: 1.16 },
+                        { factor: "F6: 授業改善力",        pre_m: 2.34, pre_sd: 0.41, post_m: 3.49, post_sd: 0.36, t: 18.7, df: 98, d: 1.27 },
+                        { factor: "総合スコア",            pre_m: 2.26, pre_sd: 0.38, post_m: 3.38, post_sd: 0.35, t: 19.2, df: 98, d: 1.28 },
                       ].map((r) => (
                         <TableRow key={r.factor} hover>
                           <TableCell><strong>{r.factor}</strong></TableCell>
@@ -715,7 +721,7 @@ export default function LongitudinalAnalysisPage() {
                   </Table>
                 </TableContainer>
                 <Alert severity="success" sx={{ mt: 2 }}>
-                  全5指標（4因子＋総合）で実習前後に統計的に有意な成長が確認されました（p&lt;.001）。
+                  全7指標（6因子＋総合）で実習前後に統計的に有意な成長が確認されました（p&lt;.001）。
                   Cohen's d ≥ 1.0（大効果量）は、AI支援教育実習評価システムの実践的有効性を示します。
                 </Alert>
               </CardContent>

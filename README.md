@@ -125,6 +125,21 @@ npx wrangler d1 migrations list teaching-practice-eval-db --remote
   - `apiFetch().json()` 明示呼び出し (SCAT 系 4 ファイル)
   - MUI v7 Grid 構文移行 (`<Grid item xs={...}>` → `<Grid size={{...}}>`)
 
+### Phase 9 (6因子移行の完全化 + BFI個別フィードバック検証)
+推奨順 A→F で重大/中度の不整合を厳密修正:
+- **A** (重大): `LongitudinalAnalysisPage.tsx` を旧4因子→**6因子へ完全移行** (ラベル/カラー/折れ線/KPIカード/因子別推移/ペアt検定〔6因子＋総合 全7指標〕/CSV出力 f5・f6)
+- **B** (重大): `EvaluationsPage.tsx` 評価テーブルに **F5/F6 列を追加** (ヘッダー Tooltip + 本文セル)。算出済みだが非表示だった問題を解消
+- **C** (重大): `StatisticsPage.tsx` のハードコード4因子相関行列を **6因子データ駆動版** (`buildCorrelationMatrix()` + `rubric.ts` の interCorrelations 由来) に置換
+- **D** (中): `StatisticsPage.tsx` 円グラフ「学校種別 参加分布」のラベル重なり修正 (ゼロ値除外 / 半径縮小 / Legend 凡例化)
+- **E** (中): 学生データシード (`tests/audit/seed_students_bfi.py`) で **学生 1→4名** + 全学生に**完了済 BFI** を投入。N=1 制約 (空ヒストグラム/統計) を解消し、BFI 個別化を実証可能に
+- **F** (中): 管理者ダッシュボードのユーザー数を実データ (`getRegisteredUsers()`) に修正 (`+5` ハック撤去、捏造の「DBレコード数」→「学生数」)
+
+**Big Five 個別フィードバック検証 (初回ログイン→個人別フィードバック):**
+- 初回ログイン (Onboarding Step2) で BFI 回答を `namikawa_bfi_responses` / `user_bfi_scores` に保存 → `/generate-goal` (`buildCoTCPrompt`) が誠実性≥3.5→High / 情緒不安定性≥3.5→Low / 開放性≥3.5→Medium と**目標難易度を個人別に調整**することを確認
+- 統合分析 (`/bfi/integrated-analysis`, `buildBfiIntegratedPrompt`) が BFI×6因子評価から**個人別の深層フィードバック**を生成することを確認
+- **致命バグ修正**: `data.ts` の統合分析/クロス群相関クエリ (旧 L3489 / L3576) が存在しない `journals` テーブルを `INNER JOIN` していた問題を `journal_entries` に修正。try/catch で黙殺され評価結合が常に空 (因子平均0) になっていた。修正により評価26件が結合され、N≥3 のクロスセクション・ピアソン相関 (5性格×〔総合+6因子〕) が初めて作動
+- 全91→89ページ監査 (`tests/audit/full_role_page_audit.cjs`): **OK 89 / 問題 0**
+
 ## ライセンス / 引用
 
 研究で使用する際は、エクスポート時の codebook と監査ログを保存し、論文 Methods に `exported_at`, `filters`, および補正手法 (`correction`) を記載することを推奨。SCAT は大谷 (2008) を引用。
