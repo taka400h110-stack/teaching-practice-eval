@@ -140,6 +140,16 @@ npx wrangler d1 migrations list teaching-practice-eval-db --remote
 - **致命バグ修正**: `data.ts` の統合分析/クロス群相関クエリ (旧 L3489 / L3576) が存在しない `journals` テーブルを `INNER JOIN` していた問題を `journal_entries` に修正。try/catch で黙殺され評価結合が常に空 (因子平均0) になっていた。修正により評価26件が結合され、N≥3 のクロスセクション・ピアソン相関 (5性格×〔総合+6因子〕) が初めて作動
 - 全91→89ページ監査 (`tests/audit/full_role_page_audit.cjs`): **OK 89 / 問題 0**
 
+### Phase 10 (学生別 AI対話ログ機能) (#20)
+学生の生成AI（省察支援チャット）との対話ログを**一人ひとり記録**し、**他ロールが閲覧**できるようにした:
+- **保存機能**: `ChatBotPage.tsx` の `sendMessage` で学生発言＋AI応答を都度 DB へ永続化 (`apiClient.saveChatMessage`)。リロードで消える問題を解消し、`student_id` を JWT から必ず記録
+- **スキーマバグ修正**: `POST /chat-sessions/:journalId/messages` が存在しない `phase` 列へ挿入していた問題を、実テーブル定義 (`current_state` / `phase_reached`) に整合。入力検証 (role=user|assistant / content 必須)、セッション集計 (`total_turns` / `max_rd_chat_level`) 更新を追加
+- **閲覧API**: `GET /chat-sessions` に `users` を LEFT JOIN し学生名・メール・メッセージ数を付加。学生は自分のセッションのみ (JWT id 強制)、特権ロール (教員/メンター/研究者/管理者/委員会) は全学生または指定学生を取得
+- **詳細API**: `GET /chat-sessions/:journalId` の `current_state → phase` マッピング修正、messages を `{id, role, content, phase, reflection_depth, timestamp}` に整形
+- **閲覧UI新設**: `StudentChatLogsPage.tsx` (`/student-chat-logs`) — 3ペイン構成 (学生選択 → セッション一覧 → 会話全文)。`AppLayout` のナビに教員/メンター/研究者/協力者/委員会/管理者向けリンク追加
+- **シード/監査**: `tests/audit/seed_chat_logs.py` でデモログ 8 セッション / 64 メッセージ投入。監査スクリプトに `/student-chat-logs` を追加。検証スクリプト `tests/audit/verify_chat_logs_page.cjs` で UI レンダリング・ロール分離を確認
+- CI: 必須4チェック (build / role-ui-smoke / export-filter-audit / statistics-validity-required) 全パス
+
 ## ライセンス / 引用
 
 研究で使用する際は、エクスポート時の codebook と監査ログを保存し、論文 Methods に `exported_at`, `filters`, および補正手法 (`correction`) を記載することを推奨。SCAT は大谷 (2008) を引用。
