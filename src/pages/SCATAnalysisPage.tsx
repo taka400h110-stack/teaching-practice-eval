@@ -24,6 +24,7 @@ import CompareIcon     from "@mui/icons-material/Compare";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, Legend, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 
 // ────────────────────────────────────────────────────────────────
 // 型定義
@@ -166,12 +167,9 @@ function aggregateConcepts(rows: ScatRow[]) {
     .sort((a, b) => b.count - a.count);
 }
 
-const FACTOR_LABELS: Record<string, string> = {
-  factor1: "F1: 児童生徒への指導力",
-  factor2: "F2: 自己評価力",
-  factor3: "F3: 学級経営力",
-  factor4: "F4: 職務理解・行動力",
-};
+const FACTOR_LABELS: Record<string, string> = Object.fromEntries(
+  RUBRIC_FACTORS.map((f, i) => [f.key, `F${i + 1}: ${f.label}`]),
+);
 
 // ────────────────────────────────────────────────────────────────
 // CSV ダウンロード
