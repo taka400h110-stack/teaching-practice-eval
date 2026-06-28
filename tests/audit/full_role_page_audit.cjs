@@ -36,11 +36,11 @@ const ROLE_PAGES = {
   ],
   univ_teacher: [
     '/teacher-dashboard', '/journals', '/evaluations', '/statistics',
-    '/teacher-statistics', '/cohorts', '/profile',
+    '/teacher-statistics', '/cohorts', '/student-chat-logs', '/profile',
   ],
   school_mentor: [
     '/teacher-dashboard', '/journals', '/evaluations', '/statistics',
-    '/teacher-statistics', '/cohorts', '/profile',
+    '/teacher-statistics', '/cohorts', '/student-chat-logs', '/profile',
   ],
   evaluator: [
     '/evaluations', '/profile',
@@ -49,23 +49,23 @@ const ROLE_PAGES = {
     '/admin', '/teacher-dashboard', '/journals', '/evaluations', '/statistics',
     '/teacher-statistics', '/longitudinal', '/advanced-analytics', '/platform-analytics',
     '/cohorts', '/scat', '/scat-batch', '/scat-network', '/scat-timeline',
-    '/research/journal-import', '/exports', '/profile',
+    '/research/journal-import', '/exports', '/student-chat-logs', '/profile',
   ],
   collaborator: [
     '/journals', '/evaluations', '/statistics', '/teacher-statistics',
     '/longitudinal', '/advanced-analytics', '/cohorts', '/scat', '/scat-batch',
-    '/scat-network', '/scat-timeline', '/research/journal-import', '/exports', '/profile',
+    '/scat-network', '/scat-timeline', '/research/journal-import', '/exports', '/student-chat-logs', '/profile',
   ],
   board_observer: [
     '/journals', '/evaluations', '/statistics', '/teacher-statistics',
     '/longitudinal', '/advanced-analytics', '/cohorts', '/scat', '/scat-batch',
-    '/scat-network', '/scat-timeline', '/exports', '/profile',
+    '/scat-network', '/scat-timeline', '/exports', '/student-chat-logs', '/profile',
   ],
   admin: [
     '/admin', '/teacher-dashboard', '/journals', '/evaluations', '/statistics',
     '/teacher-statistics', '/longitudinal', '/advanced-analytics', '/platform-analytics',
     '/cohorts', '/scat', '/scat-batch', '/scat-network', '/scat-timeline',
-    '/research/journal-import', '/exports', '/admin/exports', '/register', '/profile',
+    '/research/journal-import', '/exports', '/admin/exports', '/register', '/student-chat-logs', '/profile',
   ],
 };
 

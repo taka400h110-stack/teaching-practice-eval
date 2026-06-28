@@ -235,6 +235,14 @@ export default function ChatBotPage() {
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
+    // 学生発言をDBに永続化（失敗してもUIは継続）
+    apiClient.saveChatMessage(journalId, {
+      role: "user",
+      content,
+      phase,
+      reflection_depth: rdLevel,
+    }).catch(() => {});
+
     try {
       // OpenAI API 経由で応答を生成（CoT-B + CoT-C）
       const journalData = allJournals.find((j) => j.id === journalId);
@@ -288,16 +296,31 @@ export default function ChatBotPage() {
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, botMsg]);
+
+      // AI応答をDBに永続化
+      apiClient.saveChatMessage(journalId, {
+        role: "assistant",
+        content: botContent,
+        phase,
+        reflection_depth: rdLevel,
+      }).catch(() => {});
     } catch {
       // エラー時フォールバック
       await new Promise((r) => setTimeout(r, 600));
+      const fbContent = generateCoTResponse(content, rdLevel);
       const botMsg: ChatMessage = {
         id:        `b-${Date.now()}`,
         role:      "assistant",
-        content:   generateCoTResponse(content, rdLevel),
+        content:   fbContent,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, botMsg]);
+      apiClient.saveChatMessage(journalId, {
+        role: "assistant",
+        content: fbContent,
+        phase,
+        reflection_depth: rdLevel,
+      }).catch(() => {});
     } finally {
       setLoading(false);
     }

@@ -609,12 +609,26 @@ throw new Error("Failed to save self evaluation");
   },
 
   // ── チャット ──
-  // 全チャットセッション一覧（journal-004のデモセッション含む）
-  getAllChatSessions: async (): Promise<ChatSession[]> => {
+  // チャットセッション一覧
+  // 学生: 自分のセッションのみ（バックエンドがJWTから自動でstudent_idを強制）
+  // 特権ロール(教員/メンター/研究者/管理者/委員会): 全学生 or 指定学生
+  getAllChatSessions: async (studentId?: string): Promise<ChatSession[]> => {
     try {
       const user = JSON.parse(localStorage.getItem("user_info") || "{}");
-      const userId = user.id || "user-001";
-      const res = await apiFetch(`/api/data/chat-sessions?student_id=${userId}`, { headers: {  } });
+      const role = user.role || "student";
+      const privileged = [
+        "teacher", "univ_teacher", "school_mentor",
+        "researcher", "admin", "collaborator", "board_observer"
+      ].includes(role);
+      let qs = "";
+      if (studentId) {
+        qs = `?student_id=${encodeURIComponent(studentId)}`;
+      } else if (!privileged) {
+        // 学生は自分のIDで絞り込み（バックエンドでも強制される）
+        qs = `?student_id=${encodeURIComponent(user.id || "user-001")}`;
+      }
+      // 特権ロールで studentId 未指定 → 全学生のセッションを取得（qsなし）
+      const res = await apiFetch(`/api/data/chat-sessions${qs}`, { headers: {  } });
       if (!res.ok) return [];
       const data = await res.json() as any;
       return data.sessions || [];
@@ -635,6 +649,23 @@ throw new Error("Failed to save self evaluation");
   sendChatMessage: async (journalId: string, content: string): Promise<{ session: ChatSession; reply: ChatMessage }> => {
     // Note: ChatBotPage directly fetches from OpenAI in standard flow, this mock fallback won't be heavily used
     return { session: { id: "new", journal_id: journalId, phase: "phase1", messages: [], created_at: new Date().toISOString() }, reply: { id: "r", role: "assistant", content: "dummy", timestamp: new Date().toISOString() } };
+  },
+  // 1メッセージ（学生発言 or AI応答）をDBに永続化する
+  saveChatMessage: async (
+    journalId: string,
+    msg: { role: "user" | "assistant"; content: string; phase?: string; reflection_depth?: number }
+  ): Promise<{ success: boolean; message_id?: string; session_id?: string }> => {
+    try {
+      const res = await apiFetch(`/api/data/chat-sessions/${journalId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(msg)
+      });
+      if (!res.ok) return { success: false };
+      return await res.json() as any;
+    } catch {
+      return { success: false };
+    }
   },
 
   // ── コーホート（教員ダッシュボード用学生プロファイル） ──
