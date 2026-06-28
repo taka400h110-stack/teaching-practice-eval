@@ -202,6 +202,8 @@ export default function LongitudinalAnalysisPage() {
         f2_mean: +(mean('factor2')?.toFixed(2)), f2_sd: +(sd('factor2', mean('factor2'))?.toFixed(2)),
         f3_mean: +(mean('factor3')?.toFixed(2)), f3_sd: +(sd('factor3', mean('factor3'))?.toFixed(2)),
         f4_mean: +(mean('factor4')?.toFixed(2)), f4_sd: +(sd('factor4', mean('factor4'))?.toFixed(2)),
+        f5_mean: +(mean('factor5')?.toFixed(2)), f5_sd: +(sd('factor5', mean('factor5'))?.toFixed(2)),
+        f6_mean: +(mean('factor6')?.toFixed(2)), f6_sd: +(sd('factor6', mean('factor6'))?.toFixed(2)),
         total_mean: +(mean('total')?.toFixed(2)), total_sd: +(sd('total', mean('total'))?.toFixed(2)),
       };
     });

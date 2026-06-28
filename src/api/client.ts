@@ -351,7 +351,9 @@ const apiClient = {
           factor1: data.factor1_score || 0,
           factor2: data.factor2_score || 0,
           factor3: data.factor3_score || 0,
-          factor4: data.factor4_score || 0
+          factor4: data.factor4_score || 0,
+          factor5: data.factor5_score || 0,
+          factor6: data.factor6_score || 0
         },
         evaluation_items: items.map((i: any) => ({
           item_number: i.item_number,
@@ -382,12 +384,14 @@ const apiClient = {
           factor1: e.factor1_score || 0,
           factor2: e.factor2_score || 0,
           factor3: e.factor3_score || 0,
-          factor4: e.factor4_score || 0
+          factor4: e.factor4_score || 0,
+          factor5: e.factor5_score || 0,
+          factor6: e.factor6_score || 0
         },
         evaluation_items: [],
         overall_comment: e.overall_comment || "",
         total_score: e.total_score || 0,
-        evaluated_item_count: 23,
+        evaluated_item_count: 40,
         tokens_used: e.token_count || 0,
         halo_check: e.halo_effect_detected === 1
       }));
@@ -510,6 +514,8 @@ const apiClient = {
           factor2: w.factor2,
           factor3: w.factor3,
           factor4: w.factor4,
+          factor5: w.factor5,
+          factor6: w.factor6,
           total: w.total,
           ai_total: w.ai_total,
           journal_id: w.journal_id
@@ -536,6 +542,8 @@ const apiClient = {
         factor2: e.factor2_score,
         factor3: e.factor3_score,
         factor4: e.factor4_score,
+        factor5: e.factor5_score,
+        factor6: e.factor6_score,
         total: e.total_score,
         comment: e.comment
       }));
@@ -551,11 +559,13 @@ const apiClient = {
         body: JSON.stringify({
           student_id: 'user-001',
           week_number: data.week,
-          factor1: data.factor1,
-          factor2: data.factor2,
-          factor3: data.factor3,
-          factor4: data.factor4,
-                    comment: data.comment
+          factor1_score: data.factor1,
+          factor2_score: data.factor2,
+          factor3_score: data.factor3,
+          factor4_score: data.factor4,
+          factor5_score: data.factor5,
+          factor6_score: data.factor6,
+          comment: data.comment
         })
       });
       if (res.ok) {
