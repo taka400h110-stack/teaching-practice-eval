@@ -2,7 +2,7 @@
 
 /**
  * src/pages/JournalDetailPage.tsx
- * 実習日誌詳細 — 日誌本文 / AI評価レーダー / 23項目スコア / 成長曲線 / AIフィードバック
+ * 実習日誌詳細 — 日誌本文 / AI評価レーダー / 40項目スコア / 成長曲線 / AIフィードバック
  */
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -38,41 +38,19 @@ import SendIcon from "@mui/icons-material/Send";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { JournalEntry, JournalStatus, HourRecord, EvaluationResult, GrowthData } from "../types";
+import { RUBRIC_FACTORS, RUBRIC_ITEMS } from "../constants/rubric";
 
 // ─────────────────────────────────────────────
-// 定数（論文確定版 4因子23項目）
+// 定数（論文確定版 6因子40項目 / rubric.ts を単一の真実の源とする）
 // ─────────────────────────────────────────────
-const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"] as const;
-const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"] as const;
-const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
-const FACTOR_ALPHA  = [0.87, 0.87, 0.91, 0.91] as const;
+const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
+const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
+const FACTOR_ROMAN  = RUBRIC_FACTORS.map((f) => f.roman);
+const FACTOR_ALPHA  = RUBRIC_FACTORS.map((f) => f.alpha);
 
-// 23項目ラベル（rubric.tsと同一内容）
-const ITEM_LABELS = [
-  /* F1  1 */ "特別支援対応力（実践）",
-  /* F1  2 */ "外国語児童への指導実践",
-  /* F1  3 */ "特別支援対応力（理解）",
-  /* F1  4 */ "外国語児童への対応理解",
-  /* F1  5 */ "性差・多様性への理解",
-  /* F1  6 */ "文化的多様性への理解",
-  /* F1  7 */ "教科特性を踏まえた授業設計",
-  /* F2  8 */ "体験と成長の接続",
-  /* F2  9 */ "指導姿勢の検証能力",
-  /* F2 10 */ "模範的姿勢の実践",
-  /* F2 11 */ "フィードバック受容力",
-  /* F2 12 */ "実践省察と改善責任",
-  /* F2 13 */ "専門性向上のための自己評価",
-  /* F3 14 */ "生徒指導力",
-  /* F3 15 */ "学級管理能力",
-  /* F3 16 */ "リーダーシップ発揮",
-  /* F3 17 */ "児童の困難支援",
-  /* F4 18 */ "同僚の学習支援役割理解",
-  /* F4 19 */ "特別責任を有する同僚役割の理解",
-  /* F4 20 */ "人間関係・専門的期待への対応",
-  /* F4 21 */ "教師役割の多様性理解",
-  /* F4 22 */ "教師の権威の意味理解",
-  /* F4 23 */ "職業倫理と連帯責任",
-];
+// 40項目ラベル（rubric.tsと同一内容）
+const ITEM_LABELS = RUBRIC_ITEMS.map((item) => item.label);
 
 // 項目→因子インデックスのマッピング
 function itemFactorIdx(itemNum: number): number {
@@ -250,7 +228,8 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
   const growthUntilNow = (growthData?.weekly_scores ?? []).filter((w) => w.week <= weekNumber);
 
   // 因子別にitem群を分割
-  const factorGroups: Record<string, typeof evalData.evaluation_items> = { factor1: [], factor2: [], factor3: [], factor4: [] };
+  const factorGroups: Record<string, typeof evalData.evaluation_items> =
+    Object.fromEntries(FACTOR_KEYS.map((k) => [k, [] as typeof evalData.evaluation_items]));
   evalData.evaluation_items.forEach((item) => {
     const key = item.factor as keyof typeof factorGroups;
     if (factorGroups[key]) factorGroups[key].push(item);
@@ -315,12 +294,12 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
         </CardContent>
       </Card>
 
-      {/* ─── ② 23項目スコア（因子別アコーディオン）─── */}
+      {/* ─── ② 40項目スコア（因子別アコーディオン）─── */}
       <Card sx={{ mb: 2.5 }}>
         <CardContent>
           <Box display="flex" alignItems="center" gap={1} mb={1}>
             <StarIcon sx={{ color: "#f57c00" }} />
-            <Typography variant="subtitle1" fontWeight="bold">AI評価 — 23項目得点（因子別）</Typography>
+            <Typography variant="subtitle1" fontWeight="bold">AI評価 — 40項目得点（因子別）</Typography>
           </Box>
           <Divider sx={{ mb: 1.5 }} />
           {FACTOR_KEYS.map((key, fi) => {
@@ -332,7 +311,7 @@ const EvaluationPanel: React.FC<EvalPanelProps> = ({ evalData, growthData, weekN
                   <Box display="flex" alignItems="center" gap={1} width="100%">
                     <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: FACTOR_COLORS[fi], flexShrink: 0 }} />
                     <Typography variant="body2" fontWeight={700} color={FACTOR_COLORS[fi]}>
-                      因子{["Ⅰ","Ⅱ","Ⅲ","Ⅳ"][fi]}　{FACTOR_LABELS[fi]}
+                      因子{FACTOR_ROMAN[fi]}　{FACTOR_LABELS[fi]}
                     </Typography>
                     <Chip label={`平均 ${(typeof avg === "number" ? avg.toFixed(2) : "—")}`} size="small" sx={{ ml: "auto", mr: 1, bgcolor: `${FACTOR_COLORS[fi]}20`, color: FACTOR_COLORS[fi], fontWeight: "bold" }} />
                   </Box>
