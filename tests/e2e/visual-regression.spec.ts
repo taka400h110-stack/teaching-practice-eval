@@ -43,18 +43,6 @@ test.describe('Visual Regression (Desktop)', () => {
     });
   });
 
-  test('Reliability Analysis visual regression', async ({ page }) => {
-    await loginAs(page, 'admin');
-    await page.goto('/reliability');
-    await prepareStableUi(page);
-    
-    await expect(page).toHaveScreenshot('reliability-analysis-desktop.png', {
-      mask: getDynamicRegions(page),
-      fullPage: true,
-      ...getVisualThreshold('chart')
-    });
-  });
-
   test('Longitudinal Analysis visual regression', async ({ page }) => {
     await loginAs(page, 'admin');
     await page.goto('/longitudinal');

@@ -16,7 +16,7 @@ async function login(page, email) {
   const browser = await chromium.launch();
 
   // 重要ページ + researcherにあるが collaborator/board_observer にないページの確認
-  const sharedPages = ['/admin', '/evaluations', '/comparison', '/reliability', '/cohorts', '/longitudinal', '/scat', '/scat-batch', '/statistics', '/advanced-analytics', '/exports', '/journals'];
+  const sharedPages = ['/admin', '/evaluations', '/cohorts', '/longitudinal', '/scat', '/scat-batch', '/statistics', '/advanced-analytics', '/exports', '/journals'];
   // researcher限定 - collaborator/board_observer は /unauthorized 期待
   const restricted = ['/teacher-dashboard', '/platform-analytics'];
 

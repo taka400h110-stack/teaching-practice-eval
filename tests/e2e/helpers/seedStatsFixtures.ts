@@ -72,23 +72,6 @@ export async function seedStatsFixtures(page: Page) {
   });
 }
 
-export async function mockReliabilityStats(page: Page, type: 'malformed' | 'normal' = 'normal') {
-  if (type === 'malformed') {
-    await page.route('**/api/stats/full-reliability', async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          icc: { icc: 'NaN', ci95: [0.9, 0.8], f: 'Infinity', df1: null, df2: -1, p: 2.0, interpretation: null },
-          bland_altman: { bias: null, loa_lower: 100, loa_upper: -100, points: [{x: 'a', y: 'b'}] },
-          pearson: { r: 1.5, p: -0.5 },
-          krippendorff_alpha: { alpha: 'undefined', interpretation: '' }
-        })
-      });
-    });
-  }
-}
-
 export async function mockLongitudinalStatsMalformed(page: Page) {
   await page.route('**/api/data/cohorts', async route => {
     await route.fulfill({

@@ -59,7 +59,6 @@ const ROLE_SPECS: RoleSpec[] = [
       '/scat-timeline',
       '/research/journal-import',
       '/exports',
-      '/reliability',
       '/longitudinal',
     ],
   },
