@@ -33,6 +33,12 @@ const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
 const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
 const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
 
+// 6因子テーブルヘッダ (F1〜F6) のツールチップ: 正規ラベルを rubric.ts から取得
+const FACTOR_HEADER_TOOLTIP: Record<string, string> = RUBRIC_FACTORS.reduce(
+  (acc, f, i) => { acc[`F${i + 1}`] = f.label; return acc; },
+  {} as Record<string, string>
+);
+
 export default function EvaluationsPage() {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState("all");
@@ -217,8 +223,10 @@ export default function EvaluationsPage() {
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: "#e3f2fd" }}>
-              {["週", "日付", "タイトル", "ステータス", "総合", "F1", "F2", "F3", "F4", "操作"].map((h) => (
-                <TableCell key={h} sx={{ fontWeight: 700 }}>{h}</TableCell>
+              {["週", "日付", "タイトル", "ステータス", "総合", "F1", "F2", "F3", "F4", "F5", "F6", "操作"].map((h) => (
+                <Tooltip key={h} title={FACTOR_HEADER_TOOLTIP[h] || ""} arrow disableHoverListener={!FACTOR_HEADER_TOOLTIP[h]}>
+                  <TableCell sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>{h}</TableCell>
+                </Tooltip>
               ))}
             </TableRow>
           </TableHead>
@@ -240,6 +248,8 @@ export default function EvaluationsPage() {
                 <TableCell>{r.f2 ?? "–"}</TableCell>
                 <TableCell>{r.f3 ?? "–"}</TableCell>
                 <TableCell>{r.f4 ?? "–"}</TableCell>
+                <TableCell>{r.f5 ?? "–"}</TableCell>
+                <TableCell>{r.f6 ?? "–"}</TableCell>
                 <TableCell>
                   <Box display="flex" gap={0.5}>
                     <Tooltip title="評価詳細を見る">

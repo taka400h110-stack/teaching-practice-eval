@@ -3486,7 +3486,7 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
         SELECT e.id as eval_id, e.journal_id, e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score, e.factor5_score, e.factor6_score,
                j.week_number, j.entry_date
         FROM evaluations e
-        INNER JOIN journals j ON j.id = e.journal_id
+        INNER JOIN journal_entries j ON j.id = e.journal_id
         WHERE j.student_id = ? AND e.eval_type = 'ai'
         ORDER BY j.week_number ASC, j.entry_date ASC
       `).bind(userId).all();
@@ -3573,7 +3573,7 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
                AVG(e.factor3_score) AS avg_f3, AVG(e.factor4_score) AS avg_f4,
                AVG(e.factor5_score) AS avg_f5, AVG(e.factor6_score) AS avg_f6
         FROM evaluations e
-        INNER JOIN journals j ON j.id = e.journal_id
+        INNER JOIN journal_entries j ON j.id = e.journal_id
         WHERE e.eval_type = 'ai'
         GROUP BY j.student_id
       `).all().catch(() => ({ results: [] as any[] }));
@@ -3591,6 +3591,8 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
           { key: "avg_f2", label: "f2" },
           { key: "avg_f3", label: "f3" },
           { key: "avg_f4", label: "f4" },
+          { key: "avg_f5", label: "f5" },
+          { key: "avg_f6", label: "f6" },
         ];
         for (const pf of personalityFactors) {
           const bfiVec = pairUserIds.map(uid => calculateBfiScores(allBfi[uid])[pf] || 0);
