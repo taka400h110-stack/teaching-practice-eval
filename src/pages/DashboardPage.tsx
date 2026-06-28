@@ -21,9 +21,11 @@ import SchoolIcon      from "@mui/icons-material/School";
 import { useQuery }    from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { JournalEntry, WeeklyScore } from "../types";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 
-const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
-const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"];
+const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
+const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
 
 function ScoreBar({ value, max = 5, color }: { value: number; max?: number; color: string }) {
   return (
@@ -195,7 +197,7 @@ export default function DashboardPage() {
                 <Button size="small" onClick={() => navigate("/growth")}>詳細</Button>
               </Box>
               {latest ? (
-                (["factor1","factor2","factor3","factor4"] as const).map((f, i) => (
+                FACTOR_KEYS.map((f, i) => (
                   <Box key={f} mb={1.5}>
                     <Box display="flex" justifyContent="space-between" mb={0.4}>
                       <Typography variant="body2" fontWeight={600}>{FACTOR_LABELS[i]}</Typography>
