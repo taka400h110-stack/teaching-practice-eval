@@ -9,33 +9,6 @@ import { seedStatsFixtures } from './helpers/seedStatsFixtures';
 
 test.describe('Export and Filter Actions Audit', () => {
   
-  test('ReliabilityAnalysisPage: Export CSV and Tab Switch', async ({ page }) => {
-    await loginAs(page, 'admin');
-    await seedStatsFixtures(page);
-    await page.goto('/reliability');
-    
-    // Wait for page to load
-    await expect(page.getByText(/信頼性/).first()).toBeVisible();
-
-    // Check Export CSV button if it exists
-    const exportBtn = page.getByRole('button', { name: /CSV|ダウンロード/i }).first();
-    if (await exportBtn.isVisible()) {
-      const download = await assertDownloadStarted(page, exportBtn, /csv/i);
-      const csvContent = await readDownloadedCsv(download);
-      assertCsvContent(csvContent, []); // or some basic headers
-    }
-
-    // Try switching tabs if present (e.g. ICC vs Alpha)
-    const tabs = page.getByRole('tab');
-    if (await tabs.count() > 1) {
-      await assertFilterChangedResults(
-        page,
-        async () => { await tabs.nth(1).click(); },
-        page.locator('.recharts-wrapper, table, .MuiCardContent-root')
-      );
-    }
-  });
-  
   test('StatisticsPage: Export CSV Content Validation', async ({ page }) => {
     await loginAs(page, 'admin');
     await seedStatsFixtures(page);

@@ -25,8 +25,6 @@ const JournalWorkflowPage     = lazy(() => import("./pages/JournalWorkflowPage")
 const EvaluationResultPage    = lazy(() => import("./pages/EvaluationResultPage"));
 const EvaluationsPage         = lazy(() => import("./pages/EvaluationsPage"));
 const HumanEvaluationPage     = lazy(() => import("./pages/HumanEvaluationPage"));
-const ComparisonPage          = lazy(() => import("./pages/ComparisonPage"));
-const ReliabilityAnalysisPage = lazy(() => import("./pages/ReliabilityAnalysisPage"));
 // 成長・分析 (RQ3)
 const GrowthVisualizationPage = lazy(() => import("./pages/GrowthVisualizationPage"));
 const LongitudinalAnalysisPage= lazy(() => import("./pages/LongitudinalAnalysisPage"));
@@ -58,8 +56,6 @@ const JournalImportDetailPage = lazy(() => import("./pages/research/JournalImpor
 const JournalOCRPage          = lazy(() => import("./pages/JournalOCRPage"));
 // 教員統計
 const TeacherStatisticsPage   = lazy(() => import("./pages/TeacherStatisticsPage"));
-// 国際比較
-const InternationalComparisonPage = lazy(() => import("./pages/InternationalComparisonPage"));
 // BFI パーソナリティ診断
 const BFIPage = lazy(() => import("./pages/BFIPage"));
 // プロフィール & プレースホルダ
@@ -159,8 +155,6 @@ export default function App() {
           <Route path="evaluations"                         element={<PrivateRoute allowedRoles={["admin", "researcher", "evaluator", "teacher", "univ_teacher", "school_mentor", "collaborator", "board_observer"]}><EvaluationsPage /></PrivateRoute>} />
           <Route path="evaluations/:journalId"              element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer", "student", "teacher", "univ_teacher", "school_mentor"]}><EvaluationResultPage /></PrivateRoute>} />
           <Route path="evaluations/:journalId/human"        element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><HumanEvaluationPage /></PrivateRoute>} />
-          <Route path="comparison"                          element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><ComparisonPage /></PrivateRoute>} />
-          <Route path="reliability"                         element={<PrivateRoute allowedRoles={["evaluator", "researcher", "admin", "collaborator", "board_observer"]}><ReliabilityAnalysisPage /></PrivateRoute>} />
 
           {/* 成長・分析 (RQ3) */}
           <Route path="growth"            element={<PrivateRoute allowedRoles={["student"]}><GrowthVisualizationPage /></PrivateRoute>} />
@@ -201,9 +195,6 @@ export default function App() {
 
           {/* 教員統計 */}
           <Route path="teacher-statistics" element={<PrivateRoute allowedRoles={["teacher", "univ_teacher", "school_mentor", "researcher", "admin", "collaborator", "board_observer"]}><TeacherStatisticsPage /></PrivateRoute>} />
-
-          {/* 国際比較（RQ1） */}
-          <Route path="international"     element={<PrivateRoute allowedRoles={["researcher", "admin", "collaborator", "board_observer"]}><InternationalComparisonPage /></PrivateRoute>} />
 
           {/* BFI パーソナリティ診断 */}
           <Route path="bfi"               element={<PrivateRoute allowedRoles={["student"]}><BFIPage /></PrivateRoute>} />
