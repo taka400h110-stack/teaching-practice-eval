@@ -107,6 +107,8 @@ export interface FactorScores {
   factor2: number;
   factor3: number;
   factor4: number;
+  factor5: number;
+  factor6: number;
 }
 
 export interface EvaluationItem {
@@ -141,6 +143,8 @@ export interface WeeklyScore {
   factor2: number;
   factor3: number;
   factor4: number;
+  factor5: number;
+  factor6: number;
   total:   number;
 }
 
@@ -159,6 +163,8 @@ export interface SelfEvaluation {
   factor2:   number;
   factor3:   number;
   factor4:   number;
+  factor5:   number;
+  factor6:   number;
   total:     number;
   comment?:  string;
 }
@@ -213,6 +219,8 @@ export interface StudentProfile {
   final_factor2:     number;
   final_factor3:     number;
   final_factor4:     number;
+  final_factor5:     number;
+  final_factor6:     number;
   final_total:       number;
   growth_delta:      number;
   self_eval_gap:     number;

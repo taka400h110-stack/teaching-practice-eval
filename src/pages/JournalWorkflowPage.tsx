@@ -213,9 +213,9 @@ function HourBlock({ record, index, total, onChange, onDelete, onMoveUp, onMoveD
 // ═══════════════════════════════════════════
 // ② AI評価 定数
 // ═══════════════════════════════════════════
-const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"] as const;
-const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"] as const;
-const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
+const FACTOR_LABELS = _RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_COLORS = _RUBRIC_FACTORS.map((f) => f.color);
+const FACTOR_KEYS   = _RUBRIC_FACTORS.map((f) => f.key);
 
 // ═══════════════════════════════════════════
 // ③ チャット 定数・ユーティリティ
@@ -235,7 +235,7 @@ const PHASE_LABELS: Record<string, { label: string; color: string; suggestions: 
 
 // ────────────────────────────────────────────
 // 省察深さレベル（rubric.ts から統一インポート）
-// 2026-03-07: 全4因子・全23項目に共通適用
+// 2026-03-07: 全6因子・全40項目に共通適用
 // ────────────────────────────────────────────
 // REFLECTION_DEPTH_LEVELS は rubric.ts からインポート済み
 
@@ -268,7 +268,7 @@ function generateCoTResponse(userMsg: string, rdLevel: number): string {
     return `良い方向性ですね！SMART基準で目標を整理しましょう：\n\n• Specific（具体的）: 何を改善しますか？\n• Measurable（測定可能）: どのルーブリック項目で何点を目指しますか？\n• Achievable（達成可能）: 実習期間内で現実的ですか？\n• Relevant（関連性）: あなたの課題に直結していますか？\n• Time-bound（期限）: 何週目までにやりますか？`;
   }
   if (rdLevel <= 2) {
-    return `ありがとうございます。\n\n「なぜそうなったのか」「どうすれば改善できるか」を、ルーブリックの4因子（F1:指導力・F2:自己評価力・F3:学級経営力・F4:職務理解）の観点から振り返ってみましょう。[現在の省察深さ: RD-${rdLevel}]`;
+    return `ありがとうございます。\n\n「なぜそうなったのか」「どうすれば改善できるか」を、ルーブリックの6因子（${_RUBRIC_FACTORS.map((f) => `${f.roman}:${f.label}`).join("・")}）の観点から振り返ってみましょう。[現在の省察深さ: RD-${rdLevel}]`;
   }
   return `深い省察ができています（RD-${rdLevel}）。\n\nこの洞察を具体的な行動目標に変換するために、次週のSMART目標として書き出してみましょう。`;
 }
@@ -992,7 +992,7 @@ export default function JournalWorkflowPage() {
                   <CardContent>
                     <Typography variant="subtitle2" fontWeight="bold" mb={1}>
                       <AssessmentIcon sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle" }} />
-                      4因子レーダーチャート
+                      6因子レーダーチャート
                     </Typography>
                     <ResponsiveContainer width="100%" height={240}>
                       <RadarChart data={radarData}>

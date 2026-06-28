@@ -1,6 +1,41 @@
 // @ts-nocheck
 import { UserRole } from "../../types";
 import { applyAnonymization } from "../services/anonymization";
+import { getFactorKeyByItemNum, RUBRIC_ITEMS } from "../../constants/rubric";
+
+/**
+ * 6因子40項目ルーブリックに基づき、AI/人間評価のitem配列から
+ * 総合スコア・各因子平均（factor1〜factor6）・評価済み項目数を算出する。
+ * 因子割り当ては getFactorKeyByItemNum で項目番号から決定する。
+ */
+function computeFactorAverages(
+  items: Array<{ item_number: number; score?: number | null; is_na?: boolean }>,
+) {
+  const buckets: Record<string, number[]> = {
+    factor1: [], factor2: [], factor3: [], factor4: [], factor5: [], factor6: [],
+  };
+  for (const it of items) {
+    if (it.is_na || it.score == null || !it.score) continue;
+    const fk = getFactorKeyByItemNum(it.item_number);
+    buckets[fk].push(it.score as number);
+  }
+  const avg = (arr: number[]) =>
+    arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
+  const all = ([] as number[]).concat(
+    buckets.factor1, buckets.factor2, buckets.factor3,
+    buckets.factor4, buckets.factor5, buckets.factor6,
+  );
+  return {
+    total: avg(all) ?? 0,
+    f1: avg(buckets.factor1),
+    f2: avg(buckets.factor2),
+    f3: avg(buckets.factor3),
+    f4: avg(buckets.factor4),
+    f5: avg(buckets.factor5),
+    f6: avg(buckets.factor6),
+    evaluatedCount: all.length,
+  };
+}
 
 /**
  * src/api/routes/data.ts
@@ -106,6 +141,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       factor2_score REAL,
       factor3_score REAL,
       factor4_score REAL,
+      factor5_score REAL,
+      factor6_score REAL,
       overall_comment TEXT,
       reasoning TEXT,
       halo_effect_detected INTEGER DEFAULT 0,
@@ -136,6 +173,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       factor2_score REAL,
       factor3_score REAL,
       factor4_score REAL,
+      factor5_score REAL,
+      factor6_score REAL,
       comment TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (journal_id) REFERENCES journal_entries(id)
@@ -172,6 +211,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       factor2_score REAL,
       factor3_score REAL,
       factor4_score REAL,
+      factor5_score REAL,
+      factor6_score REAL,
       total_score REAL,
       rd_journal_level INTEGER,
       comment TEXT,
@@ -329,6 +370,8 @@ async function ensureSchema(db: D1Database): Promise<void> {
       factor2_score REAL,
       factor3_score REAL,
       factor4_score REAL,
+      factor5_score REAL,
+      factor6_score REAL,
       total_score REAL,
       rd_journal_level INTEGER,
       ga_self INTEGER DEFAULT 0,
@@ -606,24 +649,16 @@ async function runJournalAutoPipeline(
       const aiResult = JSON.parse(raw);
 
       if (aiResult.items && Array.isArray(aiResult.items)) {
-        const scoresF: Record<string, number[]> = { f1: [], f2: [], f3: [], f4: [] };
-        aiResult.items.forEach((it: any) => {
-          if (it.is_na || !it.score) return;
-          if (it.item_number <= 7) scoresF.f1.push(it.score);
-          else if (it.item_number <= 13) scoresF.f2.push(it.score);
-          else if (it.item_number <= 17) scoresF.f3.push(it.score);
-          else scoresF.f4.push(it.score);
-        });
-        const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
-        const totalScore = avg([...scoresF.f1, ...scoresF.f2, ...scoresF.f3, ...scoresF.f4]) ?? 0;
-        const f1 = avg(scoresF.f1), f2 = avg(scoresF.f2), f3 = avg(scoresF.f3), f4 = avg(scoresF.f4);
+        const fa = computeFactorAverages(aiResult.items);
+        const totalScore = fa.total;
+        const f1 = fa.f1, f2 = fa.f2, f3 = fa.f3, f4 = fa.f4, f5 = fa.f5, f6 = fa.f6;
 
         const evalId = "auto-eval-" + journalId + "-" + Date.now();
         await db.prepare(`
-          INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, overall_comment, reasoning, token_count, duration_ms, created_at)
-          VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
+          INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, overall_comment, reasoning, token_count, duration_ms, created_at)
+          VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
         `).bind(
-          evalId, journalId, "gpt-4o", "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4,
+          evalId, journalId, "gpt-4o", "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4, f5, f6,
           String((aiResult as any).overall_comment || ""),
           String(aiResult.reasoning || "")
         ).run();
@@ -1003,33 +1038,22 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
   }
 
   try {
-    const scores = { f1: [] as number[], f2: [] as number[], f3: [] as number[], f4: [] as number[] };
-    body.evaluation.items.forEach((item: any) => {
-      if (item.is_na || !item.score) return;
-      if (item.item_number <= 7) scores.f1.push(item.score);
-      else if (item.item_number <= 13) scores.f2.push(item.score);
-      else if (item.item_number <= 17) scores.f3.push(item.score);
-      else scores.f4.push(item.score);
-    });
-
-    const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
-    const allScores = [...scores.f1, ...scores.f2, ...scores.f3, ...scores.f4];
-    
-    const computedTotal = avg(allScores);
+    const fa = computeFactorAverages(body.evaluation.items);
+    const computedTotal = fa.total;
     const evalId = genId();
     
     await db.prepare(`
       INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature,
-        total_score, factor1_score, factor2_score, factor3_score, factor4_score,
+        total_score, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score,
         overall_comment, reasoning, halo_effect_detected, token_count, duration_ms, created_at)
-      VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       evalId, body.journal_id,
       body.model_name ?? "gpt-4o",
       body.prompt_version ?? "CoT-A-v1.0",
       body.temperature ?? 0.2,
       computedTotal,
-      avg(scores.f1), avg(scores.f2), avg(scores.f3), avg(scores.f4),
+      fa.f1, fa.f2, fa.f3, fa.f4, fa.f5, fa.f6,
       body.evaluation.overall_comment,
       body.evaluation.reasoning,
       body.evaluation.halo_effect_detected ? 1 : 0,
@@ -1038,7 +1062,7 @@ dataRouter.post("/evaluations", requireRoles(["student", "evaluator", "researche
       new Date().toISOString()
     ).run();
 
-    // 23項目を保存
+    // 全項目を保存（6因子40項目）
     for (const item of body.evaluation.items) {
       const rdLevel = (item.rd_level as string | undefined) || scoreToRdLevel(item.score);
       await db.prepare(`
@@ -1173,17 +1197,7 @@ dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin"
   }
 
   try {
-    const scores = { f1: [] as number[], f2: [] as number[], f3: [] as number[], f4: [] as number[] };
-    body.items.forEach((item) => {
-      if (item.is_na || !item.score) return;
-      if (item.item_number <= 7) scores.f1.push(item.score);
-      else if (item.item_number <= 13) scores.f2.push(item.score);
-      else if (item.item_number <= 17) scores.f3.push(item.score);
-      else scores.f4.push(item.score);
-    });
-
-    const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
-    const allScores = [...scores.f1, ...scores.f2, ...scores.f3, ...scores.f4];
+    const fa = computeFactorAverages(body.items);
 
     // 既存の同一評価者のデータがあれば削除（アイテムも含む）
     const oldEvals = await db.prepare("SELECT id FROM human_evaluations WHERE journal_id = ? AND evaluator_id = ?").bind(body.journal_id, body.evaluator_id).all();
@@ -1197,11 +1211,11 @@ dataRouter.post("/human-evals", requireRoles(["evaluator", "researcher", "admin"
     const id = genId();
     await db.prepare(`
       INSERT INTO human_evaluations (id, journal_id, evaluator_id, evaluator_name,
-        total_score, factor1_score, factor2_score, factor3_score, factor4_score, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        total_score, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id, body.journal_id, body.evaluator_id, body.evaluator_name,
-      avg(allScores), avg(scores.f1), avg(scores.f2), avg(scores.f3), avg(scores.f4),
+      fa.total, fa.f1, fa.f2, fa.f3, fa.f4, fa.f5, fa.f6,
       nowISO()
     ).run();
 
@@ -1280,6 +1294,8 @@ dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c
     factor2_score: number;
     factor3_score: number;
     factor4_score: number;
+    factor5_score?: number;
+    factor6_score?: number;
     rd_journal_level?: number;
     comment?: string;
   };
@@ -1289,17 +1305,24 @@ dataRouter.post("/self-evals", requireRoles(["student"] as UserRole[]), async (c
   if (validatedWeek instanceof Response) return validatedWeek;
 
   try {
-    const total = (body.factor1_score * 7 + body.factor2_score * 6 + body.factor3_score * 4 + body.factor4_score * 6) / 23;
+    // 6因子40項目 加重平均（各因子項目数 [11,8,5,7,5,4] / 40）
+    const f5 = body.factor5_score ?? 0;
+    const f6 = body.factor6_score ?? 0;
+    const total = (
+      body.factor1_score * 11 + body.factor2_score * 8 + body.factor3_score * 5 +
+      body.factor4_score * 7 + f5 * 5 + f6 * 4
+    ) / 40;
     const id = genId();
 
     await db.prepare(`
       INSERT OR REPLACE INTO self_evaluations
         (id, student_id, week_number, journal_id, factor1_score, factor2_score, factor3_score, factor4_score,
-         total_score, rd_journal_level, comment, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         factor5_score, factor6_score, total_score, rd_journal_level, comment, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id, body.student_id, validatedWeek, body.journal_id ?? null,
       body.factor1_score, body.factor2_score, body.factor3_score, body.factor4_score,
+      f5, f6,
       Math.round(total * 100) / 100,
       body.rd_journal_level ?? null, body.comment ?? null, nowISO()
     ).run();
@@ -1326,6 +1349,8 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
         AVG(e.factor2_score) as factor2,
         AVG(e.factor3_score) as factor3,
         AVG(e.factor4_score) as factor4,
+        AVG(e.factor5_score) as factor5,
+        AVG(e.factor6_score) as factor6,
         AVG(e.total_score) as ai_total,
         MAX(j.id) as journal_id
       FROM journal_entries j
@@ -1343,6 +1368,8 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
         AVG(factor2_score) as self_f2,
         AVG(factor3_score) as self_f3,
         AVG(factor4_score) as self_f4,
+        AVG(factor5_score) as self_f5,
+        AVG(factor6_score) as self_f6,
         AVG(total_score) as self_total
       FROM self_evaluations
       WHERE student_id = ?
@@ -1367,6 +1394,8 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
           factor2: row.factor2 || 0,
           factor3: row.factor3 || 0,
           factor4: row.factor4 || 0,
+          factor5: row.factor5 || 0,
+          factor6: row.factor6 || 0,
           total: row.ai_total || 0,    // 互換: total = AI 評価 (歴史的キー)
           ai_total: row.ai_total || 0,
           self_total: self ? (self.self_total || 0) : null,
@@ -1374,6 +1403,8 @@ dataRouter.get("/growth/:studentId", requireRoles(["student", "teacher", "univ_t
           self_factor2: self ? (self.self_f2 || 0) : null,
           self_factor3: self ? (self.self_f3 || 0) : null,
           self_factor4: self ? (self.self_f4 || 0) : null,
+          self_factor5: self ? (self.self_f5 || 0) : null,
+          self_factor6: self ? (self.self_f6 || 0) : null,
           gap: self && row.ai_total ? Math.round(((row.ai_total - (self.self_total || 0)) * 100)) / 100 : null,
           journal_id: row.journal_id || ""
         };
@@ -1561,14 +1592,14 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
     // 各学生の週次スコアを取得
     const profiles = await Promise.all(students.map(async (s: any) => {
       const scoresResult = await db.prepare(`
-        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, total_score
+        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, total_score
         FROM learning_progress_scores
         WHERE student_id = ?
         ORDER BY week_number ASC
       `).bind(s.id).all();
       const scores = scoresResult.results as any[];
 
-      // フロントは weekly_scores を { week, factor1, factor2, factor3, factor4, total } の
+      // フロントは weekly_scores を { week, factor1..factor6, total } の
       // オブジェクト配列として扱う (LongitudinalAnalysisPage / StatisticsPage 等)。
       const weeklyScores = scores.map((r: any) => ({
         week: r.week_number,
@@ -1576,6 +1607,8 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
         factor2: r.factor2_score,
         factor3: r.factor3_score,
         factor4: r.factor4_score,
+        factor5: r.factor5_score,
+        factor6: r.factor6_score,
         total: r.total_score,
       }));
       const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
@@ -1585,6 +1618,8 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
       const finalFactor2 = lastScore ? lastScore.factor2_score : 0;
       const finalFactor3 = lastScore ? lastScore.factor3_score : 0;
       const finalFactor4 = lastScore ? lastScore.factor4_score : 0;
+      const finalFactor5 = lastScore ? lastScore.factor5_score : 0;
+      const finalFactor6 = lastScore ? lastScore.factor6_score : 0;
       const growthDelta = (lastScore && firstScore)
         ? parseFloat((lastScore.total_score - firstScore.total_score).toFixed(2))
         : 0;
@@ -1614,6 +1649,8 @@ dataRouter.get("/teacher/profiles", requireRoles(["teacher", "univ_teacher", "sc
         final_factor2: finalFactor2,
         final_factor3: finalFactor3,
         final_factor4: finalFactor4,
+        final_factor5: finalFactor5,
+        final_factor6: finalFactor6,
         growth_delta: growthDelta,
       };
     }));
@@ -1650,7 +1687,7 @@ dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_ment
 
     const profiles = await Promise.all(students.map(async (s: any) => {
       const scoresResult = await db.prepare(`
-        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, total_score
+        SELECT week_number, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, total_score
         FROM learning_progress_scores
         WHERE student_id = ?
         ORDER BY week_number ASC
@@ -1663,6 +1700,8 @@ dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_ment
         factor2: r.factor2_score,
         factor3: r.factor3_score,
         factor4: r.factor4_score,
+        factor5: r.factor5_score,
+        factor6: r.factor6_score,
         total: r.total_score,
       }));
       const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
@@ -1696,6 +1735,8 @@ dataRouter.get("/cohorts", requireRoles(["teacher", "univ_teacher", "school_ment
         final_factor2: lastScore ? lastScore.factor2_score : 0,
         final_factor3: lastScore ? lastScore.factor3_score : 0,
         final_factor4: lastScore ? lastScore.factor4_score : 0,
+        final_factor5: lastScore ? lastScore.factor5_score : 0,
+        final_factor6: lastScore ? lastScore.factor6_score : 0,
         growth_delta: growthDelta,
       };
     }));
@@ -1790,7 +1831,7 @@ dataRouter.get("/export/evaluations-csv", requireRoles(["researcher", "admin", "
     const { results } = await db.prepare(`
       SELECT
         je.student_id, je.week_number, je.entry_date,
-        e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score,
+        e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score, e.factor5_score, e.factor6_score,
         e.halo_effect_detected, e.overall_comment, e.model_name
       FROM evaluations e
       JOIN journal_entries je ON e.journal_id = je.id
@@ -1800,7 +1841,7 @@ dataRouter.get("/export/evaluations-csv", requireRoles(["researcher", "admin", "
 
     const headers = [
       "student_id", "week_number", "entry_date",
-      "total_score", "factor1_score", "factor2_score", "factor3_score", "factor4_score",
+      "total_score", "factor1_score", "factor2_score", "factor3_score", "factor4_score", "factor5_score", "factor6_score",
       "halo_effect_detected", "overall_comment", "model_name"
     ];
 
@@ -1872,7 +1913,7 @@ dataRouter.get("/export/reliability-csv", requireRoles(["researcher", "admin", "
 
 // ────────────────────────────────────────────────────────────────
 // GET /api/data/rubric-behaviors
-// 全23項目×5段階のRD水準行動指標を返す（または初期投入）
+// 全40項目×5段階のRD水準行動指標を返す（または初期投入）
 // 2026-03-07: 全因子共通RD水準対応
 // ────────────────────────────────────────────────────────────────
 dataRouter.get("/rubric-behaviors", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator", "board_observer"]), async (c) => {
@@ -1927,297 +1968,38 @@ dataRouter.post("/evaluation-items/backfill-rd-level", requireRoles(["admin", "r
 });
 
 // POST /api/data/rubric-behaviors/seed
-// 全23項目×5段階のRD水準行動指標をDBに投入（初期化）
+// 全40項目×5段階のRD水準行動指標をDBに投入（初期化）
 // ────────────────────────────────────────────────────────────────
 dataRouter.post("/rubric-behaviors/seed", requireRoles(["admin", "researcher"] as UserRole[]), async (c) => {
   const db = c.env?.DB;
   if (!db) return c.json({ error: "DB not configured" }, 500);
 
-  // 全4因子・全23項目×5段階のRD行動指標データ（rubric.ts と完全同期 2026-03-07）
-  const behaviors = [
-    // ── 因子Ⅰ 児童生徒への指導力（項目1–7）──
-    { item_number:1, factor:"factor1", item_label:"特別支援対応力（実践）", lambda:0.95,
-      score:5, rd_level:"RD4", indicator:"IEP相当の支援内容をインクルーシブ教育の理念・障害者権利条約等と批判的に結びつけ、「なぜその支援を選択したか」の前提を問い直した記述がある。担任・特別支援教員と連携した実践の根拠を信念レベルで記述している" },
-    { item_number:1, factor:"factor1", item_label:"特別支援対応力（実践）", lambda:0.95,
-      score:4, rd_level:"RD3", indicator:"授業前に支援の見通しを立て、個々の状態に応じた座席・教材・声かけの原因・背景を分析し、代替的な支援方法を検討した上で実践し、結果を省察として日誌に記している" },
-    { item_number:1, factor:"factor1", item_label:"特別支援対応力（実践）", lambda:0.95,
-      score:3, rd_level:"RD2", indicator:"担当教員の指示に従い支援を実施し、実施後の感想・気づきを言語化しているが、原因分析や代替案の検討は限定的" },
-    { item_number:1, factor:"factor1", item_label:"特別支援対応力（実践）", lambda:0.95,
-      score:2, rd_level:"RD1", indicator:"支援の事実のみを記述するにとどまり（「○○をした」「座席を配慮した」等）、省察的要素や気づきの言語化が見られない" },
-    { item_number:1, factor:"factor1", item_label:"特別支援対応力（実践）", lambda:0.95,
-      score:1, rd_level:"RD0", indicator:"特別な支援が必要な児童への対応・省察が日誌に見られない、または誤った記述がある" },
-    { item_number:2, factor:"factor1", item_label:"外国語児童への指導実践", lambda:0.85,
-      score:5, rd_level:"RD4", indicator:"多文化共生・言語的マイノリティ支援の教育的信念・社会的文脈（JSLカリキュラムの意義等）と実践を批判的に結びつけ、「なぜその指導手段を選んだか」の前提を問い直した記述がある" },
-    { item_number:2, factor:"factor1", item_label:"外国語児童への指導実践", lambda:0.85,
-      score:4, rd_level:"RD3", indicator:"視覚教材や簡易な日本語での言い換えなど複数の工夫の原因・背景を分析し、「他にどんな方法があったか」を検討した上で実践し、その効果を省察として日誌に記している" },
-    { item_number:2, factor:"factor1", item_label:"外国語児童への指導実践", lambda:0.85,
-      score:3, rd_level:"RD2", indicator:"指導教員のアドバイスを受けてシンプルな言い換えや視覚補助を行い、実施後の感想・気づきを言語化しているが、方法の根拠や代替案への言及は限定的" },
-    { item_number:2, factor:"factor1", item_label:"外国語児童への指導実践", lambda:0.85,
-      score:2, rd_level:"RD1", indicator:"母語が日本語でない児童への対応の事実のみを記述し（「ゆっくり話した」等）、省察的要素が見られない" },
-    { item_number:2, factor:"factor1", item_label:"外国語児童への指導実践", lambda:0.85,
-      score:1, rd_level:"RD0", indicator:"該当児童への個別対応・省察が日誌に記述されていない" },
-    { item_number:3, factor:"factor1", item_label:"特別支援対応力（理解）", lambda:0.81,
-      score:5, rd_level:"RD4", indicator:"障害種別（LD・ADHD・ASD・身体障害等）に応じた対応の根拠（制度・研究・指導書等）を明示し、「なぜその知識・制度を指導方法の選択に用いるのか」を倫理的・社会的観点から問い直した記述がある" },
-    { item_number:3, factor:"factor1", item_label:"特別支援対応力（理解）", lambda:0.81,
-      score:4, rd_level:"RD3", indicator:"複数の障害特性と対応策の因果関係を分析し、授業設計への反映根拠と代替的アプローチを具体的に検討した記述がある" },
-    { item_number:3, factor:"factor1", item_label:"特別支援対応力（理解）", lambda:0.81,
-      score:3, rd_level:"RD2", indicator:"一般的な支援知識（配慮事項・合理的配慮等）の理解を言語化しているが、児童の実態への応用根拠や代替案への言及は限定的" },
-    { item_number:3, factor:"factor1", item_label:"特別支援対応力（理解）", lambda:0.81,
-      score:2, rd_level:"RD1", indicator:"特別支援に関する知識を断片的に列挙するにとどまり（「○○に配慮が必要と思う」等）、省察的要素が見られない" },
-    { item_number:3, factor:"factor1", item_label:"特別支援対応力（理解）", lambda:0.81,
-      score:1, rd_level:"RD0", indicator:"特別支援に関する理解・省察が日誌に示されていない" },
-    { item_number:4, factor:"factor1", item_label:"外国語児童への対応理解", lambda:0.64,
-      score:5, rd_level:"RD4", indicator:"JSLカリキュラム・生活日本語指導・通訳支援等の制度的枠組みを、多文化共生教育の信念・社会的文脈と批判的に結びつけ、「なぜその制度的対応が必要か」の前提を問い直した記述がある" },
-    { item_number:4, factor:"factor1", item_label:"外国語児童への対応理解", lambda:0.64,
-      score:4, rd_level:"RD3", indicator:"日本語指導の方針（取り出し指導・在籍学級支援）の差異を分析し、自クラスの状況に照らした複数の選択肢と判断根拠を具体的に検討した記述がある" },
-    { item_number:4, factor:"factor1", item_label:"外国語児童への対応理解", lambda:0.64,
-      score:3, rd_level:"RD2", indicator:"言語面の配慮（わかりやすい日本語・視覚支援）への理解を言語化しているが、制度的背景の知識・代替案への言及は限定的" },
-    { item_number:4, factor:"factor1", item_label:"外国語児童への対応理解", lambda:0.64,
-      score:2, rd_level:"RD1", indicator:"「配慮が必要」という認識を事実として記述するにとどまり、具体的な対応方法の検討や省察が乏しい" },
-    { item_number:4, factor:"factor1", item_label:"外国語児童への対応理解", lambda:0.64,
-      score:1, rd_level:"RD0", indicator:"外国語児童への対応理解・省察が記述に見られない" },
-    { item_number:5, factor:"factor1", item_label:"性差・多様性への理解", lambda:0.58,
-      score:5, rd_level:"RD4", indicator:"性差に関する発達心理学的知見（統計的傾向と個人差の区別）を教育的信念・倫理的観点と批判的に結びつけ、固定的性別役割分業を避けた関わりの前提を問い直し、その根拠を省察に記述している" },
-    { item_number:5, factor:"factor1", item_label:"性差・多様性への理解", lambda:0.58,
-      score:4, rd_level:"RD3", indicator:"グループ編成・声かけ等における性差への配慮の原因・背景を分析し、「別の関わり方はなかったか」を具体的に検討した事例を記述している" },
-    { item_number:5, factor:"factor1", item_label:"性差・多様性への理解", lambda:0.58,
-      score:3, rd_level:"RD2", indicator:"性差への気づきや感情を言語化しているが（「性差を意識する場面があった」等）、実践への応用根拠や代替案への言及は限定的" },
-    { item_number:5, factor:"factor1", item_label:"性差・多様性への理解", lambda:0.58,
-      score:2, rd_level:"RD1", indicator:"性差に関する事実のみを列挙するにとどまり、省察的要素が見られない。または記述に固定的性別観が見られる" },
-    { item_number:5, factor:"factor1", item_label:"性差・多様性への理解", lambda:0.58,
-      score:1, rd_level:"RD0", indicator:"性差・多様性への言及・省察がなく、無自覚な偏りが見受けられる" },
-    { item_number:6, factor:"factor1", item_label:"文化的多様性への理解", lambda:0.45,
-      score:5, rd_level:"RD4", indicator:"特定の児童の行動・反応の背景にある文化的・宗教的・社会的要因を多文化共生の信念・社会的文脈と批判的に結びつけ、「自分の文化的前提は何か」を問い直した記述がある" },
-    { item_number:6, factor:"factor1", item_label:"文化的多様性への理解", lambda:0.45,
-      score:4, rd_level:"RD3", indicator:"文化的背景が学習・行動に影響する原因・背景を複数の事例で分析し、代替的な関わり方を具体的に検討した記述がある" },
-    { item_number:6, factor:"factor1", item_label:"文化的多様性への理解", lambda:0.45,
-      score:3, rd_level:"RD2", indicator:"多文化共生への気づきや感想を言語化しているが（「文化の違いを感じた」等）、実習日誌での言及は抽象的で原因分析は限定的" },
-    { item_number:6, factor:"factor1", item_label:"文化的多様性への理解", lambda:0.45,
-      score:2, rd_level:"RD1", indicator:"文化的多様性に関する事実のみを列挙するにとどまり、省察的要素が見られない" },
-    { item_number:6, factor:"factor1", item_label:"文化的多様性への理解", lambda:0.45,
-      score:1, rd_level:"RD0", indicator:"文化的多様性への理解・省察が日誌に示されていない" },
-    { item_number:7, factor:"factor1", item_label:"教科特性を踏まえた授業設計", lambda:0.44,
-      score:5, rd_level:"RD4", indicator:"担当教科の本質的な見方・考え方（学習指導要領準拠）とクラスの学習実態を教育的信念・教科観と批判的に結びつけ、「なぜその授業設計を選択したか」の前提を問い直し、論拠を日誌に明示している" },
-    { item_number:7, factor:"factor1", item_label:"教科特性を踏まえた授業設計", lambda:0.44,
-      score:4, rd_level:"RD3", indicator:"教科特性（例：算数の数学的思考、国語の言語感覚）を意識した授業設計の原因・背景を分析し、代替的な設計案と「なぜそれを選んだか」を検討した記述がある" },
-    { item_number:7, factor:"factor1", item_label:"教科特性を踏まえた授業設計", lambda:0.44,
-      score:3, rd_level:"RD2", indicator:"教科書・指導書に沿った授業実施後の気づき・感想を言語化しているが（「児童の反応が予想と違った」等）、教科特性への応用根拠や代替案は限定的" },
-    { item_number:7, factor:"factor1", item_label:"教科特性を踏まえた授業設計", lambda:0.44,
-      score:2, rd_level:"RD1", indicator:"授業設計が指導書の模倣にとどまり、授業の事実のみを記述し、省察的要素や児童実態との接続が見られない" },
-    { item_number:7, factor:"factor1", item_label:"教科特性を踏まえた授業設計", lambda:0.44,
-      score:1, rd_level:"RD0", indicator:"授業設計の根拠や児童実態への省察が日誌に見られない" },
-    // ── 因子Ⅱ 自己評価力（項目8–13）──
-    { item_number:8, factor:"factor2", item_label:"体験と成長の接続", lambda:0.94,
-      score:5, rd_level:"RD4", indicator:"特定の実習体験を、教師成長理論（反省的実践家論・Dreyfusモデル等）や自己の教育的信念・社会的文脈と批判的に結びつけ、将来の専門的発達への含意および現在の信念の問い直しを記述している" },
-    { item_number:8, factor:"factor2", item_label:"体験と成長の接続", lambda:0.94,
-      score:4, rd_level:"RD3", indicator:"具体的な体験から「なぜそうなったか」「何を学んだか」を原因－結果として分析し、別の関わり方や次回への改善策を検討している" },
-    { item_number:8, factor:"factor2", item_label:"体験と成長の接続", lambda:0.94,
-      score:3, rd_level:"RD2", indicator:"体験から得た感情・気づき（「○○が大変だった」「△△に驚いた」等）を言語化しているが、教師としての発達との因果分析や代替案は限定的" },
-    { item_number:8, factor:"factor2", item_label:"体験と成長の接続", lambda:0.94,
-      score:2, rd_level:"RD1", indicator:"体験を「できた・できなかった」の事実として列挙するにとどまり、教師としての成長や発達との接続が見られない" },
-    { item_number:8, factor:"factor2", item_label:"体験と成長の接続", lambda:0.94,
-      score:1, rd_level:"RD0", indicator:"体験と教師としての成長の関係についての省察が日誌に見られない" },
-    { item_number:9, factor:"factor2", item_label:"指導姿勢の検証能力", lambda:0.81,
-      score:5, rd_level:"RD4", indicator:"自己の指導哲学・教育的信念に照らして授業実践を批判的に問い直し、「なぜその指導を選んだか」「その前提は妥当か」を理論的裏付けとともに記述し、継続的な教育への関心が信念レベルで示されている" },
-    { item_number:9, factor:"factor2", item_label:"指導姿勢の検証能力", lambda:0.81,
-      score:4, rd_level:"RD3", indicator:"授業中の自己行動（発問・板書・反応等）の原因・背景を多角的に分析し、具体的な代替策・改善案を提示している" },
-    { item_number:9, factor:"factor2", item_label:"指導姿勢の検証能力", lambda:0.81,
-      score:3, rd_level:"RD2", indicator:"授業への感想や気づき（「発問が難しかった」「児童が積極的だった」等）を言語化しているが、検証の視点・方法が表面的" },
-    { item_number:9, factor:"factor2", item_label:"指導姿勢の検証能力", lambda:0.81,
-      score:2, rd_level:"RD1", indicator:"授業後の記述が「うまくいった・うまくいかなかった」の事実評価にとどまり、検証プロセスが見えない" },
-    { item_number:9, factor:"factor2", item_label:"指導姿勢の検証能力", lambda:0.81,
-      score:1, rd_level:"RD0", indicator:"自分の指導姿勢への省察が日誌に見られない" },
-    { item_number:10, factor:"factor2", item_label:"模範的姿勢の実践", lambda:0.72,
-      score:5, rd_level:"RD4", indicator:"自己の価値観・態度を教育的信念や文化的・倫理的文脈と批判的に吟味し、「なぜその価値観を模範として示すべきか」を問い直した上で、意図的な実践とその省察を記述している" },
-    { item_number:10, factor:"factor2", item_label:"模範的姿勢の実践", lambda:0.72,
-      score:4, rd_level:"RD3", indicator:"模範として示した行動（挨拶・公平な対応・積極性等）の効果・影響を分析し、「別の示し方はなかったか」「なぜそれを選んだか」を具体的に検討している" },
-    { item_number:10, factor:"factor2", item_label:"模範的姿勢の実践", lambda:0.72,
-      score:3, rd_level:"RD2", indicator:"模範を示そうとした場面の感情・気づきを言語化しているが（「手本になれたか不安だった」等）、原因分析や代替案の検討は限定的" },
-    { item_number:10, factor:"factor2", item_label:"模範的姿勢の実践", lambda:0.72,
-      score:2, rd_level:"RD1", indicator:"模範的行動の事実のみを記述し（「挨拶をした」「笑顔で接した」等）、内的な気づきや省察が見られない" },
-    { item_number:10, factor:"factor2", item_label:"模範的姿勢の実践", lambda:0.72,
-      score:1, rd_level:"RD0", indicator:"自分が模範を示すという視点での省察が日誌に見られない" },
-    { item_number:11, factor:"factor2", item_label:"フィードバック受容力", lambda:0.62,
-      score:5, rd_level:"RD4", indicator:"受けたフィードバックを自己の教育的信念・実践哲学に照らして批判的に検討し、取捨選択の根拠・信念レベルでの問い直しを記述している（「このアドバイスを受け入れることが自分の教育観とどう整合するか」等）" },
-    { item_number:11, factor:"factor2", item_label:"フィードバック受容力", lambda:0.62,
-      score:4, rd_level:"RD3", indicator:"フィードバックの背景・意図を分析し、具体的な改善行動と複数の代替案を提示し、その実践結果を省察として記述している" },
-    { item_number:11, factor:"factor2", item_label:"フィードバック受容力", lambda:0.62,
-      score:3, rd_level:"RD2", indicator:"フィードバックを受けた際の感情・気づきを言語化しているが（「厳しかったが気づいた」等）、改善行動への具体的な接続や原因分析が不明確" },
-    { item_number:11, factor:"factor2", item_label:"フィードバック受容力", lambda:0.62,
-      score:2, rd_level:"RD1", indicator:"フィードバックの内容を事実として記録するにとどまり（「○○と言われた」等）、受容・省察の記述がない" },
-    { item_number:11, factor:"factor2", item_label:"フィードバック受容力", lambda:0.62,
-      score:1, rd_level:"RD0", indicator:"フィードバックへの言及・受容の省察が日誌に見られない" },
-    { item_number:12, factor:"factor2", item_label:"実践省察と改善責任", lambda:0.61,
-      score:5, rd_level:"RD4", indicator:"実践の問題点を社会的・教育的文脈（学校制度、文化的背景等）と批判的に結びつけ、専門的アイデンティティの形成と関連させて省察している。自己の専門的ニーズを構造的に記述し、長期的改善責任を表明している" },
-    { item_number:12, factor:"factor2", item_label:"実践省察と改善責任", lambda:0.61,
-      score:4, rd_level:"RD3", indicator:"実践課題の原因を多角的に分析し（「なぜ失敗したか」「何が影響しているか」）、具体的改善計画と実行・再評価のサイクルを記述している" },
-    { item_number:12, factor:"factor2", item_label:"実践省察と改善責任", lambda:0.61,
-      score:3, rd_level:"RD2", indicator:"実践の問題点への気づきと改善意欲を言語化しているが（「次はうまくやりたい」等）、原因分析や改善の具体策が浅い" },
-    { item_number:12, factor:"factor2", item_label:"実践省察と改善責任", lambda:0.61,
-      score:2, rd_level:"RD1", indicator:"実践の結果を事実として記述するにとどまり（「授業がうまくいかなかった」等）、省察・責任意識が見られない" },
-    { item_number:12, factor:"factor2", item_label:"実践省察と改善責任", lambda:0.61,
-      score:1, rd_level:"RD0", indicator:"実践省察・改善責任への言及が日誌に見られない" },
-    { item_number:13, factor:"factor2", item_label:"専門性向上のための自己評価", lambda:0.52,
-      score:5, rd_level:"RD4", indicator:"外部評価・自己評価・教育的信念を統合し、自己の専門的成長段階と社会的役割を批判的に評価している。「なぜその評価基準を用いるのか」「自分の成長に何が欠けているか」を理論的・倫理的観点から問い直している" },
-    { item_number:13, factor:"factor2", item_label:"専門性向上のための自己評価", lambda:0.52,
-      score:4, rd_level:"RD3", indicator:"自己評価と他者評価の差異を分析し、複数の視点から強みと課題を特定し、具体的な成長課題と改善行動を記述している" },
-    { item_number:13, factor:"factor2", item_label:"専門性向上のための自己評価", lambda:0.52,
-      score:3, rd_level:"RD2", indicator:"自己評価を試み、感情・気づきを言語化しているが（「自分は〇〇が苦手だと思った」等）、評価基準が主観的で原因分析が浅い" },
-    { item_number:13, factor:"factor2", item_label:"専門性向上のための自己評価", lambda:0.52,
-      score:2, rd_level:"RD1", indicator:"自己評価が「よかった・悪かった」の二値的判断にとどまり、根拠・省察が乏しい" },
-    { item_number:13, factor:"factor2", item_label:"専門性向上のための自己評価", lambda:0.52,
-      score:1, rd_level:"RD0", indicator:"自己評価・自己省察の記述が日誌に見られない" },
-    // ── 因子Ⅲ 学級経営力（項目14–17）──
-    { item_number:14, factor:"factor3", item_label:"生徒指導力", lambda:0.91,
-      score:5, rd_level:"RD4", indicator:"問題行動の背景要因（家庭環境・友人関係・学習困難等）を生徒指導の理念・社会的文脈（予防的・治療的指導の意義等）と批判的に結びつけ、「なぜその指導方針を選択したか」の前提を問い直した記述がある" },
-    { item_number:14, factor:"factor3", item_label:"生徒指導力", lambda:0.91,
-      score:4, rd_level:"RD3", indicator:"生徒指導上の問題場面における原因・背景を多角的に分析し、代替的な介入方法を検討した上で適切に対応し、指導後の経過観察と省察を日誌に記述している" },
-    { item_number:14, factor:"factor3", item_label:"生徒指導力", lambda:0.91,
-      score:3, rd_level:"RD2", indicator:"生徒指導の基本方針（叱責より支援）への気づきや感想を言語化しているが（「難しかった」「どう対応すべきかわからなかった」等）、原因分析や代替案の検討は限定的" },
-    { item_number:14, factor:"factor3", item_label:"生徒指導力", lambda:0.91,
-      score:2, rd_level:"RD1", indicator:"問題行動への対応の事実のみを記述するにとどまり（「注意した」「指導教員に報告した」等）、省察的要素が見られない" },
-    { item_number:14, factor:"factor3", item_label:"生徒指導力", lambda:0.91,
-      score:1, rd_level:"RD0", indicator:"生徒指導に関する意識・実践・省察が日誌に見られない" },
-    { item_number:15, factor:"factor3", item_label:"学級管理能力", lambda:0.87,
-      score:5, rd_level:"RD4", indicator:"授業規律・清掃・当番・席次等の管理業務を、学級経営の教育的信念・学校文化の社会的文脈と批判的に結びつけ、「なぜそのマネジメントスタイルを選択したか」の前提を問い直し、安定した学級環境創出の根拠を記述している" },
-    { item_number:15, factor:"factor3", item_label:"学級管理能力", lambda:0.87,
-      score:4, rd_level:"RD3", indicator:"担任の管理スタイルの原因・背景を分析し、自分なりの改善工夫と代替的アプローチを検討しながら運営した記述がある" },
-    { item_number:15, factor:"factor3", item_label:"学級管理能力", lambda:0.87,
-      score:3, rd_level:"RD2", indicator:"基本的な管理業務への気づきや感想を言語化しているが（「突発的な事態に戸惑った」等）、対処法の根拠や代替案への言及は限定的" },
-    { item_number:15, factor:"factor3", item_label:"学級管理能力", lambda:0.87,
-      score:2, rd_level:"RD1", indicator:"管理業務の事実のみを記述するにとどまり（「当番を確認した」等）、省察的要素が見られない" },
-    { item_number:15, factor:"factor3", item_label:"学級管理能力", lambda:0.87,
-      score:1, rd_level:"RD0", indicator:"学級管理への関与・省察が日誌に見られない" },
-    { item_number:16, factor:"factor3", item_label:"リーダーシップ発揮", lambda:0.83,
-      score:5, rd_level:"RD4", indicator:"民主的・支援的リーダーシップのスタイルを、教育的信念・権威の社会的意味と批判的に結びつけ、「なぜそのリーダーシップ様式を選んだか」の前提を問い直した記述がある" },
-    { item_number:16, factor:"factor3", item_label:"リーダーシップ発揮", lambda:0.83,
-      score:4, rd_level:"RD3", indicator:"指示の明確さ・一貫した対応・公平な扱い等のリーダーシップ行動の原因・背景を分析し、「別のアプローチはなかったか」を検討した具体的記述がある" },
-    { item_number:16, factor:"factor3", item_label:"リーダーシップ発揮", lambda:0.83,
-      score:3, rd_level:"RD2", indicator:"教師としての権威・リーダーシップへの気づきや感情を言語化しているが（「うまく指示できなかった」等）、場面によって不安定で原因分析は限定的" },
-    { item_number:16, factor:"factor3", item_label:"リーダーシップ発揮", lambda:0.83,
-      score:2, rd_level:"RD1", indicator:"リーダーシップ行動の事実のみを記述するにとどまり（「指示を出した」等）、省察的要素が見られない" },
-    { item_number:16, factor:"factor3", item_label:"リーダーシップ発揮", lambda:0.83,
-      score:1, rd_level:"RD0", indicator:"教師としてのリーダーシップに関する省察が日誌にほとんどない" },
-    { item_number:17, factor:"factor3", item_label:"児童の困難支援", lambda:0.77,
-      score:5, rd_level:"RD4", indicator:"学習面・対人面・情緒面の困難を、子どもの権利・インクルーシブ支援の教育的信念・社会的文脈と批判的に結びつけ、SC・保護者・管理職と連携した組織的支援の根拠を問い直した記述がある" },
-    { item_number:17, factor:"factor3", item_label:"児童の困難支援", lambda:0.77,
-      score:4, rd_level:"RD3", indicator:"児童の困難の原因・背景を多角的に分析し、傾聴・個別面談・授業内配慮等の複数の支援アプローチを検討・試みた記述がある" },
-    { item_number:17, factor:"factor3", item_label:"児童の困難支援", lambda:0.77,
-      score:3, rd_level:"RD2", indicator:"困難を抱える児童への気づきや感情を言語化しているが（「どうしてあげればよいかわからなかった」等）、体系的支援への言及は限定的" },
-    { item_number:17, factor:"factor3", item_label:"児童の困難支援", lambda:0.77,
-      score:2, rd_level:"RD1", indicator:"困難の存在を事実として記録するにとどまり（「○○が困っていた」等）、支援行動への省察的要素が見られない" },
-    { item_number:17, factor:"factor3", item_label:"児童の困難支援", lambda:0.77,
-      score:1, rd_level:"RD0", indicator:"児童の困難への気づき・支援・省察が日誌に見られない" },
-    // ── 因子Ⅳ 職務を理解して行動する力（項目18–23）──
-    { item_number:18, factor:"factor4", item_label:"同僚の学習支援役割理解", lambda:1.03,
-      score:5, rd_level:"RD4", indicator:"担任・副担任・特別支援教員・養護教諭等の協働役割を、チーム学校の理念・組織的支援の社会的文脈と批判的に結びつけ、「なぜ役割分担がこうあるべきか」の前提を問い直し、実習活動との接続を記述している" },
-    { item_number:18, factor:"factor4", item_label:"同僚の学習支援役割理解", lambda:1.03,
-      score:4, rd_level:"RD3", indicator:"複数の同僚の役割分担の原因・背景を分析し、実習活動でその連携を意識した複数の行動と代替的なアプローチを検討した記述がある" },
-    { item_number:18, factor:"factor4", item_label:"同僚の学習支援役割理解", lambda:1.03,
-      score:3, rd_level:"RD2", indicator:"担任以外の教職員の役割への気づきや感想を言語化しているが（「こんな役割があると知った」等）、実習場面での連携意識の根拠は限定的" },
-    { item_number:18, factor:"factor4", item_label:"同僚の学習支援役割理解", lambda:1.03,
-      score:2, rd_level:"RD1", indicator:"同僚の役割について担任に偏った事実のみを記述するにとどまり、省察的要素が見られない" },
-    { item_number:18, factor:"factor4", item_label:"同僚の学習支援役割理解", lambda:1.03,
-      score:1, rd_level:"RD0", indicator:"同僚や他の教職員の役割に関する省察が日誌に見られない" },
-    { item_number:19, factor:"factor4", item_label:"特別責任を有する同僚役割の理解", lambda:0.98,
-      score:5, rd_level:"RD4", indicator:"指導教諭・主任・副校長・特別支援コーディネーター等の特別な職責を、学校組織の理念・教育法制（学校教育法・特別支援教育体制等）と批判的に結びつけ、「なぜそれらの役割が必要か」の前提を問い直した記述がある" },
-    { item_number:19, factor:"factor4", item_label:"特別責任を有する同僚役割の理解", lambda:0.98,
-      score:4, rd_level:"RD3", indicator:"主任・特別支援コーディネーター等の役割の原因・背景を分析し、実習中に複数の視点から適切に関わった記述と代替的な関わり方への検討がある" },
-    { item_number:19, factor:"factor4", item_label:"特別責任を有する同僚役割の理解", lambda:0.98,
-      score:3, rd_level:"RD2", indicator:"特別な責任を持つ役職への気づきや感想を言語化しているが（「こんな職務があると知った」等）、具体的職務内容への理解は表面的" },
-    { item_number:19, factor:"factor4", item_label:"特別責任を有する同僚役割の理解", lambda:0.98,
-      score:2, rd_level:"RD1", indicator:"「担任以外にも役割がある」程度の事実のみを記述するにとどまり、省察的要素が見られない" },
-    { item_number:19, factor:"factor4", item_label:"特別責任を有する同僚役割の理解", lambda:0.98,
-      score:1, rd_level:"RD0", indicator:"特別な責任を有する同僚役割への省察が日誌にない" },
-    { item_number:20, factor:"factor4", item_label:"人間関係・専門的期待への対応", lambda:0.50,
-      score:5, rd_level:"RD4", indicator:"保護者・同僚・管理職からの期待を、専門職としての教育的信念・社会的役割と批判的に結びつけ、「なぜその期待に応えるべきか・応えないべきか」の前提を問い直し、専門職としての判断軸を明示した記述がある" },
-    { item_number:20, factor:"factor4", item_label:"人間関係・専門的期待への対応", lambda:0.50,
-      score:4, rd_level:"RD3", indicator:"複数のステークホルダーからの期待の原因・背景を分析し、それぞれへの対応策と代替的アプローチを検討し、意識的にとった行動を記述している" },
-    { item_number:20, factor:"factor4", item_label:"人間関係・専門的期待への対応", lambda:0.50,
-      score:3, rd_level:"RD2", indicator:"指導教員・担任からの期待への気づきや感情を言語化しているが（「期待に応えられたか不安だった」等）、期待への対応根拠は限定的" },
-    { item_number:20, factor:"factor4", item_label:"人間関係・専門的期待への対応", lambda:0.50,
-      score:2, rd_level:"RD1", indicator:"期待への対応の事実のみを記述するにとどまり（「言われた通りにした」等）、省察的要素が見られない" },
-    { item_number:20, factor:"factor4", item_label:"人間関係・専門的期待への対応", lambda:0.50,
-      score:1, rd_level:"RD0", indicator:"教師への期待に関する認識・省察が日誌に見られない" },
-    { item_number:21, factor:"factor4", item_label:"教師役割の多様性理解", lambda:0.46,
-      score:5, rd_level:"RD4", indicator:"教師の役割（授業者・相談者・保護者連携者・コーディネーター等）の多様性を、教師専門職の理念・法令・研究と批判的に結びつけ、「なぜ役割が多様であるべきか」の前提を問い直し、場面に応じた役割の使い分けの根拠を記述している" },
-    { item_number:21, factor:"factor4", item_label:"教師役割の多様性理解", lambda:0.46,
-      score:4, rd_level:"RD3", indicator:"教師の複数の役割の原因・背景を分析し、実習場面での役割実践の根拠と代替的なアプローチを具体的に検討した記述がある" },
-    { item_number:21, factor:"factor4", item_label:"教師役割の多様性理解", lambda:0.46,
-      score:3, rd_level:"RD2", indicator:"「授業をする以外にも仕事がある」という気づきや感想を言語化しているが（「いろいろな役割があると知った」等）、具体的な方法の根拠は限定的" },
-    { item_number:21, factor:"factor4", item_label:"教師役割の多様性理解", lambda:0.46,
-      score:2, rd_level:"RD1", indicator:"教師の役割を授業者の側面のみに限定した事実記述にとどまり、省察的要素が見られない" },
-    { item_number:21, factor:"factor4", item_label:"教師役割の多様性理解", lambda:0.46,
-      score:1, rd_level:"RD0", indicator:"教師の役割多様性への省察が日誌に見られない" },
-    { item_number:22, factor:"factor4", item_label:"教師の権威の意味理解", lambda:0.42,
-      score:5, rd_level:"RD4", indicator:"権威を信頼に基づく影響力として捉え、その哲学的・社会的根拠（権威の正当性の理論等）を教育的信念と批判的に結びつけ、「自分が権威を行使することの意味」の前提を問い直した記述がある" },
-    { item_number:22, factor:"factor4", item_label:"教師の権威の意味理解", lambda:0.42,
-      score:4, rd_level:"RD3", indicator:"権威の正当性（専門知識・倫理的行動・公平な扱い）の原因・背景を分析し、日常的な関わりでどう体現するかの代替的アプローチを検討した記述がある" },
-    { item_number:22, factor:"factor4", item_label:"教師の権威の意味理解", lambda:0.42,
-      score:3, rd_level:"RD2", indicator:"教師の権威への気づきや感想を言語化しているが（「権威のある存在として見られていると感じた」等）、意味や行使の仕方への考察が浅い" },
-    { item_number:22, factor:"factor4", item_label:"教師の権威の意味理解", lambda:0.42,
-      score:2, rd_level:"RD1", indicator:"権威を役職からの強制力と捉えた事実記述のみにとどまり、省察的要素が限定的" },
-    { item_number:22, factor:"factor4", item_label:"教師の権威の意味理解", lambda:0.42,
-      score:1, rd_level:"RD0", indicator:"教師の権威についての理解・省察が日誌に見られない" },
-    { item_number:23, factor:"factor4", item_label:"職業倫理と連帯責任", lambda:0.41,
-      score:5, rd_level:"RD4", indicator:"学校の教育方針・服務規律・情報管理方針を、教師の職業倫理・社会的責任の信念と批判的に結びつけ、「なぜ連帯責任を担うべきか」の前提を問い直し、倫理的判断の根拠を明示した記述がある" },
-    { item_number:23, factor:"factor4", item_label:"職業倫理と連帯責任", lambda:0.41,
-      score:4, rd_level:"RD3", indicator:"学校の方針に沿って行動した原因・背景を分析し、組織の一員としての責任意識を複数の具体的場面で示し、代替的な行動を検討した記述がある" },
-    { item_number:23, factor:"factor4", item_label:"職業倫理と連帯責任", lambda:0.41,
-      score:3, rd_level:"RD2", indicator:"学校の方針に従おうとした気づきや感想を言語化しているが（「組織の一員だと感じた」等）、連帯責任の概念への理解は表面的" },
-    { item_number:23, factor:"factor4", item_label:"職業倫理と連帯責任", lambda:0.41,
-      score:2, rd_level:"RD1", indicator:"個人の行動の事実のみを記述するにとどまり（「方針に従った」等）、組織的連帯責任への省察が見られない" },
-    { item_number:23, factor:"factor4", item_label:"職業倫理と連帯責任", lambda:0.41,
-      score:1, rd_level:"RD0", indicator:"職業倫理・連帯責任に関する省察が日誌に見られない" },
-  ];
-
-  // 項目番号 → 項目文マップ（rubric.ts と完全同期 2026-03-07）
-  const ITEM_TEXTS: Record<number, string> = {
-    1:  "特別な支援を必要とする児童（身体障害を有する者を含む）に対して、見通しをもって適切な対応ができること",
-    2:  "自国の言語が母語でない児童に対して、適切な対応や指導ができること",
-    3:  "特別な支援を必要とする児童（身体障害を有する者を含む）に対して、どのような対応をすればよいかを理解していること",
-    4:  "自国の言語が母語でない児童に対して、どのような対応をすればよいかを理解していること",
-    5:  "児童の「性別」による心理・行動の違いの重要性を正しく理解していること",
-    6:  "児童の発達と健康は、様々な社会的、宗教的、民族的、文化的、言語的影響を受けることを理解していること",
-    7:  "各教科等の特性を踏まえ、児童の実態に即した授業づくりができること",
-    8:  "実習生の体験から得た知識が、教師の仕事や教師としての発達にいかに関係するかを理解できること",
-    9:  "授業と学習に関して語り、教育活動の発展に関する興味と関心を示し、自分自身の指導や姿勢を検証する能力を備えていること",
-    10: "児童に対して期待している肯定的な価値観、態度、および行動を実践して見せること",
-    11: "アドバイスとフィードバックに基づき行動し、指導と助言を受け入れること",
-    12: "自分自身の実践を反省し、改善し、専門的ニーズの発達を認識し、それを実現することに責任を持つこと",
-    13: "教師としての専門性を向上させるために反省、自己省察することも含めて、自分自身を評価する力を有すること",
-    14: "クラス運営に伴う生徒指導に関する力を有すること",
-    15: "クラス運営に伴う管理能力を有すること",
-    16: "権威ある存在として教室内でクラス運営に伴うリーダーシップを発揮することができること",
-    17: "学校や授業における児童の困難や葛藤の解決を支援することができること",
-    18: "共に働いている同僚が、学習のサポートに適切に参加し、彼らが果たすことを期待されている役割を理解していること",
-    19: "特別な責任を有する同僚の役割を知ること",
-    20: "教師の仕事に関連する人間関係及び専門的な面においての期待を分析し対応すること",
-    21: "教師の役割を遂行するための多様な方法を知り、その根拠を理解すること",
-    22: "授業とクラスの社会生活における教師の権威の意味について理解すること",
-    23: "職業の方針と実践に留意し、その実践においては連帯責任を有すること",
-  };
-
+  // 全6因子・全40項目×5段階のRD行動指標データ（rubric.ts と完全同期）
+  // 6因子40項目×5段階のRD行動指標を rubric.ts（単一の真実の源）から投入
   let insertedCount = 0;
-  for (const b of behaviors) {
-    const id = `beh-${b.item_number}-${b.score}`;
-    try {
-      await db.prepare(`
-        INSERT OR REPLACE INTO rubric_item_behaviors
-          (id, item_number, factor, item_label, item_text, lambda, score, rd_level, indicator)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        id, b.item_number, b.factor, b.item_label,
-        ITEM_TEXTS[b.item_number] ?? `項目${b.item_number}`,
-        b.lambda, b.score, b.rd_level, b.indicator
-      ).run();
-      insertedCount++;
-    } catch (e) {
-      console.warn(`Skip item ${b.item_number} score ${b.score}:`, e);
+  let totalCount = 0;
+  for (const item of RUBRIC_ITEMS) {
+    const factorKey = getFactorKeyByItemNum(item.num);
+    for (const b of item.behaviors) {
+      totalCount++;
+      const id = `beh-${item.num}-${b.score}`;
+      try {
+        await db.prepare(`
+          INSERT OR REPLACE INTO rubric_item_behaviors
+            (id, item_number, factor, item_label, item_text, lambda, score, rd_level, indicator)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          id, item.num, factorKey, item.label,
+          item.text, item.lambda, b.score, b.rd, b.indicator
+        ).run();
+        insertedCount++;
+      } catch (e) {
+        console.warn(`Skip item ${item.num} score ${b.score}:`, e);
+      }
     }
   }
 
-  return c.json({ success: true, inserted: insertedCount, total: behaviors.length });
+  return c.json({ success: true, inserted: insertedCount, total: totalCount });
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -2229,8 +2011,8 @@ dataRouter.get("/rubric-behaviors/:itemNumber", requireRoles(["student", "teache
   if (!db) return c.json({ error: "DB not configured" }, 500);
 
   const itemNum = parseInt(c.req.param("itemNumber") || "");
-  if (isNaN(itemNum) || itemNum < 1 || itemNum > 23) {
-    return c.json({ error: "Invalid item number (1-23)" }, 400);
+  if (isNaN(itemNum) || itemNum < 1 || itemNum > 40) {
+    return c.json({ error: "Invalid item number (1-40)" }, 400);
   }
 
   try {
@@ -2363,9 +2145,9 @@ dataRouter.get("/export/joint-display-csv", requireRoles(["researcher", "admin",
         ss.text_content,
         je.student_id, je.week_number, je.id as journal_id,
         e.total_score as ai_total_score,
-        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4,
+        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4, e.factor5_score as ai_f5, e.factor6_score as ai_f6,
         se.total_score as self_total_score,
-        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4
+        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4, se.factor5_score as self_f5, se.factor6_score as self_f6
       FROM scat_codes sc
       JOIN scat_segments ss ON sc.segment_id = ss.id
       LEFT JOIN journal_entries je ON ss.source_journal_id = je.id
@@ -2482,9 +2264,9 @@ dataRouter.get("/joint-display", requireRoles(["researcher", "admin", "collabora
         ss.text_content,
         je.student_id, je.week_number, je.id as journal_id,
         e.total_score as ai_total_score,
-        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4,
+        e.factor1_score as ai_f1, e.factor2_score as ai_f2, e.factor3_score as ai_f3, e.factor4_score as ai_f4, e.factor5_score as ai_f5, e.factor6_score as ai_f6,
         se.total_score as self_total_score,
-        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4
+        se.factor1_score as self_f1, se.factor2_score as self_f2, se.factor3_score as self_f3, se.factor4_score as self_f4, se.factor5_score as self_f5, se.factor6_score as self_f6
       FROM scat_codes sc
       JOIN scat_segments ss ON sc.segment_id = ss.id
       LEFT JOIN journal_entries je ON ss.source_journal_id = je.id
@@ -3701,7 +3483,7 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
     let evaluations: any[] = [];
     try {
       const evalRes = await db.prepare(`
-        SELECT e.id as eval_id, e.journal_id, e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score,
+        SELECT e.id as eval_id, e.journal_id, e.total_score, e.factor1_score, e.factor2_score, e.factor3_score, e.factor4_score, e.factor5_score, e.factor6_score,
                j.week_number, j.entry_date
         FROM evaluations e
         INNER JOIN journals j ON j.id = e.journal_id
@@ -3735,20 +3517,24 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
     const avgRdScore = rdScores.length > 0 ? rdScores.reduce((s, v) => s + v, 0) / rdScores.length : 0;
 
     // ⑤ AI評価4因子平均
-    const factorAverages: Record<string, number> = { f1: 0, f2: 0, f3: 0, f4: 0 };
+    const factorAverages: Record<string, number> = { f1: 0, f2: 0, f3: 0, f4: 0, f5: 0, f6: 0 };
     if (evaluations.length > 0) {
-      let cnt1 = 0, cnt2 = 0, cnt3 = 0, cnt4 = 0;
-      let sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0;
+      let cnt1 = 0, cnt2 = 0, cnt3 = 0, cnt4 = 0, cnt5 = 0, cnt6 = 0;
+      let sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0, sum5 = 0, sum6 = 0;
       for (const ev of evaluations) {
         if (typeof ev.factor1_score === "number") { sum1 += ev.factor1_score; cnt1++; }
         if (typeof ev.factor2_score === "number") { sum2 += ev.factor2_score; cnt2++; }
         if (typeof ev.factor3_score === "number") { sum3 += ev.factor3_score; cnt3++; }
         if (typeof ev.factor4_score === "number") { sum4 += ev.factor4_score; cnt4++; }
+        if (typeof ev.factor5_score === "number") { sum5 += ev.factor5_score; cnt5++; }
+        if (typeof ev.factor6_score === "number") { sum6 += ev.factor6_score; cnt6++; }
       }
       factorAverages.f1 = cnt1 > 0 ? sum1 / cnt1 : 0;
       factorAverages.f2 = cnt2 > 0 ? sum2 / cnt2 : 0;
       factorAverages.f3 = cnt3 > 0 ? sum3 / cnt3 : 0;
       factorAverages.f4 = cnt4 > 0 ? sum4 / cnt4 : 0;
+      factorAverages.f5 = cnt5 > 0 ? sum5 / cnt5 : 0;
+      factorAverages.f6 = cnt6 > 0 ? sum6 / cnt6 : 0;
     }
 
     // ⑥ SCAT 直近テーマ取得 (テーブル不在も許容)
@@ -3784,7 +3570,8 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
       const allEvalRows = await db.prepare(`
         SELECT j.student_id, AVG(e.total_score) AS avg_total,
                AVG(e.factor1_score) AS avg_f1, AVG(e.factor2_score) AS avg_f2,
-               AVG(e.factor3_score) AS avg_f3, AVG(e.factor4_score) AS avg_f4
+               AVG(e.factor3_score) AS avg_f3, AVG(e.factor4_score) AS avg_f4,
+               AVG(e.factor5_score) AS avg_f5, AVG(e.factor6_score) AS avg_f6
         FROM evaluations e
         INNER JOIN journals j ON j.id = e.journal_id
         WHERE e.eval_type = 'ai'

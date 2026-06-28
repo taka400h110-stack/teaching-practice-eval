@@ -13,6 +13,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requireRoles } from "../middleware/auth";
 import { statsProvider } from "../services/statsProvider";
+import { getFactorKeyByItemNum } from "../../constants/rubric";
 
 const statsRouter = new Hono<{ Bindings: CloudflareBindings }>();
 statsRouter.use("*", cors());
@@ -985,17 +986,16 @@ statsRouter.get("/ai-vs-human", requireRoles(["evaluator", "researcher", "admin"
           evaluator_name: he.evaluator_id,
           ai_total: ae.total_score || 0,
           human_total: he.total_score || 0,
-          ai_f1: ae.factor1_score, ai_f2: ae.factor2_score, ai_f3: ae.factor3_score, ai_f4: ae.factor4_score,
-          human_f1: he.factor1_score, human_f2: he.factor2_score, human_f3: he.factor3_score, human_f4: he.factor4_score,
+          ai_f1: ae.factor1_score, ai_f2: ae.factor2_score, ai_f3: ae.factor3_score, ai_f4: ae.factor4_score, ai_f5: ae.factor5_score, ai_f6: ae.factor6_score,
+          human_f1: he.factor1_score, human_f2: he.factor2_score, human_f3: he.factor3_score, human_f4: he.factor4_score, human_f5: he.factor5_score, human_f6: he.factor6_score,
         });
       }
     }
     // 項目別比較: human_eval_items を items として返却し、対応する AI スコアは
     // 同 journal の evaluations から factor 平均で推定
     const { results: heItems } = await db.prepare("SELECT * FROM human_eval_items").all();
-    // item_number → factor のマッピング (ComparisonPage.tsx の ITEMS と一致)
-    const factorOf = (n: number) =>
-      n <= 7 ? "factor1_score" : n <= 13 ? "factor2_score" : n <= 17 ? "factor3_score" : "factor4_score";
+    // item_number → factor のマッピング（rubric.ts を単一の真実の源とする / 6因子40項目）
+    const factorOf = (n: number): string => `${getFactorKeyByItemNum(n)}_score`;
     const items = [];
     for (const it of heItems) {
       const he = humanIdMap.get(it.human_eval_id);
@@ -1003,12 +1003,11 @@ statsRouter.get("/ai-vs-human", requireRoles(["evaluator", "researcher", "admin"
       const ae = aiMap.get(he.journal_id);
       if (!ae) continue;
       const itemNum = Number(it.item_number);
-      // 各 factor は 4 段階換算 (1-4)、AI score を項目スコア相当に変換
+      // AI の因子スコア（因子平均）を当該項目の AI スコア相当として用いる
       const factorKey = factorOf(itemNum);
       const aiFactorScore = Number(ae[factorKey] ?? 0);
-      // factor 合計から項目数で割って 1 項目平均を推定
-      const itemsInFactor = itemNum <= 7 ? 7 : itemNum <= 13 ? 6 : itemNum <= 17 ? 4 : 3;
-      const aiItemScore = +(aiFactorScore / itemsInFactor).toFixed(2);
+      // 因子平均はすでに「1項目あたりの平均スコア」なので、そのまま項目スコア相当に用いる
+      const aiItemScore = +aiFactorScore.toFixed(2);
       items.push({
         journal_id: he.journal_id,
         item_number: itemNum,

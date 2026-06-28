@@ -55,7 +55,7 @@
 
 - `journal_imports` — 取り込みファイルとステータス (uploaded_by が研究者スコープの基準)
 - `journal_entries` — コミット後の日誌本体 (`student_id`, `entry_date`, `week_number`)
-- `evaluations` (eval_type='ai') — AI 評価 (total + factor1..4)
+- `evaluations` (eval_type='ai') — AI 評価 (total + factor1..6) ※6因子40項目構造
 - `human_evaluations` — 人間評価 (複数評価者を AVG で集約)
 - `scat_segments` / `scat_codes` — SCAT 質的コーディング (step3 概念 / step4 テーマ)
 - 全エクスポートは `audit_logs` に `resource_type='journal_import_export'` として記録

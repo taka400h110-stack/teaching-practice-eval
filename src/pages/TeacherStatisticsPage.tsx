@@ -21,14 +21,15 @@ import { useQuery } from "@tanstack/react-query";
 import Button from "@mui/material/Button";
 import DownloadIcon from "@mui/icons-material/Download";
 import apiClient from "../api/client";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 
-const FACTOR_COLORS = {
-  factor1: "#1976d2", factor2: "#43a047", factor3: "#fb8c00", factor4: "#8e24aa",
-};
-const FACTOR_LABELS = {
-  factor1: "F1: 指導力", factor2: "F2: 自己評価力",
-  factor3: "F3: 学級経営力", factor4: "F4: 職務理解",
-};
+const FACTOR_KEYS = RUBRIC_FACTORS.map((f) => f.key);
+const FACTOR_COLORS: Record<string, string> = Object.fromEntries(
+  RUBRIC_FACTORS.map((f) => [f.key, f.color]),
+);
+const FACTOR_LABELS: Record<string, string> = Object.fromEntries(
+  RUBRIC_FACTORS.map((f, i) => [f.key, `F${i + 1}: ${f.label}`]),
+);
 
 interface TabPanelProps { children: React.ReactNode; value: number; index: number }
 const TabPanel = ({ children, value, index }: TabPanelProps) =>
@@ -49,17 +50,12 @@ export default function TeacherStatisticsPage() {
   const avg = (arr: number[]) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
   const totalScores = (cohorts || []).map((p) => p.final_total || 0);
   const avgTotal = avg(totalScores);
-  const f1Scores = (cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.factor1 ?? (p.final_total || 0) * 0.9);
-  const f2Scores = (cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.factor2 ?? (p.final_total || 0));
-  const f3Scores = (cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.factor3 ?? (p.final_total || 0) * 0.95);
-  const f4Scores = (cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.factor4 ?? (p.final_total || 0) * 1.05);
-
-  const factorAvgs = {
-    factor1: avg(f1Scores),
-    factor2: avg(f2Scores),
-    factor3: avg(f3Scores),
-    factor4: avg(f4Scores),
-  };
+  const factorAvgs: Record<string, number> = Object.fromEntries(
+    FACTOR_KEYS.map((fk) => [
+      fk,
+      avg((cohorts || []).map((p) => ((p as any).factor_scores as Record<string, number>)?.[fk] ?? (p.final_total || 0))),
+    ]),
+  );
 
   // 週別平均推移（growth_data）
   const weeklyData = Array.from({ length: 10 }, (_, i) => ({

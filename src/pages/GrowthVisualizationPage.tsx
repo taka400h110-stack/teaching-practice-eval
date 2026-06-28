@@ -21,10 +21,12 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { WeeklyScore } from "../types";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 
-const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
-const FACTOR_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#7b1fa2"];
-const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
+const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
+const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
+const FACTOR_ROMAN  = RUBRIC_FACTORS.map((f) => f.roman);
 
 interface TabPanelProps { children: React.ReactNode; value: number; index: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) =>
@@ -70,6 +72,8 @@ export default function GrowthVisualizationPage() {
     factor2: s.factor2 || 0,
     factor3: s.factor3 || 0,
     factor4: s.factor4 || 0,
+    factor5: (s as any).factor5 || 0,
+    factor6: (s as any).factor6 || 0,
   }));
   const latest    = scores[scores.length - 1];
   const first     = scores[0];
@@ -78,14 +82,11 @@ export default function GrowthVisualizationPage() {
   const weekDelta  = prev ? latest.total - prev.total : 0;
 
   // recharts 用データ
-  const chartData = scores.map((s) => ({
-    week: `W${s.week}`,
-    総合: +(s.total||0).toFixed(2),
-    指導実践: +(s.factor1||0).toFixed(2),
-    自己評価: +(s.factor2||0).toFixed(2),
-    学級経営: +(s.factor3||0).toFixed(2),
-    役割理解: +(s.factor4||0).toFixed(2),
-  }));
+  const chartData = scores.map((s) => {
+    const row: Record<string, any> = { week: `W${s.week}`, 総合: +(s.total||0).toFixed(2) };
+    FACTOR_KEYS.forEach((fk) => { row[fk] = +((s as any)[fk]||0).toFixed(2); });
+    return row;
+  });
 
   // 自己評価 vs AI 評価 比較データ
   const compData = selfEvals.map((se) => {
@@ -98,14 +99,13 @@ export default function GrowthVisualizationPage() {
   }).filter((d) => d.AI評価 !== null);
 
   // 週別成長量 (fDelta)
-  const fDeltaData = scores.slice(1).map((s, i) => ({
-    week: `W${s.week}`,
-    成長量: +(s.total - scores[i].total).toFixed(3),
-    因子I: +(s.factor1 - scores[i].factor1).toFixed(3),
-    因子II: +(s.factor2 - scores[i].factor2).toFixed(3),
-    因子III: +(s.factor3 - scores[i].factor3).toFixed(3),
-    因子IV: +(s.factor4 - scores[i].factor4).toFixed(3),
-  }));
+  const fDeltaData = scores.slice(1).map((s, i) => {
+    const row: Record<string, any> = { week: `W${s.week}`, 成長量: +(s.total - scores[i].total).toFixed(3) };
+    FACTOR_KEYS.forEach((fk) => {
+      row[fk] = +(((s as any)[fk] || 0) - ((scores[i] as any)[fk] || 0)).toFixed(3);
+    });
+    return row;
+  });
 
   // レーダーデータ（最終週 vs 初期週）
   const radarData = FACTOR_LABELS.map((label, i) => ({
@@ -190,10 +190,9 @@ export default function GrowthVisualizationPage() {
                   <YAxis domain={[1, 5]} ticks={[1,2,3,4,5]} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="指導実践" stroke="#1976d2" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="自己評価" stroke="#388e3c" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="学級経営" stroke="#f57c00" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="役割理解" stroke="#7b1fa2" strokeWidth={2} dot={{ r: 3 }} />
+                  {FACTOR_KEYS.map((fk, i) => (
+                    <Line key={fk} type="monotone" dataKey={fk} name={FACTOR_LABELS[i]} stroke={FACTOR_COLORS[i]} strokeWidth={2} dot={{ r: 3 }} />
+                  ))}
                 </LineChart>
               )}
             </ResponsiveContainer>
@@ -352,10 +351,9 @@ export default function GrowthVisualizationPage() {
                 <Tooltip />
                 <Legend />
                 <ReferenceLine y={0} stroke="#666" />
-                <Bar dataKey="因子I"   fill="#1976d2" />
-                <Bar dataKey="因子II"  fill="#388e3c" />
-                <Bar dataKey="因子III" fill="#f57c00" />
-                <Bar dataKey="因子IV"  fill="#7b1fa2" />
+                {FACTOR_KEYS.map((fk, i) => (
+                  <Bar key={fk} dataKey={fk} name={`因子${FACTOR_ROMAN[i]}`} fill={FACTOR_COLORS[i]} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

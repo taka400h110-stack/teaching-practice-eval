@@ -4,6 +4,8 @@ export interface WeeklyScore {
   factor2: number;
   factor3: number;
   factor4: number;
+  factor5: number;
+  factor6: number;
   total: number;
 }
 
@@ -50,6 +52,10 @@ export interface WeeklyStat {
   f3_sd: number;
   f4_mean: number;
   f4_sd: number;
+  f5_mean: number;
+  f5_sd: number;
+  f6_mean: number;
+  f6_sd: number;
   total_mean: number;
   total_sd: number;
 }

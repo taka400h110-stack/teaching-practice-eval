@@ -10,6 +10,7 @@ import MenuBookIcon   from "@mui/icons-material/MenuBook";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { useQuery }   from "@tanstack/react-query";
 import apiClient from "../api/client";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 
 export default function TeacherDashboardPage() {
   const navigate = useNavigate();
@@ -150,9 +151,9 @@ export default function TeacherDashboardPage() {
         <Card>
           <CardContent>
             <Typography variant="subtitle1" fontWeight="bold" mb={2}>因子別平均スコア（全学生）</Typography>
-            {["因子I 指導実践力","因子II 自己評価力","因子III 学級経営力","因子IV 役割理解"].map((label, i) => {
+            {RUBRIC_FACTORS.map((f, i) => `因子${f.roman} ${f.label}`).map((label, i) => {
               const avg = profiles.length
-                ? (profiles.reduce((s, p) => s + [p.final_factor1, p.final_factor2, p.final_factor3, p.final_factor4][i], 0) / profiles.length)
+                ? (profiles.reduce((s, p) => s + ((p as any)[`final_factor${i + 1}`] ?? 0), 0) / profiles.length)
                 : 0;
               return (
                 <Box key={label} mb={2}>

@@ -16,9 +16,12 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 
-const COLORS = ["#1976d2", "#43a047", "#fb8c00", "#8e24aa", "#e53935"];
-const FACTOR_LABELS = ["児童生徒への指導力", "自己評価力", "学級経営力", "職務を理解して行動する力"];
+const COLORS = ["#1976d2", "#43a047", "#fb8c00", "#8e24aa", "#e53935", "#00acc1"];
+const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
+const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
 
 interface TabPanelProps { children: React.ReactNode; value: number; index: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) =>
@@ -75,7 +78,7 @@ export default function StatisticsPage() {
   const handleExportCohortCSV = () => {
     const headers = [
       "学籍番号", "氏名", "学年", "性別", "学校種別", "実習形態", "実習週数",
-      "因子1_指導力", "因子2_自己評価力", "因子3_学級経営力", "因子4_職務理解",
+      ...RUBRIC_FACTORS.map((f, i) => `因子${i + 1}_${f.label}`),
       "総合スコア", "成長量(Δ)", "自己評価差", "LPS",
       "BigFive_外向性", "BigFive_協調性", "BigFive_誠実性", "BigFive_神経質傾向", "BigFive_開放性",
       "実習校名", "指導教員",
@@ -92,10 +95,7 @@ export default function StatisticsPage() {
       schoolTypeMap[p.school_type] ?? p.school_type,
       p.internship_type === "intensive" ? "集中実習" : "分散実習",
       String(p.weeks),
-      (p?.final_factor1 ?? 0).toFixed(3),
-      (p?.final_factor2 ?? 0).toFixed(3),
-      (p?.final_factor3 ?? 0).toFixed(3),
-      (p?.final_factor4 ?? 0).toFixed(3),
+      ...FACTOR_KEYS.map((fk) => (p?.[`final_${fk}`] ?? 0).toFixed(3)),
       (p?.final_total ?? 0).toFixed(3),
       (p?.growth_delta ?? 0).toFixed(3),
       (p.self_eval_gap ?? 0).toFixed(3),
@@ -113,7 +113,7 @@ export default function StatisticsPage() {
   };
 
   const handleExportWeeklyCSV = () => {
-    const headers = ["学籍番号", "氏名", "週", "因子1", "因子2", "因子3", "因子4", "総合"];
+    const headers = ["学籍番号", "氏名", "週", ...FACTOR_KEYS.map((_, i) => `因子${i + 1}`), "総合"];
     const rows: string[][] = [];
     cohorts.forEach((p: any) => {
       (p?.weekly_scores ?? []).forEach((ws: any) => {
@@ -122,10 +122,7 @@ export default function StatisticsPage() {
           anonymize ? `ID-${String(p?.id ?? "").slice(0, 4)}` : String(p?.student_number ?? p?.id ?? ""),
           anonymize ? "匿名ユーザー" : String(p?.name ?? ""),
           String(ws?.week ?? ""),
-          Number(ws?.factor1 ?? 0).toFixed(3),
-          Number(ws?.factor2 ?? 0).toFixed(3),
-          Number(ws?.factor3 ?? 0).toFixed(3),
-          Number(ws?.factor4 ?? 0).toFixed(3),
+          ...FACTOR_KEYS.map((fk) => Number(ws?.[fk] ?? 0).toFixed(3)),
           Number(ws?.total ?? 0).toFixed(3),
         ]);
       });
@@ -154,6 +151,8 @@ export default function StatisticsPage() {
           factor2: p.final_factor2,
           factor3: p.final_factor3,
           factor4: p.final_factor4,
+          factor5: p.final_factor5,
+          factor6: p.final_factor6,
           total:   p.final_total,
           growth_delta: p.growth_delta,
           self_eval_gap: p.self_eval_gap,
@@ -215,18 +214,18 @@ export default function StatisticsPage() {
         if (found) return found;
         // weekly_scores が数値配列の場合は index で代用
         const num = ws[i];
-        if (typeof num === "number") return { week: weekNum, total: num, factor1: num, factor2: num, factor3: num, factor4: num };
+        if (typeof num === "number") return { week: weekNum, total: num, factor1: num, factor2: num, factor3: num, factor4: num, factor5: num, factor6: num };
         return null;
       })
       .filter(Boolean);
-    return {
+    const row: Record<string, any> = {
       week: weekNum,
       avg: +(weekScores.reduce((s: any, ws: any) => s + (ws?.total ?? 0), 0)   / (weekScores.length || 1)).toFixed(2),
-      f1:  +(weekScores.reduce((s: any, ws: any) => s + (ws?.factor1 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
-      f2:  +(weekScores.reduce((s: any, ws: any) => s + (ws?.factor2 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
-      f3:  +(weekScores.reduce((s: any, ws: any) => s + (ws?.factor3 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
-      f4:  +(weekScores.reduce((s: any, ws: any) => s + (ws?.factor4 ?? 0), 0) / (weekScores.length || 1)).toFixed(2),
     };
+    FACTOR_KEYS.forEach((fk, idx) => {
+      row[`f${idx + 1}`] = +(weekScores.reduce((s: any, ws: any) => s + (ws?.[fk] ?? 0), 0) / (weekScores.length || 1)).toFixed(2);
+    });
+    return row;
   });
 
   return (
@@ -362,10 +361,9 @@ export default function StatisticsPage() {
                 <ReTooltip />
                 <Legend />
                 <Line type="monotone" dataKey="avg" stroke="#000"    strokeWidth={3}   name="総合平均" dot />
-                <Line type="monotone" dataKey="f1"  stroke="#1976d2" strokeWidth={1.5} name={FACTOR_LABELS[0]} dot={false} />
-                <Line type="monotone" dataKey="f2"  stroke="#43a047" strokeWidth={1.5} name={FACTOR_LABELS[1]} dot={false} />
-                <Line type="monotone" dataKey="f3"  stroke="#fb8c00" strokeWidth={1.5} name={FACTOR_LABELS[2]} dot={false} />
-                <Line type="monotone" dataKey="f4"  stroke="#8e24aa" strokeWidth={1.5} name={FACTOR_LABELS[3]} dot={false} />
+                {FACTOR_KEYS.map((_, i) => (
+                  <Line key={i} type="monotone" dataKey={`f${i + 1}`} stroke={FACTOR_COLORS[i]} strokeWidth={1.5} name={FACTOR_LABELS[i]} dot={false} />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -425,21 +423,18 @@ export default function StatisticsPage() {
                     const labels = ["小学校", "中学校", "高校", "特別支援"];
                     return types.map((t, i) => {
                       const grp = cohorts.filter((p: any) => p.school_type === t);
-                      const avg = (key: "final_factor1" | "final_factor2" | "final_factor3" | "final_factor4") =>
-                        +(grp.reduce((s: any, p: any) => s + p[key], 0) / (grp.length || 1)).toFixed(2);
-                      return {
-                        type: labels[i],
-                        f1: avg("final_factor1"),
-                        f2: avg("final_factor2"),
-                        f3: avg("final_factor3"),
-                        f4: avg("final_factor4"),
-                      };
+                      const avg = (key: string) =>
+                        +(grp.reduce((s: any, p: any) => s + (p[key] ?? 0), 0) / (grp.length || 1)).toFixed(2);
+                      const row: Record<string, any> = { type: labels[i] };
+                      FACTOR_KEYS.forEach((fk, idx) => { row[`f${idx + 1}`] = avg(`final_${fk}`); });
+                      return row;
                     });
                   })()}>
                     <PolarGrid />
                     <PolarAngleAxis dataKey="type" tick={{ fontSize: 12 }} />
-                    <Radar dataKey="f1" stroke="#1976d2" fill="#1976d2" fillOpacity={0.2} name={FACTOR_LABELS[0]} />
-                    <Radar dataKey="f2" stroke="#43a047" fill="#43a047" fillOpacity={0.2} name={FACTOR_LABELS[1]} />
+                    {FACTOR_KEYS.map((_, i) => (
+                      <Radar key={i} dataKey={`f${i + 1}`} stroke={FACTOR_COLORS[i]} fill={FACTOR_COLORS[i]} fillOpacity={0.2} name={FACTOR_LABELS[i]} />
+                    ))}
                     <Legend />
                   </RadarChart>
                 </ResponsiveContainer>

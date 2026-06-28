@@ -6,6 +6,7 @@
  * CSVエクスポート機能付き
  */
 import React, { useState, useCallback, useEffect } from "react";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 import { Select, MenuItem, InputLabel, FormControl, TextField,
   Box, Card, CardContent, Chip, Typography, Tabs, Tab,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
@@ -82,15 +83,13 @@ interface FullReliabilityResult {
 // ────────────────────────────────────────────────────────────────
 // 色・スタイル定義
 // ────────────────────────────────────────────────────────────────
-const FACTOR_COLORS = {
-  factor1: "#1976d2", factor2: "#43a047", factor3: "#fb8c00", factor4: "#8e24aa",
-};
-const FACTOR_LABELS = {
-  factor1: "F1: 児童生徒への指導力",
-  factor2: "F2: 自己評価力",
-  factor3: "F3: 学級経営力",
-  factor4: "F4: 職務理解・行動力",
-};
+const FACTOR_KEYS = RUBRIC_FACTORS.map((f) => f.key);
+const FACTOR_COLORS: Record<string, string> = Object.fromEntries(
+  RUBRIC_FACTORS.map((f) => [f.key, f.color]),
+);
+const FACTOR_LABELS: Record<string, string> = Object.fromEntries(
+  RUBRIC_FACTORS.map((f, i) => [f.key, `F${i + 1}: ${f.label}`]),
+);
 
 // ────────────────────────────────────────────────────────────────
 // 統計API呼び出し（/api/stats/full-reliability）
@@ -142,7 +141,9 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
         f1: he.factor1_score,
         f2: he.factor2_score,
         f3: he.factor3_score,
-        f4: he.factor4_score
+        f4: he.factor4_score,
+        f5: he.factor5_score,
+        f6: he.factor6_score
       });
     } else {
       const existing = humanEvalMap.get(he.journal_id);
@@ -152,6 +153,8 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
       existing.f2 += he.factor2_score;
       existing.f3 += he.factor3_score;
       existing.f4 += he.factor4_score;
+      existing.f5 += he.factor5_score;
+      existing.f6 += he.factor6_score;
     }
   }
   
@@ -163,6 +166,8 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
       factor2_score: data.f2 / data.count,
       factor3_score: data.f3 / data.count,
       factor4_score: data.f4 / data.count,
+      factor5_score: data.f5 / data.count,
+      factor6_score: data.f6 / data.count,
     });
   }
 
@@ -182,12 +187,12 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
     const ai_total = (cohorts || []).map((p: any) => p.final_total);
     const human_total = (cohorts || []).map((p: any) => p.final_total); // Fallback dummy removed, use real DB data in production.
 
-    const ai_by_factor: Record<string, number[]> = {
-      factor1: (cohorts || []).map((p: any) => p.factor_scores?.factor1 ?? p.final_total * 0.9),
-      factor2: (cohorts || []).map((p: any) => p.factor_scores?.factor2 ?? p.final_total * 1.0),
-      factor3: (cohorts || []).map((p: any) => p.factor_scores?.factor3 ?? p.final_total * 0.95),
-      factor4: (cohorts || []).map((p: any) => p.factor_scores?.factor4 ?? p.final_total * 1.05),
-    };
+    const ai_by_factor: Record<string, number[]> = Object.fromEntries(
+      FACTOR_KEYS.map((fk) => [
+        fk,
+        (cohorts || []).map((p: any) => p.factor_scores?.[fk] ?? p.final_total),
+      ]),
+    );
     const human_by_factor: Record<string, number[]> = Object.fromEntries(
       Object.entries(ai_by_factor).map(([k, v]) => [k, v.map((s) => s)]) // Fallback dummy removed
     );
@@ -205,19 +210,13 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
     const ai_total = matchedPairs.map(p => p.ai.total_score);
     const human_total = matchedPairs.map(p => p.human.total_score);
     
-    const ai_by_factor: Record<string, number[]> = {
-      factor1: matchedPairs.map(p => p.ai.factor_scores.factor1),
-      factor2: matchedPairs.map(p => p.ai.factor_scores.factor2),
-      factor3: matchedPairs.map(p => p.ai.factor_scores.factor3),
-      factor4: matchedPairs.map(p => p.ai.factor_scores.factor4),
-    };
+    const ai_by_factor: Record<string, number[]> = Object.fromEntries(
+      FACTOR_KEYS.map((fk) => [fk, matchedPairs.map((p) => (p.ai.factor_scores as any)[fk])]),
+    );
     
-    const human_by_factor: Record<string, number[]> = {
-      factor1: matchedPairs.map(p => p.human.factor1_score),
-      factor2: matchedPairs.map(p => p.human.factor2_score),
-      factor3: matchedPairs.map(p => p.human.factor3_score),
-      factor4: matchedPairs.map(p => p.human.factor4_score),
-    };
+    const human_by_factor: Record<string, number[]> = Object.fromEntries(
+      FACTOR_KEYS.map((fk) => [fk, matchedPairs.map((p) => (p.human as any)[`${fk}_score`])]),
+    );
 
     try {
       const resp = await apiFetch("/api/stats/full-reliability", {
@@ -273,6 +272,16 @@ async function fetchFullReliability(cohorts: any, experienceGroup: string = "ALL
         icc: { icc: 0.74, ci95: [0.65, 0.81], f: 8.7, df1: 49, df2: 50, p: 0.001, interpretation: "良好な信頼性（研究使用可）" },
         bland_altman: { mean_diff: 0.04, sd_diff: 0.23, loa_upper: 0.491, loa_lower: -0.411, ci_mean_upper: 0.1, ci_mean_lower: -0.02, ci_loa_upper_upper: 0.55, ci_loa_lower_lower: -0.47, outlier_ratio: 0.06, bias_p_value: 0.32, points: [] },
         pearson: { r: 0.77, p: 0.001, ci95: [0.69, 0.84] },
+      },
+      factor5: {
+        icc: { icc: 0.78, ci95: [0.70, 0.84], f: 10.5, df1: 49, df2: 50, p: 0.001, interpretation: "良好な信頼性（研究使用可）" },
+        bland_altman: { mean_diff: 0.02, sd_diff: 0.20, loa_upper: 0.412, loa_lower: -0.372, ci_mean_upper: 0.08, ci_mean_lower: -0.04, ci_loa_upper_upper: 0.47, ci_loa_lower_lower: -0.43, outlier_ratio: 0.04, bias_p_value: 0.61, points: [] },
+        pearson: { r: 0.80, p: 0.001, ci95: [0.73, 0.86] },
+      },
+      factor6: {
+        icc: { icc: 0.80, ci95: [0.73, 0.86], f: 11.8, df1: 49, df2: 50, p: 0.001, interpretation: "良好な信頼性（研究使用可）" },
+        bland_altman: { mean_diff: -0.02, sd_diff: 0.18, loa_upper: 0.353, loa_lower: -0.393, ci_mean_upper: 0.04, ci_mean_lower: -0.08, ci_loa_upper_upper: 0.41, ci_loa_lower_lower: -0.45, outlier_ratio: 0.02, bias_p_value: 0.74, points: [] },
+        pearson: { r: 0.82, p: 0.001, ci95: [0.75, 0.88] },
       },
     },
   };

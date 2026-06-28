@@ -664,7 +664,9 @@ journalImportsRouter.get(
                   AVG(factor1_score) AS avg_f1,
                   AVG(factor2_score) AS avg_f2,
                   AVG(factor3_score) AS avg_f3,
-                  AVG(factor4_score) AS avg_f4
+                  AVG(factor4_score) AS avg_f4,
+                  AVG(factor5_score) AS avg_f5,
+                  AVG(factor6_score) AS avg_f6
            FROM human_evaluations
            WHERE journal_id IN (${placeholders})
            GROUP BY journal_id`,
@@ -763,6 +765,8 @@ journalImportsRouter.get(
       "ai_factor2",
       "ai_factor3",
       "ai_factor4",
+      "ai_factor5",
+      "ai_factor6",
       "ai_model",
       "ai_prompt_version",
       "ai_halo_detected",
@@ -774,12 +778,16 @@ journalImportsRouter.get(
       "human_avg_f2",
       "human_avg_f3",
       "human_avg_f4",
+      "human_avg_f5",
+      "human_avg_f6",
       // AI と 人間 の差分
       "score_diff_total",
       "score_diff_f1",
       "score_diff_f2",
       "score_diff_f3",
       "score_diff_f4",
+      "score_diff_f5",
+      "score_diff_f6",
       // SCAT
       "scat_segments",
       "scat_concepts",
@@ -806,11 +814,15 @@ journalImportsRouter.get(
       const aiF2 = ai?.factor2_score;
       const aiF3 = ai?.factor3_score;
       const aiF4 = ai?.factor4_score;
+      const aiF5 = ai?.factor5_score;
+      const aiF6 = ai?.factor6_score;
       const huTotal = hu?.avg_total;
       const huF1 = hu?.avg_f1;
       const huF2 = hu?.avg_f2;
       const huF3 = hu?.avg_f3;
       const huF4 = hu?.avg_f4;
+      const huF5 = hu?.avg_f5;
+      const huF6 = hu?.avg_f6;
 
       const diff = (a: any, b: any) =>
         a != null && b != null ? Number(a) - Number(b) : "";
@@ -839,6 +851,8 @@ journalImportsRouter.get(
           aiF2 ?? "",
           aiF3 ?? "",
           aiF4 ?? "",
+          aiF5 ?? "",
+          aiF6 ?? "",
           ai?.model_name ?? "",
           ai?.prompt_version ?? "",
           ai?.halo_effect_detected ?? "",
@@ -849,11 +863,15 @@ journalImportsRouter.get(
           huF2 ?? "",
           huF3 ?? "",
           huF4 ?? "",
+          huF5 ?? "",
+          huF6 ?? "",
           diff(aiTotal, huTotal),
           diff(aiF1, huF1),
           diff(aiF2, huF2),
           diff(aiF3, huF3),
           diff(aiF4, huF4),
+          diff(aiF5, huF5),
+          diff(aiF6, huF6),
           sc.segments,
           sc.concepts,
           sc.themes,
@@ -1032,7 +1050,7 @@ function buildCodebook(): {
   const analysis: CodebookSection = {
     format: "analysis_csv",
     endpoint: "GET /api/data/journal-imports/export.analysis.csv",
-    description: "量的分析向け統合 CSV (49 列)。journal_entries + AI 評価 + 人間評価 (平均) + SCAT 概念数 を結合。score_diff_* 列は AI 値 - 人間平均 で事前計算済み。R / SPSS / Python statsmodels での t 検定 / ANOVA / 相関分析を想定。コミット済み日誌のみが対象 (status='committed')。",
+    description: "量的分析向け統合 CSV (55 列)。journal_entries + AI 評価 + 人間評価 (平均) + SCAT 概念数 を結合。score_diff_* 列は AI 値 - 人間平均 で事前計算済み。R / SPSS / Python statsmodels での t 検定 / ANOVA / 相関分析を想定。コミット済み日誌のみが対象 (status='committed')。",
     row_limit: 5000,
     filters: [
       { name: "student_id", type: "string", description: "学生 ID 絞り込み" },
@@ -1066,6 +1084,8 @@ function buildCodebook(): {
       { name: "ai_factor2", type: "number", description: "AI 評価 因子2", source: "evaluations.factor2_score", nullable: true },
       { name: "ai_factor3", type: "number", description: "AI 評価 因子3", source: "evaluations.factor3_score", nullable: true },
       { name: "ai_factor4", type: "number", description: "AI 評価 因子4", source: "evaluations.factor4_score", nullable: true },
+      { name: "ai_factor5", type: "number", description: "AI 評価 因子5", source: "evaluations.factor5_score", nullable: true },
+      { name: "ai_factor6", type: "number", description: "AI 評価 因子6", source: "evaluations.factor6_score", nullable: true },
       { name: "ai_model", type: "string", description: "使用 AI モデル名", source: "evaluations.model", nullable: true },
       { name: "ai_prompt_version", type: "string", description: "プロンプトバージョン", source: "evaluations.prompt_version", nullable: true },
       { name: "ai_halo_detected", type: "boolean", description: "ハロー効果が検出されたか", source: "evaluations.halo_detected", nullable: true },
@@ -1077,12 +1097,16 @@ function buildCodebook(): {
       { name: "human_avg_f2", type: "number", description: "人間評価 因子2 平均", source: "AVG(human_evaluations.factor2_score)", nullable: true },
       { name: "human_avg_f3", type: "number", description: "人間評価 因子3 平均", source: "AVG(human_evaluations.factor3_score)", nullable: true },
       { name: "human_avg_f4", type: "number", description: "人間評価 因子4 平均", source: "AVG(human_evaluations.factor4_score)", nullable: true },
+      { name: "human_avg_f5", type: "number", description: "人間評価 因子5 平均", source: "AVG(human_evaluations.factor5_score)", nullable: true },
+      { name: "human_avg_f6", type: "number", description: "人間評価 因子6 平均", source: "AVG(human_evaluations.factor6_score)", nullable: true },
       // AI - 人間 の差分
       { name: "score_diff_total", type: "number", description: "ai_total_score - human_avg_total", source: "サーバ計算", nullable: true, notes: "正値: AI が高評価、負値: 人間が高評価" },
       { name: "score_diff_f1", type: "number", description: "ai_factor1 - human_avg_f1", source: "サーバ計算", nullable: true },
       { name: "score_diff_f2", type: "number", description: "ai_factor2 - human_avg_f2", source: "サーバ計算", nullable: true },
       { name: "score_diff_f3", type: "number", description: "ai_factor3 - human_avg_f3", source: "サーバ計算", nullable: true },
       { name: "score_diff_f4", type: "number", description: "ai_factor4 - human_avg_f4", source: "サーバ計算", nullable: true },
+      { name: "score_diff_f5", type: "number", description: "ai_factor5 - human_avg_f5", source: "サーバ計算", nullable: true },
+      { name: "score_diff_f6", type: "number", description: "ai_factor6 - human_avg_f6", source: "サーバ計算", nullable: true },
       // SCAT
       { name: "scat_segments", type: "integer", description: "SCAT セグメント数 (この日誌から切り出された質的データ単位)", source: "COUNT(scat_segments WHERE source_journal_id=journal_id)" },
       { name: "scat_concepts", type: "integer", description: "SCAT step3 概念の数 (step3_concept != '')", source: "COUNT(scat_codes step3_concept)" },
@@ -1165,7 +1189,7 @@ function buildCodebook(): {
     filters: analysisFilters,
     fields: [
       { name: "Participants and Data", type: "string", description: "対象 N、学生数、実習週範囲、語数記述統計、AI/人間/SCAT データ被覆数を本文に展開", source: "計算" },
-      { name: "Materials and Instruments", type: "string", description: "評価ルーブリック (4 因子 / 0–5 リッカート) と SCAT 質的分析手法を記述", source: "テンプレート" },
+      { name: "Materials and Instruments", type: "string", description: "評価ルーブリック (6 因子40項目 / 0–5 リッカート) と SCAT 質的分析手法を記述", source: "テンプレート" },
       { name: "AI Evaluation", type: "string", description: "LLM 評価の方法とプロンプトバージョン管理について記述", source: "テンプレート" },
       { name: "Statistical Analysis", type: "string", description: "記述統計・群間比較・相関・効果量・APA 報告形式について記述", source: "テンプレート" },
       { name: "Software and Tools", type: "string", description: "本プラットフォームの技術スタック、統計計算実装の出典 (Numerical Recipes 6.4) を記述", source: "テンプレート" },
@@ -1304,11 +1328,15 @@ type AnalysisDatum = {
   ai_f2: number | null;
   ai_f3: number | null;
   ai_f4: number | null;
+  ai_f5: number | null;
+  ai_f6: number | null;
   hu_total: number | null;
   hu_f1: number | null;
   hu_f2: number | null;
   hu_f3: number | null;
   hu_f4: number | null;
+  hu_f5: number | null;
+  hu_f6: number | null;
   scat_segments: number;
   scat_concepts: number;
   scat_themes: number;
@@ -1391,7 +1419,9 @@ async function gatherAnalysisData(
                 AVG(factor1_score) AS avg_f1,
                 AVG(factor2_score) AS avg_f2,
                 AVG(factor3_score) AS avg_f3,
-                AVG(factor4_score) AS avg_f4
+                AVG(factor4_score) AS avg_f4,
+                AVG(factor5_score) AS avg_f5,
+                AVG(factor6_score) AS avg_f6
          FROM human_evaluations WHERE journal_id IN (${placeholders})
          GROUP BY journal_id`,
       )
@@ -1464,11 +1494,15 @@ async function gatherAnalysisData(
       ai_f2: num(ai?.factor2_score),
       ai_f3: num(ai?.factor3_score),
       ai_f4: num(ai?.factor4_score),
+      ai_f5: num(ai?.factor5_score),
+      ai_f6: num(ai?.factor6_score),
       hu_total: num(hu?.avg_total),
       hu_f1: num(hu?.avg_f1),
       hu_f2: num(hu?.avg_f2),
       hu_f3: num(hu?.avg_f3),
       hu_f4: num(hu?.avg_f4),
+      hu_f5: num(hu?.avg_f5),
+      hu_f6: num(hu?.avg_f6),
       scat_segments: sc.segments,
       scat_concepts: sc.concepts,
       scat_themes: sc.themes,
@@ -1510,11 +1544,15 @@ journalImportsRouter.get(
     const aiF2 = describe(pick("ai_f2"));
     const aiF3 = describe(pick("ai_f3"));
     const aiF4 = describe(pick("ai_f4"));
+    const aiF5 = describe(pick("ai_f5"));
+    const aiF6 = describe(pick("ai_f6"));
     const huTotal = describe(pick("hu_total"));
     const huF1 = describe(pick("hu_f1"));
     const huF2 = describe(pick("hu_f2"));
     const huF3 = describe(pick("hu_f3"));
     const huF4 = describe(pick("hu_f4"));
+    const huF5 = describe(pick("hu_f5"));
+    const huF6 = describe(pick("hu_f6"));
     const segs = describe(pick("scat_segments"));
     const concs = describe(pick("scat_concepts"));
     const themes = describe(pick("scat_themes"));
@@ -1543,6 +1581,8 @@ journalImportsRouter.get(
     lines.push(apaDescRow("AI 因子2", aiF2));
     lines.push(apaDescRow("AI 因子3", aiF3));
     lines.push(apaDescRow("AI 因子4", aiF4));
+    lines.push(apaDescRow("AI 因子5", aiF5));
+    lines.push(apaDescRow("AI 因子6", aiF6));
     lines.push("");
 
     lines.push(`## 表2. 人間評価スコア(評価者平均)の記述統計`);
@@ -1554,6 +1594,8 @@ journalImportsRouter.get(
     lines.push(apaDescRow("人間 因子2 (平均)", huF2));
     lines.push(apaDescRow("人間 因子3 (平均)", huF3));
     lines.push(apaDescRow("人間 因子4 (平均)", huF4));
+    lines.push(apaDescRow("人間 因子5 (平均)", huF5));
+    lines.push(apaDescRow("人間 因子6 (平均)", huF6));
     lines.push("");
 
     lines.push(`## 表3. SCAT 質的コーディング指標の記述統計`);
@@ -1630,11 +1672,15 @@ journalImportsRouter.get(
       { key: "ai_f2", label: "AI_F2" },
       { key: "ai_f3", label: "AI_F3" },
       { key: "ai_f4", label: "AI_F4" },
+      { key: "ai_f5", label: "AI_F5" },
+      { key: "ai_f6", label: "AI_F6" },
       { key: "hu_total", label: "Human_total" },
       { key: "hu_f1", label: "Human_F1" },
       { key: "hu_f2", label: "Human_F2" },
       { key: "hu_f3", label: "Human_F3" },
       { key: "hu_f4", label: "Human_F4" },
+      { key: "hu_f5", label: "Human_F5" },
+      { key: "hu_f6", label: "Human_F6" },
       { key: "scat_segments", label: "SCAT_segments" },
       { key: "scat_concepts", label: "SCAT_concepts" },
       { key: "scat_themes", label: "SCAT_themes" },
@@ -1726,6 +1772,8 @@ journalImportsRouter.get(
       { key: "ai_f2", label: "AI 因子2" },
       { key: "ai_f3", label: "AI 因子3" },
       { key: "ai_f4", label: "AI 因子4" },
+      { key: "ai_f5", label: "AI 因子5" },
+      { key: "ai_f6", label: "AI 因子6" },
       { key: "hu_total", label: "人間 合計スコア (平均)" },
       { key: "scat_concepts", label: "SCAT 概念数" },
       { key: "scat_themes", label: "SCAT テーマ数" },
@@ -1785,7 +1833,7 @@ journalImportsRouter.get(
     lines.push(`*Note.* AI と人間 (評価者平均) が両方存在する日誌のみが対象。`);
     lines.push("");
     // Phase 7-3: skip 理由を末尾列に表示
-    // Phase 7-4: correction!=none のときのみ p_adj 列を表示 (Paired family = 5 pair の検定群)
+    // Phase 7-4: correction!=none のときのみ p_adj 列を表示 (Paired family = 7 pair の検定群)
     const pairedHeader = showAdj
       ? `| 比較ペア | n | M_AI (SD) | M_人間 (SD) | M差 (AI−人間) | t | df | p | p_adj | Cohen's dz | 備考 |`
       : `| 比較ペア | n | M_AI (SD) | M_人間 (SD) | M差 (AI−人間) | t | df | p | Cohen's dz | 備考 |`;
@@ -1800,6 +1848,8 @@ journalImportsRouter.get(
       { ai: "ai_f2", hu: "hu_f2", label: "因子2" },
       { ai: "ai_f3", hu: "hu_f3", label: "因子3" },
       { ai: "ai_f4", hu: "hu_f4", label: "因子4" },
+      { ai: "ai_f5", hu: "hu_f5", label: "因子5" },
+      { ai: "ai_f6", hu: "hu_f6", label: "因子6" },
     ];
     // Phase 7-4: two-pass — first collect, correct, then emit.
     const pairedResults: TTestResult[] = pairedPairs.map((pp) => {
@@ -1918,7 +1968,7 @@ journalImportsRouter.get(
     lines.push("");
     lines.push(`### 評価尺度`);
     lines.push("");
-    lines.push(`日誌は 4 因子構造の評価ルーブリック (因子1〜因子4) に基づき、合計スコアおよび各因子スコアを 0–5 のリッカート尺度で評定した。`);
+    lines.push(`日誌は 6 因子40項目構造の評価ルーブリック (因子1〜因子6) に基づき、合計スコアおよび各因子スコアを 0–5 のリッカート尺度で評定した。`);
     lines.push("");
     lines.push(`### 質的分析手法`);
     lines.push("");

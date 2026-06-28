@@ -21,6 +21,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
   ResponsiveContainer, Legend,
 } from "recharts";
+import { RUBRIC_FACTORS } from "../constants/rubric";
 
 const STATUS_MAP = {
   pending:   { label: "評価中",   color: "warning" as const },
@@ -28,7 +29,9 @@ const STATUS_MAP = {
   failed:    { label: "失敗",     color: "error"   as const },
 };
 
-const FACTOR_LABELS = ["指導技術", "自己評価", "学級経営", "学習者理解"];
+const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
+const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
+const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
 
 export default function EvaluationsPage() {
   const navigate = useNavigate();
@@ -103,6 +106,8 @@ export default function EvaluationsPage() {
       f2: evalResult ? evalResult.factor_scores.factor2 : null,
       f3: evalResult ? evalResult.factor_scores.factor3 : null,
       f4: evalResult ? evalResult.factor_scores.factor4 : null,
+      f5: evalResult ? (evalResult.factor_scores as any).factor5 ?? null : null,
+      f6: evalResult ? (evalResult.factor_scores as any).factor6 ?? null : null,
     };
   });
 
@@ -180,10 +185,9 @@ export default function EvaluationsPage() {
                 <YAxis domain={[0, 4]} />
                 <RechartTooltip />
                 <Legend />
-                <Bar dataKey="f1" fill="#1976d2" name={FACTOR_LABELS[0]} />
-                <Bar dataKey="f2" fill="#43a047" name={FACTOR_LABELS[1]} />
-                <Bar dataKey="f3" fill="#fb8c00" name={FACTOR_LABELS[2]} />
-                <Bar dataKey="f4" fill="#8e24aa" name={FACTOR_LABELS[3]} />
+                {FACTOR_KEYS.map((_, i) => (
+                  <Bar key={i} dataKey={`f${i + 1}`} fill={FACTOR_COLORS[i]} name={FACTOR_LABELS[i]} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

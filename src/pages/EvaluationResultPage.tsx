@@ -2,7 +2,7 @@
 
 /**
  * EvaluationResultPage.tsx
- * AI評価結果ページ - 23項目詳細、因子別スコア、recharts レーダーチャート
+ * AI評価結果ページ - 40項目詳細、因子別スコア、recharts レーダーチャート
  */
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -34,9 +34,9 @@ import {
 
 const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
 const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
-const FACTOR_KEYS   = ["factor1", "factor2", "factor3", "factor4"] as const;
+const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
 
-// 23項目のラベル（rubric.ts から統一）
+// 40項目のラベル（rubric.ts から統一）
 const ITEM_LABELS: string[] = RUBRIC_ITEMS.map((item) => item.label);
 
 function ScoreChip({ score }: { score: number }) {
@@ -214,7 +214,7 @@ export default function EvaluationResultPage() {
     スコア: factorScores[i],
   }));
 
-  // 23項目スコア棒グラフ用データ
+  // 40項目スコア棒グラフ用データ
   const itemBarData = result?.evaluation_items.map((item) => ({
     name: `${item.item_number}`,
     スコア: item.score ?? 0,
@@ -375,7 +375,7 @@ export default function EvaluationResultPage() {
                 </ResponsiveContainer>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="subtitle2" fontWeight="bold" mb={1}>23項目スコア分布</Typography>
+                <Typography variant="subtitle2" fontWeight="bold" mb={1}>40項目スコア分布</Typography>
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={itemBarData}>
                     <CartesianGrid strokeDasharray="3 3" />

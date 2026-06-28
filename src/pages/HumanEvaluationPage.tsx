@@ -1,7 +1,7 @@
 /**
  * HumanEvaluationPage.tsx
  * 人間評価入力ページ
- * 2026-03-07: rubric.ts 統一 – 全23項目のRD水準ガイドを評価スライダーに表示
+ * 2026-03-07: rubric.ts 統一 – 全40項目のRD水準ガイドを評価スライダーに表示
  */
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -25,12 +25,9 @@ import {
 } from "../constants/rubric";
 
 // 因子別カラーマップ（rubric.ts と同期）
-const FACTOR_COLOR: Record<string, string> = {
-  factor1: "#1976d2",
-  factor2: "#388e3c",
-  factor3: "#f57c00",
-  factor4: "#7b1fa2",
-};
+const FACTOR_COLOR: Record<string, string> = Object.fromEntries(
+  RUBRIC_FACTORS.map((f) => [f.key, f.color]),
+);
 
 // 評価値 → RD水準チップ
 function RdIndicator({ score }: { score: number }) {
@@ -59,9 +56,9 @@ export default function HumanEvaluationPage() {
   const navigate = useNavigate();
   const { journalId } = useParams<{ journalId?: string }>();
 
-  const [scores, setScores] = useState<Record<string, number>>({
-    factor1: 3, factor2: 3, factor3: 3, factor4: 3
-  });
+  const [scores, setScores] = useState<Record<string, number>>(
+    Object.fromEntries(RUBRIC_FACTORS.map((f) => [f.key, 3])),
+  );
   const [expandedItem, setExpandedItem] = useState<number | null>(null);
   const [tab, setTab] = useState(0);
   const [snackOpen, setSnackOpen] = useState(false);
@@ -74,12 +71,10 @@ export default function HumanEvaluationPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const items = [
-        { item_number: 1, score: scores.factor1 },
-        { item_number: 2, score: scores.factor2 },
-        { item_number: 3, score: scores.factor3 },
-        { item_number: 4, score: scores.factor4 },
-      ];
+      const items = RUBRIC_FACTORS.map((f, i) => ({
+        item_number: i + 1,
+        score: scores[f.key],
+      }));
       return apiClient.saveHumanEvaluation(journalId!, journal?.week_number || 1, items);
     },
     onSuccess:  () => { setSnackOpen(true); },
@@ -110,7 +105,9 @@ export default function HumanEvaluationPage() {
   }
 
   const factorAvg = (factorKey: string) => scores[factorKey]?.toFixed(2) ?? "0.00";
-  const totalAvg = ((scores.factor1 + scores.factor2 + scores.factor3 + scores.factor4) / 4).toFixed(2);
+  const totalAvg = (
+    RUBRIC_FACTORS.reduce((s, f) => s + (scores[f.key] ?? 0), 0) / RUBRIC_FACTORS.length
+  ).toFixed(2);
 
   // 日誌本文の展開 (バージョン2対応)
   let parsedRecords: any[] = [];
@@ -188,7 +185,7 @@ export default function HumanEvaluationPage() {
         <CardContent sx={{ pb: "12px !important" }}>
           <Typography variant="subtitle2" fontWeight="bold" mb={1.5}>
             <InfoOutlinedIcon sx={{ fontSize: 16, verticalAlign: "middle", mr: 0.5 }} />
-            評価基準：Hatton &amp; Smith（1995）省察深度（RD）水準 ― 全4因子・全23項目共通
+            評価基準：Hatton &amp; Smith（1995）省察深度（RD）水準 ― 全6因子・全40項目共通
           </Typography>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             {REFLECTION_DEPTH_LEVELS.map((rd) => (
@@ -233,7 +230,7 @@ export default function HumanEvaluationPage() {
         </CardContent>
       </Card>
 
-      {/* 4因子評価 */}
+      {/* 6因子評価 */}
       {RUBRIC_FACTORS.map((factor) => {
         const currentScore = scores[factor.key] ?? 3;
         const rd = getRdByScore(currentScore);
