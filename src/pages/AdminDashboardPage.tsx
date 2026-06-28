@@ -50,7 +50,15 @@ export default function AdminDashboardPage() {
   const [tab, setTab] = useState(0);
   const { data: profilesData } = useQuery({ queryKey: ["cohort"], queryFn: () => apiClient.getCohortProfiles() });
   const { data: journalsData } = useQuery({ queryKey: ["journals"], queryFn: () => apiClient.getJournals() });
-  const { data: registeredUsersData } = useQuery({ queryKey: ["registered-users"], queryFn: () => apiClient.getRegisteredUsers() });
+  // /api/data/users は admin / researcher のみ許可。
+  // 同じ /admin を共有する collaborator / board_observer では 403 になるため、
+  // それらのロールでは取得をスキップし、学生プロフィール件数にフォールバックする。
+  const canListUsers = user?.role === "admin" || user?.role === "researcher";
+  const { data: registeredUsersData } = useQuery({
+    queryKey: ["registered-users"],
+    queryFn: () => apiClient.getRegisteredUsers(),
+    enabled: canListUsers,
+  });
 
   const profiles = Array.isArray(profilesData) ? profilesData : [];
   const journals = Array.isArray(journalsData) ? journalsData : [];
