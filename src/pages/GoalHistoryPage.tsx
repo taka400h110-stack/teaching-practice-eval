@@ -14,8 +14,10 @@ import CheckCircleIcon   from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import HelpOutlineIcon   from "@mui/icons-material/HelpOutline";
 import StarIcon          from "@mui/icons-material/Star";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../api/client";
+import { EmptyView } from "../components/StateViews";
 import type { GoalEntry } from "../types";
 import { RUBRIC_ITEMS } from "../constants/rubric";
 
@@ -66,7 +68,8 @@ function GoalCard({ goal, onToggle }: { goal: GoalEntry; onToggle?: () => void }
 }
 
 export default function GoalHistoryPage() {
-    const [newGoal, setNewGoal]   = useState("");
+  const navigate = useNavigate();
+  const [newGoal, setNewGoal]   = useState("");
   const [focusItemIds, setFocusItemIds] = useState<number[]>([]);
   const [isSmart, setIsSmart]   = useState(false);
   const [weekNum, setWeekNum]   = useState(1);
@@ -235,10 +238,16 @@ export default function GoalHistoryPage() {
                 </Box>
               </Box>
               {goals.length === 0 ? (
-                <Box textAlign="center" py={4}>
-                  <TrackChangesIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
-                  <Typography color="text.secondary">目標がまだありません</Typography>
-                </Box>
+                <EmptyView
+                  icon={<TrackChangesIcon />}
+                  title="目標がまだありません"
+                  description="左のフォームから SMART 目標を登録するか、日誌の「省察・目標設定」で次週の目標を立てましょう。"
+                  action={
+                    <Button variant="contained" startIcon={<AddCircleIcon />} onClick={() => navigate("/journal-workflow")}>
+                      日誌を書いて目標を立てる
+                    </Button>
+                  }
+                />
               ) : (
                 goals.map((g: GoalEntry) => <GoalCard key={g.id} goal={g} onToggle={() => toggleMutation.mutate(g)} />)
               )}

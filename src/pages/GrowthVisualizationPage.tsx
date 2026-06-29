@@ -5,13 +5,16 @@
  * 成長グラフ - recharts による折れ線グラフ、因子別スコア推移
  */
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Box, Alert, Card, CardContent, Chip, Grid, Typography, LinearProgress,
+  Box, Alert, Button, Card, CardContent, Chip, Grid, Typography, LinearProgress,
   ToggleButton, ToggleButtonGroup, Paper, Avatar, Divider, Tabs, Tab,
 } from "@mui/material";
 import TrendingUpIcon   from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import TrendingFlatIcon from "@mui/icons-material/TrendingFlat";
+import ShowChartIcon    from "@mui/icons-material/ShowChart";
+import EditNoteIcon     from "@mui/icons-material/EditNote";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -20,7 +23,7 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../api/client";
-import { LoadingView, ErrorView } from "../components/StateViews";
+import { LoadingView, ErrorView, EmptyView } from "../components/StateViews";
 import type { WeeklyScore } from "../types";
 import { RUBRIC_FACTORS } from "../constants/rubric";
 
@@ -38,6 +41,7 @@ function TrendIcon({ fDelta }: { fDelta: number }) {
 }
 
 export default function GrowthVisualizationPage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [view, setView] = useState<"total" | "factors">("total");
 
@@ -56,7 +60,16 @@ export default function GrowthVisualizationPage() {
   if (!growth || !growth.weekly_scores || growth.weekly_scores.length === 0) {
     return (
       <Box data-testid="growth-page-root" maxWidth={1000} mx="auto" p={3}>
-        <Alert severity="info">成長データがありません。</Alert>
+        <EmptyView
+          icon={<ShowChartIcon />}
+          title="成長データがまだありません"
+          description="日誌を書いてAI評価を受けると、週ごとのスコア推移がグラフで表示されます。まずは1件目の日誌を記録してみましょう。"
+          action={
+            <Button variant="contained" startIcon={<EditNoteIcon />} onClick={() => navigate("/journal-workflow")}>
+              日誌を書く
+            </Button>
+          }
+        />
       </Box>
     );
   }

@@ -233,9 +233,14 @@ export default function DashboardPage() {
               </Box>
               <List dense disablePadding>
                 {(journals ?? []).length === 0 && (
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                    まだ日誌がありません
-                  </Typography>
+                  <Box sx={{ py: 2, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      まだ日誌がありません
+                    </Typography>
+                    <Button size="small" variant="outlined" startIcon={<MenuBookIcon />} onClick={() => navigate("/journal-workflow")}>
+                      最初の日誌を書く
+                    </Button>
+                  </Box>
                 )}
                 {(journals ?? []).slice(0, 5).map((j: JournalEntry, idx) => {
                   const cfg = statusConfig[j.status];
@@ -284,9 +289,14 @@ export default function DashboardPage() {
                 <Button size="small" onClick={() => navigate("/goals")}>すべて見る</Button>
               </Box>
               {(goals ?? []).length === 0 && (
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                    まだ目標がありません
-                  </Typography>
+                  <Box sx={{ py: 2, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      まだ目標がありません
+                    </Typography>
+                    <Button size="small" variant="outlined" startIcon={<TrackChangesIcon />} onClick={() => navigate("/goals")}>
+                      目標を立てる
+                    </Button>
+                  </Box>
                 )}
                 {(goals ?? []).slice(0, 4).map((g) => (
                 <Paper key={g.id} variant="outlined" sx={{ p: 1.2, mb: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
