@@ -29,6 +29,7 @@ import { useQuery }       from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { ChatMessage } from "../types";
 import { apiFetch } from "../api/client";
+import { EmptyView } from "../components/StateViews";
 import {
   RUBRIC_FACTORS as _RUBRIC_FACTORS,
   RUBRIC_ITEMS,
@@ -372,20 +373,20 @@ export default function ChatBotPage() {
           </Box>
 
           {allSessions.length === 0 ? (
-            <Box p={4} textAlign="center">
-              <ChatIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
-              <Typography color="text.secondary" mb={2}>
-                まだチャット履歴がありません。<br />
-                日誌を開いて省察支援チャットを始めましょう。
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<MenuBookIcon />}
-                onClick={() => navigate("/journals")}
-              >
-                日誌一覧へ
-              </Button>
-            </Box>
+            <EmptyView
+              icon={<ChatIcon />}
+              title="まだチャット履歴がありません"
+              description="日誌を開いて省察支援チャットを始めると、ここに対話セッションが表示されます。"
+              action={
+                <Button
+                  variant="contained"
+                  startIcon={<MenuBookIcon />}
+                  onClick={() => navigate("/journals")}
+                >
+                  日誌一覧へ
+                </Button>
+              }
+            />
           ) : (
             <>
               <List dense>
