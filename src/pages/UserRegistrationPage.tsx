@@ -270,11 +270,13 @@ export default function UserRegistrationPage() {
 
             {/* 役割選択 */}
             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-              <InputLabel>役割</InputLabel>
+              <InputLabel id="register-role-label">役割</InputLabel>
               <Select
                 multiple
+                labelId="register-role-label"
                 value={selectedRoles}
                 label="役割"
+                inputProps={{ 'aria-label': '役割' }}
                 onChange={(e) => {
                   const val = e.target.value;
                   setSelectedRoles(typeof val === 'string' ? val.split(',') as UserRole[] : val as UserRole[]);
@@ -335,10 +337,12 @@ export default function UserRegistrationPage() {
             {Array.from(new Set(roleConfigs.flatMap(rc => rc.fields))).map((field) => (
               field === "school_type" ? (
                 <FormControl key={field} fullWidth size="small" sx={{ mb: 1.5 }} error={!!errors[field]}>
-                  <InputLabel>{fieldLabel(field)}</InputLabel>
+                  <InputLabel id={`register-field-${field}-label`}>{fieldLabel(field)}</InputLabel>
                   <Select
+                    labelId={`register-field-${field}-label`}
                     value={form[field] ?? ""}
                     label={fieldLabel(field)}
+                    inputProps={{ 'aria-label': fieldLabel(field) }}
                     onChange={(e) => setForm({ ...form, [field]: e.target.value })}
                   >
                     {SCHOOL_TYPES.map((t) => (

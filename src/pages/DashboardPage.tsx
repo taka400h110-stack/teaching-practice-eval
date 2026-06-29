@@ -28,11 +28,12 @@ const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
 const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
 const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
 
-function ScoreBar({ value, max = 5, color }: { value: number; max?: number; color: string }) {
+function ScoreBar({ value, max = 5, color, label }: { value: number; max?: number; color: string; label?: string }) {
   return (
     <LinearProgress
       variant="determinate"
       value={(value / max) * 100}
+      aria-label={label ? `${label}: ${value.toFixed(2)} / ${max.toFixed(1)}` : `スコア ${value.toFixed(2)} / ${max.toFixed(1)}`}
       sx={{
         height: 8, borderRadius: 4,
         bgcolor: "grey.200",
@@ -210,7 +211,7 @@ export default function DashboardPage() {
                         {(latest[f] || 0).toFixed(2)} / 5.0
                       </Typography>
                     </Box>
-                    <ScoreBar value={latest[f]} color={FACTOR_COLORS[i]} />
+                    <ScoreBar value={latest[f]} color={FACTOR_COLORS[i]} label={FACTOR_LABELS[i]} />
                   </Box>
                 ))
               ) : (
@@ -231,7 +232,10 @@ export default function DashboardPage() {
                 </Typography>
                 <Button size="small" onClick={() => navigate("/journals")}>すべて見る</Button>
               </Box>
-              <List dense disablePadding>
+              {/* 視覚的なカード内リスト（ナビゲーションではない）のため component="div" で
+                  <ul>/<li> セマンティクスを使わず、非同期描画の中間状態でも axe の list 違反が
+                  出ないようにする。各 ListItem / Divider も component="div" に揃える。 */}
+              <List dense disablePadding component="div">
                 {(journals ?? []).length === 0 && (
                   <Box sx={{ py: 2, textAlign: 'center' }}>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -246,8 +250,9 @@ export default function DashboardPage() {
                   const cfg = statusConfig[j.status];
                   return (
                     <React.Fragment key={j.id}>
-                      {idx > 0 && <Divider />}
+                      {idx > 0 && <Divider component="div" />}
                       <ListItem
+                        component="div"
                         sx={{ py: 0.8, px: 0, cursor: "pointer", "&:hover": { bgcolor: "grey.50" }, borderRadius: 1 }}
                         onClick={() => navigate(`/journal-workflow/${j.id}`)}
                         secondaryAction={

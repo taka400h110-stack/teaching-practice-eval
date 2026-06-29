@@ -207,7 +207,7 @@ export default function AdminDashboardPage() {
                     <Chip label={`平均 ${s.avg}`} size="small" color="primary" variant="outlined" />
                   </Box>
                 </Box>
-                <LinearProgress variant="determinate" value={safeProfiles.length > 0 ? (s.count / safeProfiles.length) * 100 : 0} sx={{ height: 8, borderRadius: 4 }} />
+                <LinearProgress variant="determinate" value={safeProfiles.length > 0 ? (s.count / safeProfiles.length) * 100 : 0} aria-label={`${s.label} ${s.count}名 (平均 ${s.avg})`} sx={{ height: 8, borderRadius: 4 }} />
               </Box>
             ))}
           </CardContent>
