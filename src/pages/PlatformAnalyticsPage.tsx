@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Box, Typography, Card, CardContent, Grid, Button, Tab, Tabs, Chip, Divider, CircularProgress, Alert } from "@mui/material";
+import { Box, Typography, Card, CardContent, Grid, Button, Tab, Tabs, Chip, Divider, Alert } from "@mui/material";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Science from "@mui/icons-material/Science";
 import Security from "@mui/icons-material/Security";
 import Timeline from "@mui/icons-material/Timeline";
 import FormatListNumbered from "@mui/icons-material/FormatListNumbered";
 import { apiFetch } from "../api/client";
+import { LoadingView } from "../components/StateViews";
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper as MuiPaper } from "@mui/material";
 
 function TabPanel(props: any) {
@@ -66,7 +67,7 @@ export default function PlatformAnalyticsPage() {
 
       {/* Tab 1: Pipeline */}
       <TabPanel value={tabIndex} index={0}>
-        {pipeLoading ? <CircularProgress /> : (
+        {pipeLoading ? <LoadingView label="パイプラインデータを読み込み中…" /> : (
           <Grid container spacing={3}>
             {pipelineData && Object.entries(pipelineData.layers).map(([layer, info]: any) => (
               <Grid size={{ xs: 12, sm: 6, md: 3 }} key={layer}>
@@ -152,7 +153,7 @@ export default function PlatformAnalyticsPage() {
 
       {/* Tab 3: Fairness & Validity */}
       <TabPanel value={tabIndex} index={2}>
-        {fairLoading ? <CircularProgress /> : (fairnessData as any)?.status === "not_available" ? (
+        {fairLoading ? <LoadingView label="監査データを読み込み中…" /> : (fairnessData as any)?.status === "not_available" ? (
           <Alert severity="info">
             <strong>公平性・妥当性監査</strong>: {(fairnessData as any).message}
             <Typography variant="caption" display="block" sx={{ mt: 1 }}>

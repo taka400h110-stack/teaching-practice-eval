@@ -16,7 +16,6 @@ import {
   Button,
   Card,
   CardContent,
-  CircularProgress,
   Typography,
   IconButton,
   Stack,
@@ -47,6 +46,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { unzip } from "fflate";
 import { apiFetch, getToken } from "../../api/client";
+import { LoadingView, ErrorView } from "../../components/StateViews";
 
 // 分割済みサブコンポーネント / 型 / ユーティリティ
 import {
@@ -819,9 +819,9 @@ export default function JournalImportPage() {
 
       {/* 一覧 */}
       {listQ.isLoading ? (
-        <Box display="flex" justifyContent="center" p={4}>
-          <CircularProgress />
-        </Box>
+        <LoadingView label="取り込み一覧を読み込み中…" />
+      ) : listQ.isError ? (
+        <ErrorView message="取り込み一覧の取得に失敗しました。" onRetry={() => void listQ.refetch()} />
       ) : rawItems.length === 0 ? (
         <Alert severity="info">まだ取り込みはありません。上のエリアからファイルをアップロードしてください。</Alert>
       ) : items.length === 0 ? (

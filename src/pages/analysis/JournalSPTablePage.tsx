@@ -22,6 +22,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../api/client";
+import { LoadingView, ErrorView } from "../../components/StateViews";
 
 interface SpResponse {
   scope: string;
@@ -100,16 +101,10 @@ export default function JournalSPTablePage() {
         右端の C* (注意係数) が高い学生は学習パターンが不安定、下端の C* が高い問題は学習要素として注意を要する可能性があります。
       </Alert>
 
-      {spQ.isLoading && (
-        <Box display="flex" justifyContent="center" p={4}>
-          <CircularProgress />
-        </Box>
-      )}
+      {spQ.isLoading && <LoadingView label="S-P表分析を読み込み中…" />}
 
       {spQ.isError && (
-        <Alert severity="error">
-          読み込みに失敗しました: {String((spQ.error as any)?.message || "")}
-        </Alert>
+        <ErrorView message="S-P表分析の読み込みに失敗しました。" onRetry={() => void spQ.refetch()} />
       )}
 
       {spQ.data && (

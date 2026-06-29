@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, Button } from '@mui/material';
+import { Box, Typography, Paper, Select, MenuItem, FormControl, InputLabel, Button } from '@mui/material';
 import Download from '@mui/icons-material/Download';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client';
+import { LoadingView } from '../components/StateViews';
 
 export const SCATNetworkAnalysisPage: React.FC = () => {
   const [filterPeriod, setFilterPeriod] = useState('all');
@@ -83,7 +84,7 @@ export const SCATNetworkAnalysisPage: React.FC = () => {
 
       <Paper sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
         {isLoading ? (
-          <CircularProgress />
+          <LoadingView label="概念ネットワークを読み込み中…" minHeight="100%" />
         ) : (
           
           <Box sx={{ width: '100%', height: '100%', position: 'relative' }} data-testid="network-canvas">

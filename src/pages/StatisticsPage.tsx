@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Box, Typography, Card, CardContent, Chip, Grid, Paper,
-  Tabs, Tab, LinearProgress, Table, TableBody, TableCell,
+  Tabs, Tab, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Divider,
   Button, Menu, MenuItem, Tooltip,
 } from "@mui/material";
@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
+import { LoadingView, ErrorView } from "../components/StateViews";
 import { RUBRIC_FACTORS } from "../constants/rubric";
 
 const COLORS = ["#1976d2", "#43a047", "#fb8c00", "#8e24aa", "#e53935", "#00acc1"];
@@ -111,7 +112,7 @@ export default function StatisticsPage() {
   const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null);
   const [anonymize, setAnonymize] = useState(true);
 
-  const { data: cohorts = [], isLoading } = useQuery({
+  const { data: cohorts = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["cohorts"],
     queryFn: async () => {
       const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
@@ -129,7 +130,8 @@ export default function StatisticsPage() {
     },
   });
 
-  if (isLoading) return <LinearProgress />;
+  if (isLoading) return <LoadingView label="統計データを読み込み中…" />;
+  if (isError) return <ErrorView message="統計データの取得に失敗しました。" onRetry={() => void refetch()} />;
 
   // ── エクスポートハンドラ ──
   const handleExportCohortCSV = () => {

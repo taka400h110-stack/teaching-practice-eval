@@ -8,7 +8,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { MenuItem, Select, FormControl, InputLabel, RadioGroup, Radio,
   Box, Typography, Card, CardContent, Chip, Grid, Paper,
-  Tabs, Tab, Alert, LinearProgress, Divider, Button,
+  Tabs, Tab, Alert, Divider, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   CircularProgress, Stack, Snackbar, IconButton, Tooltip,
 } from "@mui/material";
@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
+import { LoadingView, ErrorView } from "../components/StateViews";
 import {
   CohortProfile,
   WeeklyScore,
@@ -145,7 +146,7 @@ export default function LongitudinalAnalysisPage() {
   const [isCalcLGCM, setIsCalcLGCM] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, msg: "" });
 
-  const { data: cohorts, isLoading } = useQuery<CohortProfile[]>({
+  const { data: cohorts, isLoading, isError, refetch } = useQuery<CohortProfile[]>({
     queryKey: ["cohorts"],
     queryFn: async () => {
       const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
@@ -251,7 +252,8 @@ export default function LongitudinalAnalysisPage() {
         setIsCalcLGCM(false);
   }, [cohorts]);
 
-  if (isLoading) return <LinearProgress />;
+  if (isLoading) return <LoadingView label="縦断分析データを読み込み中…" />;
+  if (isError) return <ErrorView message="縦断分析データの取得に失敗しました。" onRetry={() => void refetch()} />;
 
   return (
     <Box data-testid="statistics-page-root">

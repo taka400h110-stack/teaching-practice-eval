@@ -17,6 +17,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../api/client";
+import { LoadingView, ErrorView } from "../../components/StateViews";
 
 interface TransmissionResponse {
   scope: string;
@@ -129,16 +130,10 @@ export default function JournalTransmissionPage() {
         高いほど学習要素間に到達関係 (上位 → 下位の依存) が広く張り巡らされていることを示します。
       </Alert>
 
-      {tQ.isLoading && (
-        <Box display="flex" justifyContent="center" p={4}>
-          <CircularProgress />
-        </Box>
-      )}
+      {tQ.isLoading && <LoadingView label="伝達構造分析を読み込み中…" />}
 
       {tQ.isError && (
-        <Alert severity="error">
-          読み込みに失敗しました: {String((tQ.error as any)?.message || "")}
-        </Alert>
+        <ErrorView message="伝達構造分析の読み込みに失敗しました。" onRetry={() => void tQ.refetch()} />
       )}
 
       {tQ.data && <TransmissionDisplay data={tQ.data} />}

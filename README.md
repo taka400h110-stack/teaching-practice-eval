@@ -172,6 +172,21 @@ npx wrangler d1 migrations list teaching-practice-eval-db --remote
 - **E2E テスト追加**: `verify_journal_submit.cjs` (新規提出: status:submitted・実習日尊重・snackbar・クリーン)、`verify_journal_edit_koma.cjs` (コマ追加/削除/並び替え・draft保存→body復元→編集提出 draft→submitted)
 - CI: 必須4チェック全パス＋オプション3チェック全パス
 
+### Phase 13 (共通状態表示の全ページ横展開 — UX統一) (#25)
+Phase 12 で導入した共通状態表示コンポーネント `StateViews` (LoadingView / ErrorView / EmptyView) を、全役割の主要ページへ横展開し、ローディング・エラー・空状態の体験を統一:
+- **取得失敗時の操作不能を解消**: これまで取得失敗時に何も表示されず操作不能になっていたページへ、**エラー表示＋再試行ボタン**を追加
+- **ローディング表記の統一**: 全ページで中央スピナー＋ラベル (role=status / aria-live) に統一
+- **適用ページ (計18ページ)**:
+  - 学生/教員ダッシュボード・日誌一覧 (Phase 12 で先行適用)
+  - 評価一覧 / 統計 / コホート管理 / 縦断分析 / 教員統計 / 成長可視化: `LoadingView` + 再試行付き `ErrorView`
+  - 学生別AI対話ログ: Loading/Error/Empty を完全統一
+  - SCAT概念ネットワーク / SCAT時系列 / プラットフォーム分析: ローディング表記統一
+  - 評価結果 / 日誌詳細: ローディングを `LoadingView` へ、日誌詳細は再試行付き `ErrorView` 化
+  - 研究系: ISM分析 / S-P表分析 / 伝達構造分析 / SCAT分析 / 日誌取り込み一覧 / 日誌取り込み詳細
+- **コード整理**: 未使用となった `CircularProgress` / `LinearProgress` の import を削除
+- **方針**: AI評価実行ボタンや「記録が見つかりません(戻る導線付き)」等のドメイン固有UIは破壊せず維持。フォールバックデータを持つページはローディング表記のみ統一
+- CI: 必須4チェック全パス
+
 ## ライセンス / 引用
 
 研究で使用する際は、エクスポート時の codebook と監査ログを保存し、論文 Methods に `exported_at`, `filters`, および補正手法 (`correction`) を記載することを推奨。SCAT は大谷 (2008) を引用。

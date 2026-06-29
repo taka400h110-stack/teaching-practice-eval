@@ -22,6 +22,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../api/client";
+import { LoadingView, ErrorView } from "../../components/StateViews";
 
 interface IsmResponse {
   scope: string;
@@ -96,14 +97,10 @@ export default function JournalISMPage() {
         </Stack>
       </Stack>
 
-      {ismQ.isLoading && (
-        <Box display="flex" justifyContent="center" p={4}>
-          <CircularProgress />
-        </Box>
-      )}
+      {ismQ.isLoading && <LoadingView label="ISM分析を読み込み中…" />}
 
       {ismQ.isError && (
-        <Alert severity="error">読み込みに失敗しました: {String((ismQ.error as any)?.message || "")}</Alert>
+        <ErrorView message="ISM分析の読み込みに失敗しました。" onRetry={() => void ismQ.refetch()} />
       )}
 
       {ismQ.data && (

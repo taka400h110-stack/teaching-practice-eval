@@ -23,6 +23,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ForumIcon from "@mui/icons-material/Forum";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../api/client";
+import { LoadingView, ErrorView, EmptyView } from "../components/StateViews";
 import type { ChatSession, ChatMessage } from "../types";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -47,7 +48,7 @@ export default function StudentChatLogsPage() {
   const [search, setSearch] = useState("");
 
   // 全学生の全セッション（特権ロールはstudent_id未指定で全件取得）
-  const { data: allSessions = [], isLoading } = useQuery({
+  const { data: allSessions = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["all-chat-sessions"],
     queryFn: () => apiClient.getAllChatSessions(),
   });
@@ -109,13 +110,15 @@ export default function StudentChatLogsPage() {
       <Divider sx={{ mb: 2 }} />
 
       {isLoading ? (
-        <Box display="flex" justifyContent="center" py={8}>
-          <CircularProgress />
-        </Box>
+        <LoadingView label="対話ログを読み込み中…" />
+      ) : isError ? (
+        <ErrorView message="対話ログの取得に失敗しました。" onRetry={() => void refetch()} />
       ) : (allSessions as ChatSession[]).length === 0 ? (
-        <Alert severity="info">
-          まだ対話ログが記録されていません。実習生がチャットを利用すると、ここに表示されます。
-        </Alert>
+        <EmptyView
+          icon={<ForumIcon />}
+          title="まだ対話ログがありません"
+          description="実習生が省察支援チャットを利用すると、ここに表示されます。"
+        />
       ) : (
         <Grid container spacing={2}>
           {/* 左: 学生一覧 */}

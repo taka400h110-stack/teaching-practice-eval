@@ -17,6 +17,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import type { StudentProfile } from "../types";
 import { apiFetch } from "../api/client";
+import { LoadingView, ErrorView } from "../components/StateViews";
 import { RUBRIC_FACTORS } from "../constants/rubric";
 
 const FACTOR_KEYS   = RUBRIC_FACTORS.map((f) => f.key);
@@ -54,7 +55,7 @@ export default function CohortsManagementPage() {
   const [search, setSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
 
-  const { data: profiles = [], isLoading } = useQuery({
+  const { data: profiles = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["cohorts"],
     queryFn: async () => {
       const res = await apiFetch("/api/data/cohorts", { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`, 'Content-Type': 'application/json' } });
@@ -112,7 +113,8 @@ export default function CohortsManagementPage() {
     })),
   ] : [];
 
-  if (isLoading) return <LinearProgress />;
+  if (isLoading) return <LoadingView label="コホート情報を読み込み中…" />;
+  if (isError) return <ErrorView message="コホート情報の取得に失敗しました。" onRetry={() => void refetch()} />;
 
   return (
     <Box data-testid="cohorts-page-root">
