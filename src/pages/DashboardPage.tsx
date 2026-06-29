@@ -253,7 +253,7 @@ export default function DashboardPage() {
                         secondaryAction={
                           <Box display="flex" gap={0.5}>
                             <Chip label={cfg.label} color={cfg.color} size="small" sx={{ fontSize: 10 }} />
-                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/journal-workflow/${j.id}`); }}>
+                            <IconButton size="small" aria-label="この日誌を開く" onClick={(e) => { e.stopPropagation(); navigate(`/journal-workflow/${j.id}`); }}>
                               <VisibilityIcon fontSize="small" />
                             </IconButton>
                           </Box>

@@ -468,18 +468,18 @@ export default function ChatBotPage() {
         <Box ml="auto" display="flex" gap={0.5}>
           <Tooltip title="チャット履歴">
             <Badge badgeContent={allSessions.length} color="primary" max={99}>
-              <IconButton size="small" color="primary" onClick={() => setHistoryOpen(true)}>
+              <IconButton size="small" color="primary" aria-label="チャット履歴を開く" onClick={() => setHistoryOpen(true)}>
                 <HistoryIcon fontSize="small" />
               </IconButton>
             </Badge>
           </Tooltip>
           <Tooltip title="ルーブリック参照">
-            <IconButton size="small" onClick={() => setShowRubric((p) => !p)} color={showRubric ? "primary" : "default"}>
+            <IconButton size="small" aria-label="ルーブリック参照" onClick={() => setShowRubric((p) => !p)} color={showRubric ? "primary" : "default"}>
               <TrackChangesIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title="会話をリセット">
-            <IconButton size="small" onClick={() => setMessages(session?.messages.slice(0, 1) ?? [])}>
+            <IconButton size="small" aria-label="会話をリセット" onClick={() => setMessages(session?.messages.slice(0, 1) ?? [])}>
               <RefreshIcon fontSize="small" />
             </IconButton>
           </Tooltip>

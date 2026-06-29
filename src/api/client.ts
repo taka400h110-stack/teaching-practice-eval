@@ -475,7 +475,22 @@ const apiClient = {
         })
       });
       
-      if (!aiRes.ok) throw new Error("Failed to call AI evaluate");
+      if (!aiRes.ok) {
+        // AI評価APIのエラー詳細（特に未設定=503）を保持して呼び出し側へ伝える
+        let detail = "";
+        let code = "";
+        try {
+          const errData: any = await aiRes.json();
+          detail = errData?.error || "";
+          code = errData?.code || "";
+        } catch { /* JSON以外のレスポンス */ }
+        if (aiRes.status === 503 || code === "AI_NOT_CONFIGURED") {
+          const e = new Error(detail || "AI評価機能は現在利用できません（APIキー未設定）。");
+          (e as any).code = "AI_NOT_CONFIGURED";
+          throw e;
+        }
+        throw new Error(detail || `AI評価の呼び出しに失敗しました (HTTP ${aiRes.status})`);
+      }
       const aiData: any = await aiRes.json();
 
       // 3. 評価結果を保存する
@@ -497,6 +512,8 @@ const apiClient = {
       return await apiClient.getEvaluation(journalId);
     } catch (err) {
       console.error("runEvaluation error:", err);
+      // 具体的なエラー（AI未設定など）はそのまま再スローし、UIで適切に出し分ける
+      if (err instanceof Error) throw err;
       throw new Error("Evaluation failed");
     }
   },
