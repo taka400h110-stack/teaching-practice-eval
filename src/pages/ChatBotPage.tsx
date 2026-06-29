@@ -171,7 +171,6 @@ export default function ChatBotPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const journalId = params.get("journalId");
-  if (!journalId) return <Box p={3}>日誌IDが指定されていません</Box>;
   const [messages, setMessages]    = useState<ChatMessage[]>([]);
   const [rdHistory, setRdHistory]  = useState<number[]>([]);
   const [input, setInput]          = useState("");
@@ -182,7 +181,8 @@ export default function ChatBotPage() {
 
   const { data: session } = useQuery({
     queryKey: ["chat", journalId],
-    queryFn:  () => apiClient.getChatSession(journalId),
+    queryFn:  () => apiClient.getChatSession(journalId as string),
+    enabled:  !!journalId,
   });
 
   // 全チャットセッション一覧
@@ -346,6 +346,95 @@ export default function ChatBotPage() {
   };
   const suggestions = PHASE_PROMPTS[phase] ?? PHASE_PROMPTS.phase1;
 
+  // ────────────────────────────────────────────
+  // journalId 未指定時：セッション選択ランディング
+  // （行き止まり「日誌IDが指定されていません」を解消）
+  // ────────────────────────────────────────────
+  if (!journalId) {
+    return (
+      <Box maxWidth={760} mx="auto" py={2}>
+        <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+          <ChatIcon color="primary" />
+          <Typography variant="h5" fontWeight="bold">チャット履歴</Typography>
+        </Box>
+        <Alert severity="info" sx={{ mb: 2 }} icon={<AutoAwesomeIcon />}>
+          <Typography variant="body2">
+            省察支援AIとの対話セッションを選んでください。日誌からチャットを開始すると、
+            ここに履歴が記録されていきます。
+          </Typography>
+        </Alert>
+
+        <Card>
+          <Box display="flex" alignItems="center" gap={1} p={2} borderBottom="1px solid" borderColor="divider">
+            <HistoryIcon color="action" />
+            <Typography variant="subtitle1" fontWeight="bold">対話セッション一覧</Typography>
+            <Chip label={`${allSessions.length}件`} size="small" color="primary" sx={{ ml: "auto" }} />
+          </Box>
+
+          {allSessions.length === 0 ? (
+            <Box p={4} textAlign="center">
+              <ChatIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
+              <Typography color="text.secondary" mb={2}>
+                まだチャット履歴がありません。<br />
+                日誌を開いて省察支援チャットを始めましょう。
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<MenuBookIcon />}
+                onClick={() => navigate("/journals")}
+              >
+                日誌一覧へ
+              </Button>
+            </Box>
+          ) : (
+            <>
+              <List dense>
+                {allSessions.map((s) => {
+                  const j = allJournals.find((jj) => jj.id === s.journal_id);
+                  const lastMsg = s.messages?.[(s.messages?.length ?? 0) - 1];
+                  const msgCount = s.messages?.length ?? (s as unknown as { message_count?: number }).message_count ?? 0;
+                  return (
+                    <ListItem key={s.id} disablePadding divider>
+                      <ListItemButton onClick={() => setParams({ journalId: s.journal_id })}>
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <ChatIcon sx={{ color: "primary.main", fontSize: 20 }} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2" fontWeight="medium">
+                              {j ? `Week ${j.week_number}: ${j.title.slice(0, 30)}` : s.journal_id}
+                            </Typography>
+                          }
+                          secondary={
+                            <Typography variant="caption" color="text.secondary" noWrap component="span">
+                              {lastMsg ? lastMsg.content.slice(0, 60) + "…" : `${msgCount}件のメッセージ`}
+                              {" ・ "}
+                              {msgCount}件
+                            </Typography>
+                          }
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+              <Box p={1.5} borderTop="1px solid" borderColor="divider">
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<MenuBookIcon />}
+                  onClick={() => navigate("/journals")}
+                >
+                  日誌一覧から選ぶ
+                </Button>
+              </Box>
+            </>
+          )}
+        </Card>
+      </Box>
+    );
+  }
+
   return (
     <Box display="flex" flexDirection="column" height="calc(100vh - 90px)">
       {/* ヘッダー */}
@@ -414,7 +503,8 @@ export default function ChatBotPage() {
             <List dense>
               {allSessions.map((s) => {
                 const j = allJournals.find((j) => j.id === s.journal_id);
-                const lastMsg = s.messages[s.messages.length - 1];
+                const lastMsg = s.messages?.[(s.messages?.length ?? 0) - 1];
+                const msgCount = s.messages?.length ?? (s as unknown as { message_count?: number }).message_count ?? 0;
                 const isActive = s.journal_id === journalId;
                 return (
                   <ListItem key={s.id} disablePadding sx={{ borderLeft: isActive ? "3px solid #1976d2" : "3px solid transparent" }}>
@@ -433,7 +523,7 @@ export default function ChatBotPage() {
                         }
                         secondary={
                           <Typography variant="caption" color="text.secondary" noWrap>
-                            {lastMsg ? lastMsg.content.slice(0, 60) + "..." : "メッセージなし"} ・ {s.messages.length}件
+                            {lastMsg ? lastMsg.content.slice(0, 60) + "..." : "メッセージなし"} ・ {msgCount}件
                           </Typography>
                         }
                       />
