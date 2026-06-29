@@ -38,6 +38,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import EventIcon from "@mui/icons-material/Event";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../api/client";
+import { LoadingView, ErrorView } from "../../components/StateViews";
 
 interface ImportItem {
   id: string;
@@ -165,13 +166,8 @@ export default function JournalImportDetailPage() {
     },
   });
 
-  if (detailQ.isLoading) {
-    return (
-      <Box display="flex" justifyContent="center" p={4}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  if (detailQ.isLoading) return <LoadingView label="取り込み記録を読み込み中…" />;
+  if (detailQ.isError) return <ErrorView message="取り込み記録の取得に失敗しました。" onRetry={() => void detailQ.refetch()} />;
 
   const item = detailQ.data?.item;
   if (!item) {

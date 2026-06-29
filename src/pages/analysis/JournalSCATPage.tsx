@@ -1,15 +1,16 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Card, CardContent, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip } from '@mui/material';
+import { Box, Typography, Button, Card, CardContent, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../../api/client';
+import { LoadingView, ErrorView } from '../../components/StateViews';
 
 export default function JournalSCATPage() {
   const { journalId } = useParams();
   const navigate = useNavigate();
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['scat', journalId],
     queryFn: async () => {
       const res = await apiFetch(`/api/data/scat/journals/${journalId}`);
@@ -20,8 +21,8 @@ export default function JournalSCATPage() {
     }
   });
 
-  if (isLoading) return <Box p={3}><CircularProgress /></Box>;
-  if (error) return <Box p={3}><Alert severity="error">{(error as Error).message}</Alert></Box>;
+  if (isLoading) return <LoadingView label="SCAT分析を読み込み中…" />;
+  if (error) return <ErrorView message="SCAT分析の読み込みに失敗しました。" onRetry={() => void refetch()} />;
 
   const { analysis, segments } = (data || {}) as { analysis?: any; segments?: any[] };
 
