@@ -189,15 +189,21 @@ export async function recomputeIsmIfDirty(
       .bind(scope, hash)
       .first();
     if (row) {
+      const cachedAdj: number[][] = JSON.parse(row.adjacency_json);
+      // 隣接行列が非対称なら方向付け済み (新スキーム), 対称なら無向 (旧キャッシュ)
+      const isDirected = cachedAdj.some((rowArr, i) =>
+        rowArr.some((v, j) => i !== j && v !== (cachedAdj[j]?.[i] ?? 0)),
+      );
       return {
         ids: JSON.parse(row.elements_json).map((e: any) => e.id),
         labels: JSON.parse(row.elements_json).map((e: any) => e.label || e.id),
-        adjacency: JSON.parse(row.adjacency_json),
+        adjacency: cachedAdj,
         reachability: JSON.parse(row.reachability_json),
         levels: JSON.parse(row.levels_json),
         transmissionScore: row.transmission_score ?? 0,
         nodeCount: row.node_count ?? 0,
         edgeCount: row.edge_count ?? 0,
+        directed: isDirected,
         sourceHash: row.source_hash,
       };
     }
@@ -281,14 +287,17 @@ export async function recomputeSpTableIfDirty(
       .bind(scope, ism.sourceHash)
       .first();
     if (row) {
+      // studentScores / problemScores は matrix の決定論的関数 (computeSPStats) であり
+      // テーブルには永続化していないため, キャッシュヒット時も matrix から再計算して
+      // フレッシュ計算パスと完全に一致させる (旧実装は行平均/空配列を返す不整合バグ)。
+      const cachedMatrix: number[][] = JSON.parse(row.matrix_json);
+      const cachedStats = computeSPStats(cachedMatrix);
       return {
         students: JSON.parse(row.students_json),
         problems: JSON.parse(row.problems_json),
-        matrix: JSON.parse(row.matrix_json),
-        studentScores: row.student_caution_json
-          ? JSON.parse(row.matrix_json).map((r: number[]) => r.reduce((s, x) => s + x, 0) / (r.length || 1))
-          : [],
-        problemScores: [],
+        matrix: cachedMatrix,
+        studentScores: cachedStats.studentScores,
+        problemScores: cachedStats.problemScores,
         studentCaution: JSON.parse(row.student_caution_json || "[]"),
         problemCaution: JSON.parse(row.problem_caution_json || "[]"),
         sourceHash: row.source_hash,

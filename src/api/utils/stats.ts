@@ -420,7 +420,7 @@ export function pairedTTest(
 // ────────────────────────────────────────────────────────────────
 
 /** Student t 分布の累積分布関数 P(T <= t) */
-function studentTCDF(t: number, df: number): number {
+export function studentTCDF(t: number, df: number): number {
   if (df <= 0) return NaN;
   if (t === 0) return 0.5;
   const x = df / (df + t * t);
@@ -428,6 +428,48 @@ function studentTCDF(t: number, df: number): number {
   const b = 0.5;
   const ib = incompleteBeta(x, a, b);
   return t > 0 ? 1 - 0.5 * ib : 0.5 * ib;
+}
+
+// ────────────────────────────────────────────────────────────────
+// F 分布 (Snedecor) の CDF / 生存関数 / 分位点
+// 不完全ベータ関数 I_x(a,b) を用いた高精度実装。
+// ICC(2,1) の F 検定 p 値および Shrout & Fleiss (1979) 信頼区間に使用。
+// ────────────────────────────────────────────────────────────────
+
+/** F 分布の累積分布関数 P(F <= f) , df1, df2 は自由度 */
+export function fCDF(f: number, df1: number, df2: number): number {
+  if (f <= 0 || df1 <= 0 || df2 <= 0) return 0;
+  const x = (df1 * f) / (df1 * f + df2);
+  return incompleteBeta(x, df1 / 2, df2 / 2);
+}
+
+/** F 分布の生存関数 P(F > f) = 上側確率 (F 検定 p 値) */
+export function fSF(f: number, df1: number, df2: number): number {
+  if (f <= 0 || df1 <= 0 || df2 <= 0) return 1;
+  return 1 - fCDF(f, df1, df2);
+}
+
+/**
+ * F 分布の分位点 (逆 CDF): P(F <= q) = p となる q を返す。
+ * 二分法 (bisection) で fCDF を逆解きする。Shrout & Fleiss CI で
+ * F(1-α/2; df1, df2) を求めるために使用。
+ */
+export function fInv(p: number, df1: number, df2: number): number {
+  if (p <= 0) return 0;
+  if (p >= 1) return Infinity;
+  if (df1 <= 0 || df2 <= 0) return NaN;
+  let lo = 0;
+  let hi = 1;
+  // 上限を p を超えるまで指数的に拡張
+  while (fCDF(hi, df1, df2) < p && hi < 1e8) hi *= 2;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    const c = fCDF(mid, df1, df2);
+    if (Math.abs(c - p) < 1e-10) return mid;
+    if (c < p) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
 }
 
 /** 正規化不完全ベータ関数 I_x(a, b) */
@@ -732,4 +774,181 @@ export function correctPValues(
     out[validIdx[k]] = adj[k];
   }
   return out;
+}
+
+// ════════════════════════════════════════════════════════════════
+// 信頼性分析 (原著論文準拠)
+//   - ICC(2,1): Shrout & Fleiss (1979) 二元変量効果モデル, 絶対一致
+//   - Krippendorff's α: Krippendorff (2018) 4th ed. 一致行列ベース
+// ════════════════════════════════════════════════════════════════
+
+export interface Icc21Result {
+  icc: number;
+  ci95: [number, number];
+  f: number;
+  df1: number;
+  df2: number;
+  p: number;
+  interpretation: string;
+}
+
+/**
+ * ICC(2,1) — 二元変量効果モデル, 単一測定, 絶対一致
+ * Shrout & Fleiss (1979) Case 2, Eq.(7) (point) / Table 上の CI 公式に準拠。
+ *
+ * ratings[rater][subject] (k 評価者 × n 対象)
+ *
+ * 点推定:   ICC = (MS_S - MS_E) / (MS_S + (k-1)MS_E + (k/n)(MS_R - MS_E))
+ * F 検定:   F0 = MS_S / MS_E,  df1 = n-1, df2 = (n-1)(k-1),  p = P(F > F0)
+ * 95%CI:    Shrout & Fleiss (1979) の F 分布分位点を用いた式 (下記)
+ */
+export function computeICC21(ratings: number[][], alpha = 0.05): Icc21Result {
+  const k = ratings.length;
+  const n = ratings[0]?.length ?? 0;
+  if (k < 2 || n < 2) {
+    return { icc: 0, ci95: [0, 0], f: 0, df1: 0, df2: 0, p: 1, interpretation: "データ不足" };
+  }
+
+  const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
+  const matrix: number[][] = Array.from({ length: n }, (_, i) => ratings.map((r) => r[i]));
+  const grandMean = mean(matrix.flatMap((row) => row));
+
+  const raterMeans = ratings.map((r) => mean(r));
+  const SS_R = n * raterMeans.reduce((s, rm) => s + (rm - grandMean) ** 2, 0);
+  const subjectMeans = matrix.map((row) => mean(row));
+  const SS_S = k * subjectMeans.reduce((s, sm) => s + (sm - grandMean) ** 2, 0);
+  const SS_T = matrix.flatMap((row) => row).reduce((s, v) => s + (v - grandMean) ** 2, 0);
+  const SS_E = SS_T - SS_R - SS_S;
+
+  const df_R = k - 1;
+  const df_S = n - 1;
+  const df_E = (k - 1) * (n - 1);
+
+  const MS_R = SS_R / df_R;
+  const MS_S = SS_S / df_S;
+  const MS_E = SS_E / Math.max(df_E, 1);
+
+  const icc = (MS_S - MS_E) / (MS_S + (k - 1) * MS_E + (k / n) * (MS_R - MS_E));
+  const iccClamped = Math.max(0, Math.min(1, icc));
+
+  // F 検定: F0 = MS_S / MS_E, 上側確率 (正確な F 分布)
+  const F0 = MS_E > 0 ? MS_S / MS_E : 0;
+  const df1 = df_S;          // n - 1
+  const df2 = df_E;          // (n-1)(k-1)
+  const p = F0 > 0 ? fSF(F0, df1, df2) : 1;
+
+  // 95%CI — Shrout & Fleiss (1979), ICC(2,1) 絶対一致の標準形
+  //   FL = F0 / F(1-α/2; n-1, (n-1)(k-1))
+  //   FU = F0 * F(1-α/2; (n-1)(k-1), n-1)
+  //   L  = (FL - 1) / (FL + k - 1)
+  //   U  = (FU - 1) / (FU + k - 1)
+  let L = 0;
+  let U = 0;
+  if (F0 > 0) {
+    const Fq1 = fInv(1 - alpha / 2, df1, df2);
+    const Fq2 = fInv(1 - alpha / 2, df2, df1);
+    const FL = F0 / Fq1;
+    const FU = F0 * Fq2;
+    L = (FL - 1) / (FL + k - 1);
+    U = (FU - 1) / (FU + k - 1);
+  }
+  const ci95: [number, number] = [
+    Math.max(0, Math.round(L * 1000) / 1000),
+    Math.min(1, Math.round(U * 1000) / 1000),
+  ];
+
+  const interpretation =
+    iccClamped >= 0.9 ? "非常に良好な信頼性" :
+    iccClamped >= 0.75 ? "良好な信頼性（研究使用可）" :
+    iccClamped >= 0.5 ? "中程度の信頼性（要注意）" :
+    "低い信頼性（要改善）";
+
+  return {
+    icc: Math.round(iccClamped * 1000) / 1000,
+    ci95,
+    f: Math.round(F0 * 100) / 100,
+    df1,
+    df2,
+    p: p < 0.001 ? Math.round(p * 1e6) / 1e6 : Math.round(p * 1000) / 1000,
+    interpretation,
+  };
+}
+
+export interface KrippendorffResult {
+  alpha: number;
+  interpretation: string;
+}
+
+/**
+ * Krippendorff's α — 一致行列 (coincidence matrix) ベースの正準定義。
+ * Krippendorff (2018) Content Analysis 4th ed. に準拠。
+ *
+ * α = 1 - D_o / D_e
+ *   D_o = Σ_c Σ_{c'} o_{cc'} δ²(c,c') / (n_total)          (観測不一致)
+ *   D_e = Σ_c Σ_{c'} n_c n_{c'} δ²(c,c') / (n_total(n_total-1)) (期待不一致)
+ * ここで o は一致行列 (各単位 u 内で順序対 (i,j), i≠j を 1/(m_u-1) 重みで集計),
+ * n_c は値 c の周辺度数, n_total は総ペア可能値数。
+ *
+ * ratings[rater][subject], null は欠測 (N/A)。
+ * metric: "interval" → δ² = (c-c')², "ordinal"/"nominal" は別途近似。
+ */
+export function computeKrippendorffAlpha(
+  ratings: (number | null)[][],
+  metric: "interval" | "ordinal" | "nominal" = "interval",
+): KrippendorffResult {
+  const k = ratings.length;
+  const n = ratings[0]?.length ?? 0;
+
+  // 距離関数 δ²(a,b)
+  const delta2 = (a: number, b: number): number => {
+    if (metric === "nominal") return a === b ? 0 : 1;
+    // interval も ordinal も区間距離の二乗を用いる (ordinal は近似)
+    return (a - b) ** 2;
+  };
+
+  // 各単位 (subject) 内で有効な評価を集め, 一致行列の寄与を積算する
+  // 観測不一致 D_o = Σ_units Σ_{i≠j} δ²(v_i, v_j) / (m_u - 1)
+  // 期待不一致 D_e = Σ_{全ペア p≠q over all valid values} δ²(v_p, v_q) / (n_total - 1)
+  const allValues: number[] = [];
+  let D_o = 0;
+
+  for (let s = 0; s < n; s++) {
+    const vals = ratings.map((r) => r[s]).filter((v): v is number => v !== null && v !== undefined);
+    const m = vals.length;
+    if (m < 2) continue; // ペアを作れない単位は寄与しない
+    let unitSum = 0;
+    for (let i = 0; i < m; i++) {
+      for (let j = 0; j < m; j++) {
+        if (i === j) continue;
+        unitSum += delta2(vals[i], vals[j]);
+      }
+    }
+    D_o += unitSum / (m - 1);
+    vals.forEach((v) => allValues.push(v));
+  }
+
+  const nTotal = allValues.length;
+  if (nTotal < 2) return { alpha: 1, interpretation: "データ不足" };
+
+  // 期待不一致: 全有効値の順序対 (p≠q) の δ² 平均
+  let D_e = 0;
+  for (let p = 0; p < nTotal; p++) {
+    for (let q = 0; q < nTotal; q++) {
+      if (p === q) continue;
+      D_e += delta2(allValues[p], allValues[q]);
+    }
+  }
+  D_e = D_e / (nTotal - 1);
+
+  if (D_e === 0) return { alpha: 1, interpretation: "完全一致" };
+
+  const alpha = 1 - D_o / D_e;
+  const alphaClamped = Math.max(-1, Math.min(1, alpha));
+
+  const interpretation =
+    alphaClamped >= 0.8 ? "良好な信頼性" :
+    alphaClamped >= 0.667 ? "暫定的に許容可能" :
+    "信頼性が低い（要改善）";
+
+  return { alpha: Math.round(alphaClamped * 1000) / 1000, interpretation };
 }
