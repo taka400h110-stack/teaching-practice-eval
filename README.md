@@ -150,6 +150,15 @@ npx wrangler d1 migrations list teaching-practice-eval-db --remote
 - **シード/監査**: `tests/audit/seed_chat_logs.py` でデモログ 8 セッション / 64 メッセージ投入。監査スクリプトに `/student-chat-logs` を追加。検証スクリプト `tests/audit/verify_chat_logs_page.cjs` で UI レンダリング・ロール分離を確認
 - CI: 必須4チェック (build / role-ui-smoke / export-filter-audit / statistics-validity-required) 全パス
 
+### Phase 11 (全機能QA監査 — チャット履歴の不具合修正) (#22)
+全機能・UI・ページレイアウトの厳密検証を実施し、発見した課題を修正:
+- **`/chat` 行き止まり解消**: 学生ナビ「チャット履歴」(`/chat`、journalId 未指定) が「日誌IDが指定されていません」だけの空白ページになる問題を修正。**セッション選択ランディング** (対話セッション一覧) を表示し、既存セッションのクリックで該当チャットへ遷移、履歴が無ければ日誌一覧へ誘導
+- **React フック規則違反の解消**: `ChatBotPage.tsx` の早期 `return` が `useState`/`useQuery` 群より前にあった問題を修正。全フックを無条件に先頭で実行し、`session` 取得は `enabled: !!journalId` に
+- **セッション切替クラッシュ修正**: 履歴ダイアログ/ピッカーが一覧API (messages 配列を返さず `message_count` を返す) に対し `s.messages[...].length` を参照して「システムエラー」になっていた問題を、オプショナルチェーン＋`message_count` フォールバックで修正
+- **QA監査結果**: tsc EXIT 0 / build 成功 / 全ロール×95ページ監査 **OK 95・問題0** / RBAC 6ケース全正常 / コンソール・ネットワーク監査 CLEAN / 横スクロール溢れ無し
+- **QAテスト追加**: `console_error_audit.cjs` (コンソール/ネットワークエラー検出)、`verify_chat_picker.cjs` (セッションピッカー＆遷移)、`verify_rbac_chat.cjs` (UI RBAC)、`shot_audit.cjs` (スクショ＋横溢れ検出)
+- CI: 必須4チェック全パス＋オプション3チェック (mobile / provider-health / stats-malformed) 全パス
+
 ## ライセンス / 引用
 
 研究で使用する際は、エクスポート時の codebook と監査ログを保存し、論文 Methods に `exported_at`, `filters`, および補正手法 (`correction`) を記載することを推奨。SCAT は大谷 (2008) を引用。
