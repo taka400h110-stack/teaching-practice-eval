@@ -748,20 +748,22 @@ async function runJournalAutoPipeline(
       ];
       const scored = themeDict.map(t => ({
         pair: t.pair,
-        score: t.keys.reduce((s, k) => s + (content.includes(k) ? 1 : 0), 0),
+        score: t.keys.reduce((s, k) => s + (journalText.includes(k) ? 1 : 0), 0),
       }));
       scored.sort((a, b) => b.score - a.score);
       const pair: [string, string] = scored[0].score > 0
         ? scored[0].pair
         : themeDict[Math.floor(Math.random() * themeDict.length)].pair;
       primaryThemes = pair;
-      storyline = `第${weekNumber}週、${studentName}は「${pair[0]}」「${pair[1]}」に関する省察を記述している。冒頭: 「${content.slice(0, 80).replace(/\s+/g, " ")}…」 文章全体としては、教育的判断と児童理解の往還が観察される。`;
+      // 生の content (JSON文字列) ではなく extractJournalText で抽出した本文を表示する。
+      // 以前は content.slice(0,80) が {"version":2,...} を露出させていた。
+      storyline = `第${weekNumber}週、${studentName}は「${pair[0]}」「${pair[1]}」に関する省察を記述している。冒頭: 「${journalText.slice(0, 80).replace(/\s+/g, " ")}…」 文章全体としては、教育的判断と児童理解の往還が観察される。`;
       theoreticalDescription = `本日誌は、教師の${pair[0]}行為と${pair[1]}の関係を、実践の事後省察として記述している。RD2〜RD3 水準の省察深度であり、児童の反応を媒介とした実践知の言語化が進行中。`;
 
-      const chunkSize = Math.max(80, Math.ceil(content.length / 3));
-      const numSeg = Math.min(3, Math.ceil(content.length / chunkSize));
+      const chunkSize = Math.max(80, Math.ceil(journalText.length / 3));
+      const numSeg = Math.min(3, Math.ceil(journalText.length / chunkSize));
       for (let i = 0; i < numSeg; i++) {
-        const segText = content.slice(i * chunkSize, (i + 1) * chunkSize);
+        const segText = journalText.slice(i * chunkSize, (i + 1) * chunkSize);
         const focusWord = pair[i % 2];
         segmentsToInsert.push({
           raw_text: segText || `セグメント${i + 1}`,
@@ -2457,13 +2459,21 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
       return c.json({ success: false, error: "forbidden", message: "データアクセス範囲外です。" }, 403);
     }
 
-    const fields = Object.keys(body).filter(k => k !== 'id' && k !== 'student_id');
+    // journal_entries に実在するカラムのみ UPDATE 対象とする (ホワイトリスト)。
+    // クライアントは reflection_text / title など content に内包されるフィールドも
+    // 送ってくるため、存在しないカラムをそのまま SET 句にすると
+    // 「D1_ERROR: no such column: reflection_text」で 500 になる (編集→提出が必ず失敗していた)。
+    const ALLOWED_COLUMNS = new Set([
+      "entry_date", "week_number", "title", "content", "word_count", "status",
+      "ocr_source", "ocr_confidence", "univ_teacher_comment", "school_mentor_comment", "teacher_comment",
+    ]);
+    const fields = Object.keys(body).filter(k => ALLOWED_COLUMNS.has(k));
     if (fields.length === 0) return c.json({ success: true });
-    
+
     const setClause = fields.map(k => `${k} = ?`).join(", ");
     const values = fields.map(k => (body as any)[k as keyof typeof body]);
-    
-    await db.prepare(`UPDATE journal_entries SET ${setClause} WHERE id = ?`)
+
+    await db.prepare(`UPDATE journal_entries SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
       .bind(...values, id)
       .run();
       
@@ -2659,7 +2669,22 @@ dataRouter.get("/chat-sessions/:journalId", requireRoles(["student", "teacher", 
   
   try {
     const session = await db.prepare("SELECT * FROM chat_sessions WHERE journal_id = ?").bind(journalId).first();
-    if (!session) return c.json({ error: "見つかりません" }, 404);
+    // セッション未作成は正常状態 (日誌提出直後やチャット未開始)。
+    // 404 を返すとフロント側で無駄なネットワークエラーログが出るため、
+    // 200 で「空セッション」を返してクライアントを単純化する。
+    if (!session) {
+      return c.json({
+        id: null,
+        journal_id: journalId,
+        student_id: null,
+        phase: "phase1",
+        current_state: "phase1",
+        phase_reached: "phase1",
+        total_turns: 0,
+        created_at: null,
+        messages: [],
+      });
+    }
     
     const messages = await db.prepare("SELECT * FROM chat_messages WHERE session_id = ? ORDER BY message_order ASC").bind((session as any)?.id).all();
     const s = session as any;
