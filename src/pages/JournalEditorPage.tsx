@@ -353,7 +353,7 @@ const JournalEditorPage: React.FC = () => {
     const errs: typeof errors = {};
     const totalBody = records.reduce((s, r) => s + r.body.length, 0);
     if (totalBody < 30) errs.content = "記録本文の合計が30文字以上になるよう記入してください";
-    if (!entryDate) errs.date = "日付は必須です";
+    if (!entryDate) errs.date = "実習日は必須です";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -454,8 +454,8 @@ const JournalEditorPage: React.FC = () => {
         <CardContent>
           <Typography variant="subtitle2" fontWeight="bold" mb={1.5} color="text.secondary">基本情報</Typography>
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-            <TextField label="実施日" type="date" value={entryDate} onChange={(e) => { setEntryDate(e.target.value); setErrors((ev) => ({ ...ev, date: undefined })); }}
-              error={!!errors.date} helperText={errors.date} size="small" slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 180 }} />
+            <TextField label="実習日" type="date" value={entryDate} onChange={(e) => { setEntryDate(e.target.value); setErrors((ev) => ({ ...ev, date: undefined })); }}
+              error={!!errors.date} helperText={errors.date || "実習を行った日"} size="small" slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 180 }} />
             {/* Phase 7-2: API バリデーションと整合させ 1..52 を強制 (UI 側で paste/直接入力もクランプ) */}
             <TextField label="実習週" type="number" value={weekNumber}
               onChange={(e) => {

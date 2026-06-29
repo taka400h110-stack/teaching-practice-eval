@@ -11,13 +11,14 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { useQuery }   from "@tanstack/react-query";
 import apiClient from "../api/client";
 import { RUBRIC_FACTORS } from "../constants/rubric";
+import { LoadingView, ErrorView } from "../components/StateViews";
 
 export default function TeacherDashboardPage() {
   const navigate = useNavigate();
   const [tab, setTab]       = useState(0);
   const [search, setSearch] = useState("");
 
-  const { data: profilesData } = useQuery({
+  const { data: profilesData, isLoading: loadingProfiles, isError: profilesError, refetch: refetchProfiles } = useQuery({
     queryKey: ["cohort"],
     queryFn:  () => apiClient.getCohortProfiles(),
   });
@@ -31,6 +32,9 @@ export default function TeacherDashboardPage() {
   const avgTotal = profiles.length
     ? (profiles.reduce((s, p) => s + p.final_total, 0) / profiles.length).toFixed(2)
     : "—";
+
+  if (loadingProfiles) return <LoadingView label="担当学生データを読み込み中…" />;
+  if (profilesError) return <ErrorView message="担当学生データの読み込みに失敗しました。" onRetry={() => void refetchProfiles()} />;
 
   return (
     <Box data-testid="teacher-dashboard-root" sx={{ maxWidth: "100vw", overflowX: "hidden" }}>

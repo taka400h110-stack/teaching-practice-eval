@@ -159,6 +159,19 @@ npx wrangler d1 migrations list teaching-practice-eval-db --remote
 - **QAテスト追加**: `console_error_audit.cjs` (コンソール/ネットワークエラー検出)、`verify_chat_picker.cjs` (セッションピッカー＆遷移)、`verify_rbac_chat.cjs` (UI RBAC)、`shot_audit.cjs` (スクショ＋横溢れ検出)
 - CI: 必須4チェック全パス＋オプション3チェック (mobile / provider-health / stats-malformed) 全パス
 
+### Phase 12 (教育実習日誌コア機能の致命バグ修正＋性能/UX改善) (#24)
+中核機能である**教育実習日誌の提出フロー**を厳密に E2E 検証し、提出を壊していた**致命的バグ2件**を発見・修正:
+- **🔴 新規提出が下書き扱いになり AI評価が起動しない**: `createJournal` (client.ts) が `status:"draft"` / `entry_date:今日` をハードコードで上書きしており、「提出してAI評価へ」を押しても draft で保存され自動評価パイプラインが起動しなかった問題を修正。呼び出し側 (`handleSave`) の値を尊重するように変更
+- **🔴 編集モードの提出が必ず 500 で失敗**: `PUT /journals/:id` が body 全フィールドを動的に SET 句にしていたため、`reflection_text` / `title` など `journal_entries` に存在しないカラムで `D1_ERROR: no such column` → 500。**既存日誌を開いて draft→submitted する操作が全て失敗していた**。実カラムのホワイトリストでフィルタし `updated_at` も更新するよう修正
+- **二重 AI 評価の防止**: `saveMutation.onSuccess` で `auto_pipeline_triggered` を確認し、バックエンドが評価済みならクライアント側の再評価を行わない
+- **404 ノイズ除去**: `GET /chat-sessions/:journalId` をセッション未作成時 404 → **200+空セッション**に変更
+- **SCAT 生 JSON 露出修正**: フォールバック storyline で生の content (`{"version":2,...}`) が露出していた問題を `extractJournalText` で本文抽出するよう修正
+- **「実習日」明確化**: 日付ラベルを「記入日」との混同を避け「実習日」に統一 (JournalWorkflow / JournalEditor)、補助テキスト追加
+- **⚡ バンドル大幅軽量化**: client build を `minify:false→esbuild` + `manualChunks` で react/MUI/recharts/tanstack を vendor 分割。**初期 index チャンク 1,332KB → 48.6KB (gzip 266→13.6KB、約95%削減)**、recharts はチャート非使用ページで読み込まれない
+- **🎨 共通状態表示**: `StateViews.tsx` (LoadingView / ErrorView / EmptyView) を新規追加し、ローディング・エラー（再試行ボタン付き）・空状態（アクション付き）の見た目を統一。`JournalListPage` に適用。コマ操作 IconButton に `aria-label` 付与 (A11y)
+- **E2E テスト追加**: `verify_journal_submit.cjs` (新規提出: status:submitted・実習日尊重・snackbar・クリーン)、`verify_journal_edit_koma.cjs` (コマ追加/削除/並び替え・draft保存→body復元→編集提出 draft→submitted)
+- CI: 必須4チェック全パス＋オプション3チェック全パス
+
 ## ライセンス / 引用
 
 研究で使用する際は、エクスポート時の codebook と監査ログを保存し、論文 Methods に `exported_at`, `filters`, および補正手法 (`correction`) を記載することを推奨。SCAT は大谷 (2008) を引用。

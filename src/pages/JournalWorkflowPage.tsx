@@ -174,20 +174,20 @@ function HourBlock({ record, index, total, onChange, onDelete, onMoveUp, onMoveD
               <Chip label={`${record.body.length}字`} size="small" sx={{ fontSize: 9, height: 16 }} variant="outlined" />
             )}
             <Tooltip title="上へ"><span>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onMoveUp(record.id); }} disabled={index === 0}>
+              <IconButton size="small" aria-label="このコマを上へ移動" onClick={(e) => { e.stopPropagation(); onMoveUp(record.id); }} disabled={index === 0}>
                 <KeyboardArrowUpIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </span></Tooltip>
             <Tooltip title="下へ"><span>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onMoveDown(record.id); }} disabled={index === total - 1}>
+              <IconButton size="small" aria-label="このコマを下へ移動" onClick={(e) => { e.stopPropagation(); onMoveDown(record.id); }} disabled={index === total - 1}>
                 <KeyboardArrowDownIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </span></Tooltip>
-            <IconButton size="small" onClick={() => setExpanded((v) => !v)}>
+            <IconButton size="small" aria-label={expanded ? "本文を折りたたむ" : "本文を展開"} onClick={() => setExpanded((v) => !v)}>
               {expanded ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
             </IconButton>
             <Tooltip title="削除">
-              <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); onDelete(record.id); }}>
+              <IconButton size="small" color="error" aria-label="このコマを削除" onClick={(e) => { e.stopPropagation(); onDelete(record.id); }}>
                 <DeleteOutlineIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Tooltip>
@@ -364,7 +364,9 @@ export default function JournalWorkflowPage() {
 
   const { data: chatSession } = useQuery({
     queryKey: ["chat", savedJournalId || ""],
-    queryFn:  () => savedJournalId ? apiClient.getChatSession(savedJournalId) : Promise.reject("No journal"),
+    queryFn:  () => apiClient.getChatSession(savedJournalId as string),
+    enabled:  !!savedJournalId,
+    retry:    false,
   });
 
   // 既存データ復元（URLパラメータで日誌を開いた時）
@@ -422,15 +424,22 @@ export default function JournalWorkflowPage() {
       const isDraft = payload.status === "draft";
       setSnackMsg(isDraft ? "下書きを保存しました" : "日誌を提出しました ✓");
       setSnackOpen(true);
-      
-      // SCAT分析を非同期でキックする
-      if (!isDraft) {
-        apiClient.post("/api/openai/scat-analysis/journal", { journal_id: data.id })
-          .catch(err => console.error("Auto SCAT analysis failed:", err));
-      }
 
       if (!isDraft) {
-        evalMutation.mutate(data.id);
+        // バックエンドは submit 時に runJournalAutoPipeline で
+        // AI評価＋SCAT分析を自動実行する (重複起動防止付き)。
+        // auto_pipeline_triggered が true ならクライアント側の再評価/再SCATは行わず、
+        // false の場合のみフォールバックとして起動する (二重評価を防ぐ)。
+        const pipelineTriggered = Boolean((data as unknown as { auto_pipeline_triggered?: boolean }).auto_pipeline_triggered);
+        if (pipelineTriggered) {
+          void queryClient_.invalidateQueries({ queryKey: ["allEvaluations"] });
+          setSnackMsg("日誌を提出しAI評価が完了しました ✓");
+        } else {
+          // フォールバック: バックエンドが評価しなかった場合のみクライアントで実行
+          apiClient.post("/api/openai/scat-analysis/journal", { journal_id: data.id })
+            .catch((err) => console.error("Auto SCAT analysis failed:", err));
+          evalMutation.mutate(data.id);
+        }
         setTimeout(() => setStep(1), 1000); // 提出後は自動的にAI評価タブへ
       }
     },
@@ -440,7 +449,7 @@ export default function JournalWorkflowPage() {
     const errs: typeof saveErrors = {};
     const totalBody = records.reduce((s, r) => s + r.body.length, 0);
     if (totalBody < 30) errs.content = "記録本文の合計が30文字以上になるよう記入してください";
-    if (!entryDate) errs.date = "日付は必須です";
+    if (!entryDate) errs.date = "実習日は必須です";
     setSaveErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -752,10 +761,10 @@ export default function JournalWorkflowPage() {
               <CardContent sx={{ p: "12px 16px !important" }}>
                 <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
                   <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="body2" color="text.secondary" fontWeight={600}>日付</Typography>
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>実習日</Typography>
                     <TextField type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)}
                       size="small" sx={{ width: 150 }}
-                      error={!!saveErrors.date} helperText={saveErrors.date} />
+                      error={!!saveErrors.date} helperText={saveErrors.date || "実習を行った日を選択"} />
                   </Box>
                   <Box display="flex" alignItems="center" gap={1}>
                     <Typography variant="body2" color="text.secondary" fontWeight={600}>週</Typography>

@@ -14,6 +14,7 @@ import MenuBookIcon    from "@mui/icons-material/MenuBook";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { JournalEntry } from "../types";
+import { LoadingView, ErrorView, EmptyView } from "../components/StateViews";
 
 const STATUS_CONFIG = {
   draft:     { label: "下書き",   color: "default"  as const },
@@ -27,7 +28,7 @@ export default function JournalListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filterStudentId = searchParams.get("student_id") || undefined;
 
-  const { data: journals = [], isLoading } = useQuery({
+  const { data: journals = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["journals", filterStudentId || "all"],
     queryFn:  () => apiClient.getJournals(filterStudentId),
   });
@@ -46,7 +47,8 @@ export default function JournalListPage() {
   const userRole = currentUser?.role ?? "student";
   const isStudent = userRole === "student";
 
-  if (isLoading) return <Box p={3}><Typography>読み込み中...</Typography></Box>;
+  if (isLoading) return <LoadingView label="日誌を読み込み中…" />;
+  if (isError) return <ErrorView message="日誌一覧の取得に失敗しました。" onRetry={() => void refetch()} />;
 
   return (
     <Box data-testid="journal-list-root">
@@ -89,11 +91,17 @@ export default function JournalListPage() {
 
       {journals.length === 0 && (
         <Card>
-          <CardContent sx={{ textAlign: "center", py: 6 }}>
-            <MenuBookIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
-            <Typography color="text.secondary">
-              {isStudent ? "日誌がまだありません。「新規作成」から記録を始めましょう。" : "提出された日誌がまだありません。"}
-            </Typography>
+          <CardContent>
+            <EmptyView
+              icon={<MenuBookIcon />}
+              title={isStudent ? "日誌がまだありません" : "提出された日誌がまだありません"}
+              description={isStudent ? "「新規作成」から最初の実習日誌を記録しましょう。" : "学生が日誌を提出するとここに表示されます。"}
+              action={isStudent ? (
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate("/journals/new")}>
+                  新規作成
+                </Button>
+              ) : undefined}
+            />
           </CardContent>
         </Card>
       )}

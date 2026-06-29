@@ -291,11 +291,14 @@ const apiClient = {
   },
   createJournal: async (data: Record<string, unknown>): Promise<JournalEntry> => {
     const user = JSON.parse(localStorage.getItem("user_info") || "{}");
+    // 呼び出し側 (JournalWorkflowPage.handleSave) から渡される status / entry_date を尊重する。
+    // 以前はここで status:"draft" と entry_date:今日 を上書きしており、
+    // 「提出してAI評価へ」を押しても draft で保存され AI評価パイプラインが起動しなかった。
     const payload = {
       ...data,
       student_id: user.id || "user-001",
-      entry_date: new Date().toISOString(),
-      status: "draft"
+      entry_date: (data.entry_date as string) || new Date().toISOString(),
+      status: (data.status as string) || "draft",
     };
     const res = await apiFetch("/api/data/journals", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
