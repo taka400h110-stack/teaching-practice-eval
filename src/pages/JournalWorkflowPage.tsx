@@ -333,6 +333,9 @@ export default function JournalWorkflowPage() {
   const [saveErrors, setSaveErrors] = useState<{ content?: string; date?: string }>({});
   const [snackOpen,  setSnackOpen]  = useState(false);
   const [snackMsg,   setSnackMsg]   = useState("");
+  const [snackSeverity, setSnackSeverity] = useState<"success" | "error" | "warning" | "info">("success");
+  // AI評価が失敗した場合の理由（APIキー未設定など）をAI評価タブに表示する
+  const [aiEvalError, setAiEvalError] = useState<{ message: string; notConfigured: boolean } | null>(null);
   const [savedJournalId, setSavedJournalId] = useState<string | null>(journalId ?? null);
   const dragIdRef    = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -407,9 +410,21 @@ export default function JournalWorkflowPage() {
     onSuccess: () => {
       void queryClient_.invalidateQueries({ queryKey: ["journals"] });
       void queryClient_.invalidateQueries({ queryKey: ["allEvaluations"] });
+      setAiEvalError(null);
+      setSnackSeverity("success");
       setSnackMsg("AI評価が完了しました ✓");
       setSnackOpen(true);
-    }
+    },
+    onError: (err: unknown) => {
+      const notConfigured = (err as any)?.code === "AI_NOT_CONFIGURED";
+      const message = notConfigured
+        ? "AI評価機能は現在利用できません（APIキー未設定）。日誌の記録・提出は正常に保存されています。"
+        : (err instanceof Error && err.message ? err.message : "AI評価の実行に失敗しました。時間をおいて再試行してください。");
+      setAiEvalError({ message, notConfigured });
+      setSnackSeverity(notConfigured ? "warning" : "error");
+      setSnackMsg(notConfigured ? "AI評価は現在利用できません（日誌は保存済み）" : "AI評価の実行に失敗しました");
+      setSnackOpen(true);
+    },
   });
   
   const saveMutation = useMutation<JournalEntry, Error, JournalCreateRequest>({
@@ -422,6 +437,7 @@ export default function JournalWorkflowPage() {
       
       setSavedJournalId(data.id);
       const isDraft = payload.status === "draft";
+      setSnackSeverity("success");
       setSnackMsg(isDraft ? "下書きを保存しました" : "日誌を提出しました ✓");
       setSnackOpen(true);
 
@@ -625,7 +641,7 @@ export default function JournalWorkflowPage() {
         bgcolor: "white", borderBottom: "1px solid #e0e0e0", flexShrink: 0,
         flexWrap: "wrap",
       }}>
-        <IconButton size="small" onClick={() => navigate("/journals")}>
+        <IconButton size="small" aria-label="日誌一覧へ戻る" onClick={() => navigate("/journals")}>
           <ArrowBackIcon fontSize="small" />
         </IconButton>
         <MenuBookIcon sx={{ color: "#1976d2" }} />
@@ -969,6 +985,23 @@ export default function JournalWorkflowPage() {
                 <Alert severity="info" sx={{ mb: 2 }}>
                   <CircularProgress size={16} sx={{mr:1, verticalAlign:"middle"}}/> AI評価を実行中...
                 </Alert>
+              ) : aiEvalError ? (
+                <Alert
+                  severity={aiEvalError.notConfigured ? "warning" : "error"}
+                  sx={{ mb: 2 }}
+                  action={
+                    <Button color="inherit" size="small" onClick={() => { setAiEvalError(null); evalMutation.mutate(targetJournalId); }}>
+                      再試行
+                    </Button>
+                  }
+                >
+                  {aiEvalError.message}
+                  {aiEvalError.notConfigured && (
+                    <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                      日誌の記録・提出・SCAT分析などAI評価以外の機能は通常どおりご利用いただけます。
+                    </Typography>
+                  )}
+                </Alert>
               ) : (
                 <Alert severity="info" sx={{ mb: 2 }}>
                   日誌を提出するとAI評価が生成されます。まず「① 日誌記入」タブで日誌を提出してください。
@@ -1103,7 +1136,7 @@ export default function JournalWorkflowPage() {
                 </Box>
               )}
               <Tooltip title="チャットをリセット">
-                <IconButton size="small" onClick={() => { setMessages([]); setRdHistory([]); }}>
+                <IconButton size="small" aria-label="チャットをリセット" onClick={() => { setMessages([]); setRdHistory([]); }}>
                   <RefreshIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
@@ -1254,9 +1287,9 @@ export default function JournalWorkflowPage() {
       </Box>
 
       {/* ── スナックバー ── */}
-      <Snackbar open={snackOpen} autoHideDuration={3000} onClose={() => setSnackOpen(false)}
+      <Snackbar open={snackOpen} autoHideDuration={snackSeverity === "success" ? 3000 : 6000} onClose={() => setSnackOpen(false)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
-        <Alert severity="success" onClose={() => setSnackOpen(false)}>{snackMsg}</Alert>
+        <Alert severity={snackSeverity} onClose={() => setSnackOpen(false)}>{snackMsg}</Alert>
       </Snackbar>
     </Box>
   );

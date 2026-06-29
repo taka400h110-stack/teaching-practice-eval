@@ -57,8 +57,8 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 const ROLE_COLOR: Record<UserRole, string> = {
   student:        "#1976d2",
-  teacher: "実習校教員 (Legacy)",
-    univ_teacher:   "#388e3c",
+  teacher:        "#607d8b",
+  univ_teacher:   "#388e3c",
   school_mentor:  "#f57c00",
   evaluator:      "#e64a19",
   researcher:     "#0288d1",
@@ -420,6 +420,7 @@ export default function AppLayout() {
           <IconButton
             color="inherit" edge="start"
             onClick={() => setMobileOpen(true)}
+            aria-label="メニューを開く"
             sx={{ mr: 2, display: { sm: "none" } }}
           >
             <MenuIcon />
@@ -470,7 +471,13 @@ export default function AppLayout() {
         component="main"
         sx={{
           flexGrow: 1, p: { xs: 1.5, sm: 2.5 },
-          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
+          width: { xs: "100%", sm: `calc(100% - ${DRAWER_WIDTH}px)` },
+          // flex items default to min-width:auto, which prevents shrinking below
+          // their content's min-content size and causes horizontal overflow on
+          // narrow (mobile) viewports. Force the main column to honor the viewport.
+          minWidth: 0,
+          maxWidth: "100%",
+          overflowX: "hidden",
           mt: "48px",
           bgcolor: "#f5f7fa",
           minHeight: "calc(100vh - 48px)",

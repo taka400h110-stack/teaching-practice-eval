@@ -157,7 +157,14 @@ export default function GrowthVisualizationPage() {
       </Grid>
 
       {/* タブ */}
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{ mb: 1 }}
+      >
         <Tab label="成長軌跡" />
         <Tab label="因子別推移" />
         <Tab label="自己評価比較" />

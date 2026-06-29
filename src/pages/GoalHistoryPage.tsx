@@ -191,7 +191,7 @@ export default function GoalHistoryPage() {
                   label={<Typography variant="body2">SMART目標として設定</Typography>}
                 />
                 <Tooltip title="SMARTとは？" placement="right">
-                  <IconButton size="small" onClick={() => setShowSmartHelp((v) => !v)}>
+                  <IconButton size="small" aria-label="SMARTとは？" onClick={() => setShowSmartHelp((v) => !v)}>
                     <HelpOutlineIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>

@@ -486,7 +486,7 @@ export async function callOpenAI(
 openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
+    return c.json({ error: "AI評価機能は現在利用できません（APIキー未設定）。管理者にお問い合わせください。", code: "AI_NOT_CONFIGURED" }, 503);
   }
 
   const body = await c.req.json() as {
@@ -557,7 +557,7 @@ openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher
 openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
+    return c.json({ error: "AI評価機能は現在利用できません（APIキー未設定）。管理者にお問い合わせください。", code: "AI_NOT_CONFIGURED" }, 503);
   }
 
   const body = await c.req.json() as {
@@ -594,7 +594,7 @@ openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ
 openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
+    return c.json({ error: "AI評価機能は現在利用できません（APIキー未設定）。管理者にお問い合わせください。", code: "AI_NOT_CONFIGURED" }, 503);
   }
 
   const body = await c.req.json() as {
@@ -670,7 +670,7 @@ openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_te
 openaiRouter.post("/chat", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "OPENAI_API_KEY not configured" }, 500);
+    return c.json({ error: "AI評価機能は現在利用できません（APIキー未設定）。管理者にお問い合わせください。", code: "AI_NOT_CONFIGURED" }, 503);
   }
 
   const body = await c.req.json() as {
@@ -840,7 +840,7 @@ openaiRouter.post("/analyze", requireRoles(["student", "teacher", "univ_teacher"
 // POST /api/ai/check-evidence (RQ3b GA-Evidence)
 openaiRouter.post("/check-evidence", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
-  if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
+  if (!apiKey) return c.json({ error: "AI評価機能は現在利用できません（APIキー未設定）。管理者にお問い合わせください。", code: "AI_NOT_CONFIGURED" }, 503);
 
   const authContext = getAuthContext(c);
   if (!authContext) return c.json({ error: "認証されていません" }, 401);
@@ -893,7 +893,7 @@ JSON形式で出力してください:
 // POST /api/ai/evaluate-session-rd (RQ3b RD-Chat Session-level holistic judgement)
 openaiRouter.post("/evaluate-session-rd", requireRoles(["student", "teacher", "univ_teacher", "school_mentor", "evaluator", "researcher", "admin", "collaborator"]), async (c) => {
   const apiKey = (c.env as any)?.OPENAI_API_KEY;
-  if (!apiKey) return c.json({ error: "OpenAI API key not configured" }, 500);
+  if (!apiKey) return c.json({ error: "AI評価機能は現在利用できません（APIキー未設定）。管理者にお問い合わせください。", code: "AI_NOT_CONFIGURED" }, 503);
 
   const authContext = getAuthContext(c);
   if (!authContext) return c.json({ error: "認証されていません" }, 401);

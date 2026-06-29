@@ -156,6 +156,7 @@ export default function JournalListPage() {
                   <IconButton
                     size="small"
                     color="error"
+                    aria-label="削除"
                     onClick={() => { if (confirm("削除しますか？")) deleteMutation.mutate(j.id); }}
                   >
                     <DeleteIcon fontSize="small" />
