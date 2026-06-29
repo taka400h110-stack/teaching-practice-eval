@@ -112,6 +112,7 @@ export default function TeacherDashboardPage() {
                         <Box>
                           <Typography variant="body2" fontWeight="bold">{p.final_total.toFixed(2)}</Typography>
                           <LinearProgress variant="determinate" value={(p.final_total / 5) * 100}
+                            aria-label={`総合スコア ${p.final_total.toFixed(2)} / 5.0`}
                             sx={{ height: 4, borderRadius: 2 }}
                             color={p.final_total >= 4 ? "success" : p.final_total >= 3 ? "primary" : "warning"} />
                         </Box>
@@ -165,7 +166,7 @@ export default function TeacherDashboardPage() {
                     <Typography variant="body2">{label}</Typography>
                     <Typography variant="body2" fontWeight="bold">{avg.toFixed(2)} / 5.0</Typography>
                   </Box>
-                  <LinearProgress variant="determinate" value={(avg / 5) * 100} sx={{ height: 10, borderRadius: 5 }} />
+                  <LinearProgress variant="determinate" value={(avg / 5) * 100} aria-label={`${label} 平均 ${avg.toFixed(2)} / 5.0`} sx={{ height: 10, borderRadius: 5 }} />
                 </Box>
               );
             })}

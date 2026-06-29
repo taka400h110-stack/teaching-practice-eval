@@ -153,20 +153,24 @@ function HourBlock({ record, index, total, onChange, onDelete, onMoveUp, onMoveD
           </Box>
           <TextField value={record.time_label} onChange={(e) => onChange(record.id, "time_label", e.target.value)}
             size="small" variant="standard" placeholder="コマ名"
+            inputProps={{ 'aria-label': 'コマ名' }}
             sx={{ width: 100, "& input": { fontWeight: 700, fontSize: 13 } }}
             onClick={(e) => e.stopPropagation()} />
           <AccessTimeIcon sx={{ fontSize: 13, color: "text.secondary", ml: 0.5 }} />
           <TextField value={record.time_start} onChange={(e) => onChange(record.id, "time_start", e.target.value)}
             size="small" variant="standard" type="time"
+            inputProps={{ 'aria-label': '開始時刻' }}
             sx={{ width: 72, "& input": { fontSize: 12 } }}
             onClick={(e) => e.stopPropagation()} />
           <Typography variant="caption" color="text.secondary">〜</Typography>
           <TextField value={record.time_end} onChange={(e) => onChange(record.id, "time_end", e.target.value)}
             size="small" variant="standard" type="time"
+            inputProps={{ 'aria-label': '終了時刻' }}
             sx={{ width: 72, "& input": { fontSize: 12 } }}
             onClick={(e) => e.stopPropagation()} />
           <TextField value={record.subject} onChange={(e) => onChange(record.id, "subject", e.target.value)}
             size="small" variant="standard" placeholder="教科・活動"
+            inputProps={{ 'aria-label': '教科・活動' }}
             sx={{ width: 100, ml: 1, "& input": { fontSize: 12 } }}
             onClick={(e) => e.stopPropagation()} />
           <Box sx={{ ml: "auto", display: "flex", gap: 0.3, alignItems: "center" }}>
@@ -780,13 +784,14 @@ export default function JournalWorkflowPage() {
                     <Typography variant="body2" color="text.secondary" fontWeight={600}>実習日</Typography>
                     <TextField type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)}
                       size="small" sx={{ width: 150 }}
+                      inputProps={{ 'aria-label': '実習日' }}
                       error={!!saveErrors.date} helperText={saveErrors.date || "実習を行った日を選択"} />
                   </Box>
                   <Box display="flex" alignItems="center" gap={1}>
                     <Typography variant="body2" color="text.secondary" fontWeight={600}>週</Typography>
                     <TextField select value={weekNumber} onChange={(e) => setWeekNumber(Number(e.target.value))}
                       size="small" sx={{ width: 90 }}
-                      SelectProps={{ native: true }}>
+                      SelectProps={{ native: true, inputProps: { 'aria-label': '週' } }}>
                       {[...Array(12)].map((_, i) => (
                         <option key={i+1} value={i+1}>第{i+1}週</option>
                       ))}

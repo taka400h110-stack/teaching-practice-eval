@@ -18,8 +18,10 @@
     "test:e2e:optional:stats-malformed": "playwright test tests/e2e/statistics-validity.malformed.spec.ts",
     "test:e2e:optional:mobile": "playwright test tests/e2e/mobile-interaction-audit.spec.ts",
     "test:e2e:optional:provider-health": "playwright test tests/e2e/provider-health-audit.spec.ts",
+    "test:e2e:optional:a11y": "playwright test tests/e2e/accessibility-audit.spec.ts --project=chromium",
+    "test:e2e:optional:keyboard": "playwright test tests/e2e/keyboard-navigation-audit.spec.ts --project=chromium",
     "test:ui:audit": "npm run test:e2e:smoke && npm run test:e2e:export && npm run test:e2e:stats:normal && npm run test:e2e:stats:empty && npm run test:e2e:journal-core",
-    "test:ui:audit:optional": "npm run test:e2e:optional:stats-malformed && npm run test:e2e:optional:mobile && npm run test:e2e:optional:provider-health"
+    "test:ui:audit:optional": "npm run test:e2e:optional:stats-malformed && npm run test:e2e:optional:mobile && npm run test:e2e:optional:provider-health && npm run test:e2e:optional:a11y && npm run test:e2e:optional:keyboard"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -38,6 +40,7 @@
     "recharts": "^2.15.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@cloudflare/workers-types": "^4.20260305.0",
     "@hono/vite-build": "^1.2.0",
     "@hono/vite-cloudflare-pages": "^0.4.3",

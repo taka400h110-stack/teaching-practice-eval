@@ -80,10 +80,12 @@ export const AlertHistoryPanel: React.FC = () => {
           </ToggleButtonGroup>
 
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Event Type</InputLabel>
+            <InputLabel id="alert-event-type-label">Event Type</InputLabel>
             <Select
+              labelId="alert-event-type-label"
               value={query.eventTypes || ""}
               label="Event Type"
+              inputProps={{ 'aria-label': 'Event Type' }}
               onChange={(e) => handleQueryChange('eventTypes', e.target.value)}
             >
               <MenuItem value="">All</MenuItem>
@@ -96,10 +98,12 @@ export const AlertHistoryPanel: React.FC = () => {
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Severity</InputLabel>
+            <InputLabel id="alert-severity-label">Severity</InputLabel>
             <Select
+              labelId="alert-severity-label"
               value={query.severities || ""}
               label="Severity"
+              inputProps={{ 'aria-label': 'Severity' }}
               onChange={(e) => handleQueryChange('severities', e.target.value)}
             >
               <MenuItem value="">All</MenuItem>
@@ -113,6 +117,7 @@ export const AlertHistoryPanel: React.FC = () => {
             placeholder="Search Reason..." 
             value={query.reasonQuery || ""}
             onChange={(e) => handleQueryChange('reasonQuery', e.target.value)}
+            inputProps={{ 'aria-label': 'Search Reason' }}
             sx={{ width: 200 }}
           />
 

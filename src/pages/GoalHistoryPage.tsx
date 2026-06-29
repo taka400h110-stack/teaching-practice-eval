@@ -146,6 +146,7 @@ export default function GoalHistoryPage() {
                       <LinearProgress
                         variant="determinate"
                         value={achieveRate}
+                        aria-label={`達成率 ${Math.round(achieveRate)}%`}
                         sx={{ mt: 0.5, height: 6, borderRadius: 3,
                           "& .MuiLinearProgress-bar": { bgcolor: s.color } }}
                       />

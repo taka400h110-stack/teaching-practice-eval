@@ -348,7 +348,7 @@ export default function AppLayout() {
               {collapsed[group] ? <ExpandMoreIcon sx={{ fontSize: 14, color: "text.disabled" }} /> : <ExpandLessIcon sx={{ fontSize: 14, color: "text.disabled" }} />}
             </ListItemButton>
             <Collapse in={!collapsed[group]}>
-              <List dense disablePadding>
+              <List dense disablePadding component="div">
                 {items.map((item) => {
                   const isActive =
                     location.pathname === item.path ||
@@ -390,7 +390,7 @@ export default function AppLayout() {
 
       <Divider />
       {/* ログアウト */}
-      <List dense>
+      <List dense component="div">
         <ListItemButton onClick={handleLogout} sx={{ color: "text.secondary" }}>
           <ListItemIcon sx={{ minWidth: 30 }}><LogoutIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="ログアウト" primaryTypographyProps={{ fontSize: 12 }} />
