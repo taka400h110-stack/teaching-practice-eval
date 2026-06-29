@@ -26,6 +26,7 @@ import {
 } from "recharts";
 import { useQuery, useMutation }       from "@tanstack/react-query";
 import apiClient from "../api/client";
+import { LoadingView } from "../components/StateViews";
 import type { EvaluationItem } from "../types";
 import {
   RUBRIC_ITEMS, REFLECTION_DEPTH_LEVELS, RUBRIC_FACTORS,
@@ -173,13 +174,7 @@ export default function EvaluationResultPage() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  if (isLoading) return <LoadingView label="評価結果を読み込み中…" minHeight="50vh" />;
 
   if (isError || !result) {
     return (

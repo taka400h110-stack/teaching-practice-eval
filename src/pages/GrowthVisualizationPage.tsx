@@ -6,7 +6,7 @@
  */
 import React, { useState } from "react";
 import {
-  Box, CircularProgress, Alert, Card, CardContent, Chip, Grid, Typography, LinearProgress,
+  Box, Alert, Card, CardContent, Chip, Grid, Typography, LinearProgress,
   ToggleButton, ToggleButtonGroup, Paper, Avatar, Divider, Tabs, Tab,
 } from "@mui/material";
 import TrendingUpIcon   from "@mui/icons-material/TrendingUp";
@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../api/client";
+import { LoadingView, ErrorView } from "../components/StateViews";
 import type { WeeklyScore } from "../types";
 import { RUBRIC_FACTORS } from "../constants/rubric";
 
@@ -40,7 +41,7 @@ export default function GrowthVisualizationPage() {
   const [tab, setTab] = useState(0);
   const [view, setView] = useState<"total" | "factors">("total");
 
-  const { data: growth, isLoading } = useQuery({
+  const { data: growth, isLoading, isError, refetch } = useQuery({
     queryKey: ["growth"],
     queryFn:  () => apiClient.getGrowthData(),
   });
@@ -49,13 +50,8 @@ export default function GrowthVisualizationPage() {
     queryFn:  () => apiClient.getSelfEvaluations(),
   });
 
-  if (isLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  if (isLoading) return <LoadingView label="成長データを読み込み中…" minHeight="50vh" />;
+  if (isError) return <ErrorView message="成長データの取得に失敗しました。" onRetry={() => void refetch()} />;
 
   if (!growth || !growth.weekly_scores || growth.weekly_scores.length === 0) {
     return (

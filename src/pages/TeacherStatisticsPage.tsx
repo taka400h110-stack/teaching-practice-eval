@@ -21,6 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import Button from "@mui/material/Button";
 import DownloadIcon from "@mui/icons-material/Download";
 import apiClient from "../api/client";
+import { LoadingView, ErrorView } from "../components/StateViews";
 import { RUBRIC_FACTORS } from "../constants/rubric";
 
 const FACTOR_KEYS = RUBRIC_FACTORS.map((f) => f.key);
@@ -38,12 +39,13 @@ const TabPanel = ({ children, value, index }: TabPanelProps) =>
 export default function TeacherStatisticsPage() {
   const [tab, setTab] = useState(0);
 
-  const { data: cohorts = [], isLoading } = useQuery({
+  const { data: cohorts = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["cohorts"],
     queryFn: () => apiClient.getCohortProfiles(),
   });
 
-  if (isLoading) return <LinearProgress />;
+  if (isLoading) return <LoadingView label="統計データを読み込み中…" />;
+  if (isError) return <ErrorView message="統計データの取得に失敗しました。" onRetry={() => void refetch()} />;
 
   // 統計計算
   const n = cohorts.length;

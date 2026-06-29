@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
+  Alert, Box, Button, Card, CardContent, Chip,
   Collapse, Divider, Grid, Paper, Stack, Typography, IconButton,
   Accordion, AccordionSummary, AccordionDetails, LinearProgress,
   Table, TableBody, TableCell, TableHead, TableRow, TextField, Snackbar,
@@ -37,6 +37,7 @@ import {
 import SendIcon from "@mui/icons-material/Send";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../api/client";
+import { LoadingView, ErrorView } from "../components/StateViews";
 import type { JournalEntry, JournalStatus, HourRecord, EvaluationResult, GrowthData } from "../types";
 import { RUBRIC_FACTORS, RUBRIC_ITEMS } from "../constants/rubric";
 
@@ -513,7 +514,7 @@ const JournalDetailPage: React.FC = () => {
   const currentUser = apiClient.getCurrentUser() as { id: string; name: string; role: string } | null;
   const userRole = currentUser?.role ?? "student";
 
-  const { data: journal, isLoading, isError } = useJournalQuery(journalId ?? "");
+  const { data: journal, isLoading, isError, refetch } = useJournalQuery(journalId ?? "");
 
   const { data: goals = [] } = useQuery({
     queryKey: ["goals"],
@@ -576,13 +577,9 @@ const JournalDetailPage: React.FC = () => {
       setCommentSaved(true);
     }
   });
-  if (isLoading) return (
-    <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
-      <CircularProgress />
-    </Box>
-  );
+  if (isLoading) return <LoadingView label="日誌を読み込み中…" minHeight="50vh" />;
   if (isError || !journal) return (
-    <Box p={3}><Alert severity="error">日誌の取得に失敗しました。</Alert></Box>
+    <ErrorView message="日誌の取得に失敗しました。" onRetry={() => void refetch()} />
   );
   const statusConfig = STATUS_CONFIG[journal.status];
   const formattedDate = journal.entry_date ? new Date(journal.entry_date).toLocaleDateString("ja-JP", {

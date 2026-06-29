@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, CircularProgress, Button } from '@mui/material';
+import { Box, Typography, Paper, Button } from '@mui/material';
 import Download from '@mui/icons-material/Download';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client';
+import { LoadingView } from '../components/StateViews';
 
 export const SCATTimelinePage: React.FC = () => {
   type TimelineRow = Record<string, string | number>;
@@ -61,7 +62,7 @@ export const SCATTimelinePage: React.FC = () => {
 
       <Paper sx={{ flexGrow: 1, p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         {isLoading ? (
-          <CircularProgress />
+          <LoadingView label="時系列データを読み込み中…" minHeight="100%" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart

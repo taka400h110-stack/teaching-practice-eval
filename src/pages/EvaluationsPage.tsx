@@ -17,6 +17,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../api/client";
+import { LoadingView, ErrorView } from "../components/StateViews";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
   ResponsiveContainer, Legend,
@@ -66,7 +67,7 @@ export default function EvaluationsPage() {
     setShowSurvey(false);
   };
 
-  const { data: journals = [], isLoading } = useQuery({
+  const { data: journals = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["journals"],
     queryFn: () => apiClient.getJournals(),
   });
@@ -129,7 +130,8 @@ export default function EvaluationsPage() {
     f4: r.f4,
   }));
 
-  if (isLoading) return <LinearProgress />;
+  if (isLoading) return <LoadingView label="評価一覧を読み込み中…" />;
+  if (isError) return <ErrorView message="評価一覧の取得に失敗しました。" onRetry={() => void refetch()} />;
 
   return (
     <Box>
