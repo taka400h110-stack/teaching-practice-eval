@@ -13,7 +13,7 @@
  *   - HEIC は toMarkdown が非対応の可能性 → 画像扱いで Vision にフォールバック
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import { callOpenAI } from "../routes/openai";
+import { callOpenAI, resolveModel, getChatCompletionsUrl } from "../routes/openai";
 
 // ────────────────────────────────────────────────────────────────
 // 型定義
@@ -301,6 +301,7 @@ export async function structureWithGpt(
   apiKey: string,
   rawText: string,
   filename: string,
+  env?: any,
 ): Promise<StructuredJournal> {
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY が設定されていません");
@@ -310,7 +311,8 @@ export async function structureWithGpt(
     apiKey,
     [{ role: "user", content: prompt }],
     0.2,
-    "gpt-4o",
+    resolveModel(env),
+    { baseUrl: getChatCompletionsUrl(env).replace(/\/chat\/completions$/, "") },
   );
 
   // JSON 抽出 (前後にゴミがあっても取り出せるよう)
