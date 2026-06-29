@@ -1,10 +1,11 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Card, CardContent, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip } from '@mui/material';
+import { Box, Typography, Button, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ScienceIcon from '@mui/icons-material/Science';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../../api/client';
-import { LoadingView, ErrorView } from '../../components/StateViews';
+import { LoadingView, ErrorView, EmptyView } from '../../components/StateViews';
 
 export default function JournalSCATPage() {
   const { journalId } = useParams();
@@ -44,9 +45,16 @@ export default function JournalSCATPage() {
         <Card>
           <CardContent>
             <Typography color="text.secondary" mb={2}>日誌ID: {journalId}</Typography>
-            <Alert severity="info">
-              データがありません（未分析）
-            </Alert>
+            <EmptyView
+              icon={<ScienceIcon />}
+              title="まだSCAT分析が実行されていません"
+              description="この日誌はまだSCAT分析が行われていません。日誌詳細からSCAT分析を実行すると、ストーリーライン・理論記述・セグメントがここに表示されます。"
+              action={
+                <Button variant="contained" startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
+                  日誌に戻って分析する
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : (
