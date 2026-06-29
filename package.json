@@ -14,10 +14,11 @@
     "test:e2e:export": "playwright test tests/e2e/export-filter-audit.spec.ts",
     "test:e2e:stats:normal": "playwright test tests/e2e/statistics-validity.normal.spec.ts",
     "test:e2e:stats:empty": "playwright test tests/e2e/statistics-validity.empty.spec.ts",
+    "test:e2e:journal-core": "playwright test tests/e2e/journal-core-regression.spec.ts --project=chromium",
     "test:e2e:optional:stats-malformed": "playwright test tests/e2e/statistics-validity.malformed.spec.ts",
     "test:e2e:optional:mobile": "playwright test tests/e2e/mobile-interaction-audit.spec.ts",
     "test:e2e:optional:provider-health": "playwright test tests/e2e/provider-health-audit.spec.ts",
-    "test:ui:audit": "npm run test:e2e:smoke && npm run test:e2e:export && npm run test:e2e:stats:normal && npm run test:e2e:stats:empty",
+    "test:ui:audit": "npm run test:e2e:smoke && npm run test:e2e:export && npm run test:e2e:stats:normal && npm run test:e2e:stats:empty && npm run test:e2e:journal-core",
     "test:ui:audit:optional": "npm run test:e2e:optional:stats-malformed && npm run test:e2e:optional:mobile && npm run test:e2e:optional:provider-health"
   },
   "dependencies": {
