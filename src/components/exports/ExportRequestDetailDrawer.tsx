@@ -30,7 +30,7 @@ export const ExportRequestDetailDrawer: React.FC<Props> = ({ request, open, onCl
     <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 500 } } }}>
       <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6">Export Request Details</Typography>
-        <IconButton onClick={onClose}>
+        <IconButton aria-label="閉じる" onClick={onClose}>
           <CloseIcon />
         </IconButton>
       </Box>

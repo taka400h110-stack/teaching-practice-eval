@@ -170,20 +170,20 @@ function HourBlock({
               <Chip label={`${record.body.length}字`} size="small" sx={{ fontSize: 10, height: 18 }} variant="outlined" />
             )}
             <Tooltip title="上へ移動"><span>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onMoveUp(record.id); }} disabled={index === 0}>
+              <IconButton size="small" aria-label="上へ移動" onClick={(e) => { e.stopPropagation(); onMoveUp(record.id); }} disabled={index === 0}>
                 <KeyboardArrowUpIcon fontSize="small" />
               </IconButton>
             </span></Tooltip>
             <Tooltip title="下へ移動"><span>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onMoveDown(record.id); }} disabled={index === total - 1}>
+              <IconButton size="small" aria-label="下へ移動" onClick={(e) => { e.stopPropagation(); onMoveDown(record.id); }} disabled={index === total - 1}>
                 <KeyboardArrowDownIcon fontSize="small" />
               </IconButton>
             </span></Tooltip>
-            <IconButton size="small" onClick={() => setExpanded((v) => !v)}>
+            <IconButton size="small" aria-label={expanded ? "折りたたむ" : "展開する"} onClick={() => setExpanded((v) => !v)}>
               {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
             </IconButton>
             <Tooltip title="削除">
-              <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); onDelete(record.id); }}>
+              <IconButton size="small" color="error" aria-label="削除" onClick={(e) => { e.stopPropagation(); onDelete(record.id); }}>
                 <DeleteOutlineIcon fontSize="small" />
               </IconButton>
             </Tooltip>

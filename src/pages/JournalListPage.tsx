@@ -133,20 +133,20 @@ export default function JournalListPage() {
                 </Box>
                 <Chip label={cfg.label} color={cfg.color} size="small" />
                 <Tooltip title="詳細を見る">
-                  <IconButton size="small" color="primary" onClick={() => navigate(`/journals/${j.id}`)}>
+                  <IconButton size="small" color="primary" aria-label="詳細を見る" onClick={() => navigate(`/journals/${j.id}`)}>
                     <VisibilityIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
                 {isStudent && j.status !== "evaluated" && (
                   <Tooltip title="編集">
-                    <IconButton size="small" onClick={() => navigate(`/journals/${j.id}/edit`)}>
+                    <IconButton size="small" aria-label="編集" onClick={() => navigate(`/journals/${j.id}/edit`)}>
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 )}
                 {j.status === "evaluated" && (
                   <Tooltip title="AI評価結果・コメント">
-                    <IconButton size="small" color="success" onClick={() => navigate(`/journals/${j.id}`)}>
+                    <IconButton size="small" color="success" aria-label="AI評価結果・コメント" onClick={() => navigate(`/journals/${j.id}`)}>
                       <AssessmentIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>

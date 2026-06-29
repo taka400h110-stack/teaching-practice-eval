@@ -456,17 +456,17 @@ export default function UserRegistrationPage() {
                           <TableCell align="center">
                             <Box display="flex" gap={0.5} justifyContent="center">
                               <Tooltip title="仮パスワードをコピー">
-                                <IconButton size="small" onClick={() => handleCopyPassword(u.email)}>
+                                <IconButton size="small" aria-label="仮パスワードをコピー" onClick={() => handleCopyPassword(u.email)}>
                                   <ContentCopyIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="編集">
-                                <IconButton size="small" color="primary" onClick={() => handleEdit(u)}>
+                                <IconButton size="small" color="primary" aria-label="編集" onClick={() => handleEdit(u)}>
                                   <EditIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="削除">
-                                <IconButton size="small" color="error" onClick={() => setDeleteTarget(u)}>
+                                <IconButton size="small" color="error" aria-label="削除" onClick={() => setDeleteTarget(u)}>
                                   <DeleteIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>

@@ -102,7 +102,7 @@ function ItemRow({ item, label, expanded, onToggle }: {
           <ScoreChip score={item.score} />
         </TableCell>
         <TableCell sx={{ py: 0.8, width: 30 }}>
-          <IconButton size="small">{expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
+          <IconButton size="small" aria-label={expanded ? "詳細を閉じる" : "詳細を開く"}>{expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
         </TableCell>
       </TableRow>
       {expanded && (

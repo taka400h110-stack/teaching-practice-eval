@@ -370,7 +370,7 @@ export default function JournalOCRPage() {
     <Box>
       {/* ヘッダー */}
       <Box display="flex" alignItems="center" gap={1} mb={3}>
-        <IconButton onClick={() => navigate(-1)}><ArrowBackIcon /></IconButton>
+        <IconButton aria-label="戻る" onClick={() => navigate(-1)}><ArrowBackIcon /></IconButton>
         <DocumentScannerIcon color="primary" sx={{ fontSize: 32 }} />
         <Box>
           <Typography variant="h5" fontWeight={700}>手書き日誌 OCR読み込み</Typography>
@@ -465,6 +465,7 @@ export default function JournalOCRPage() {
                         </Typography>
                         <IconButton
                           size="small"
+                          aria-label="このページを削除"
                           sx={{ position: "absolute", top: 4, right: 4, bgcolor: "rgba(0,0,0,0.5)" }}
                           onClick={() => removeFile(idx)}
                         >
@@ -609,6 +610,7 @@ export default function JournalOCRPage() {
                               <Tooltip title="テキストを修正">
                                 <IconButton
                                   size="small"
+                                  aria-label="テキストを修正"
                                   onClick={() => setEditingBlock({ pageIdx: page.pageIndex, blockId: block.id, text: block.text })}
                                 >
                                   <EditIcon fontSize="small" />

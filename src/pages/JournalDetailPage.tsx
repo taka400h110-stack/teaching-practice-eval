@@ -154,7 +154,7 @@ function HourBlockView({ rec, index }: { rec: HourRecord; index: number }) {
         )}
         {rec.subject && <Chip label={rec.subject} size="small" color="primary" variant="outlined" sx={{ fontSize: 11, height: 20 }} />}
         <Box sx={{ ml: "auto" }}>
-          <IconButton size="small">{open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
+          <IconButton size="small" aria-label={open ? "詳細を閉じる" : "詳細を開く"}>{open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
         </Box>
       </Box>
       <Collapse in={open}>
