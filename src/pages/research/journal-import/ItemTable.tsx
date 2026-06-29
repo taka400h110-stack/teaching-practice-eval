@@ -144,7 +144,7 @@ export function ItemTable(props: ItemTableProps) {
               <TableCell align="right">
                 <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                   <Tooltip title="詳細ページを開く">
-                    <IconButton size="small" onClick={() => onDetail(it)}>
+                    <IconButton size="small" aria-label="詳細ページを開く" onClick={() => onDetail(it)}>
                       <OpenInNewIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
@@ -152,6 +152,7 @@ export function ItemTable(props: ItemTableProps) {
                     <span>
                       <IconButton
                         size="small"
+                        aria-label="閲覧 (読み取り専用)"
                         onClick={() => onView(it)}
                         disabled={!it.structured_json && !it.raw_text}
                       >
@@ -163,6 +164,7 @@ export function ItemTable(props: ItemTableProps) {
                     <Tooltip title="GPT-4 で構造化">
                       <IconButton
                         size="small"
+                        aria-label="GPT-4 で構造化"
                         onClick={() => onStructure(it.id)}
                         disabled={structurePending}
                       >
@@ -172,7 +174,7 @@ export function ItemTable(props: ItemTableProps) {
                   )}
                   {["structured", "extracted", "failed"].includes(it.status) && (
                     <Tooltip title="編集">
-                      <IconButton size="small" onClick={() => onEdit(it)}>
+                      <IconButton size="small" aria-label="編集" onClick={() => onEdit(it)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -191,6 +193,7 @@ export function ItemTable(props: ItemTableProps) {
                         <IconButton
                           size="small"
                           color="success"
+                          aria-label="journal_entries にコミット"
                           onClick={() => onCommit(it.id)}
                           disabled={!it.student_id || !it.entry_date || commitPending}
                         >
@@ -201,13 +204,13 @@ export function ItemTable(props: ItemTableProps) {
                   )}
                   {it.status === "committed" && it.journal_id && (
                     <Tooltip title="日誌を開く">
-                      <IconButton size="small" onClick={() => onOpenJournal(it.journal_id!)}>
+                      <IconButton size="small" aria-label="日誌を開く" onClick={() => onOpenJournal(it.journal_id!)}>
                         <CheckCircleIcon fontSize="small" color="success" />
                       </IconButton>
                     </Tooltip>
                   )}
                   <Tooltip title="削除 (取り込み記録のみ)">
-                    <IconButton size="small" color="error" onClick={() => onDelete(it)}>
+                    <IconButton size="small" color="error" aria-label="削除 (取り込み記録のみ)" onClick={() => onDelete(it)}>
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>

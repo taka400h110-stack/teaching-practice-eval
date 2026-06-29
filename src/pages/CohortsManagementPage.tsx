@@ -146,7 +146,7 @@ export default function CohortsManagementPage() {
           <Chip label={`絞り込み: ${filtered.length}名`} size="small" />
           <Box ml="auto">
             <Tooltip title="CSV出力（モック）">
-              <IconButton size="small"><DownloadIcon /></IconButton>
+              <IconButton size="small" aria-label="CSV出力"><DownloadIcon /></IconButton>
             </Tooltip>
           </Box>
         </Box>

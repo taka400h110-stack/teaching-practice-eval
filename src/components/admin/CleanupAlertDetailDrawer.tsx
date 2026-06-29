@@ -25,7 +25,7 @@ export const CleanupAlertDetailDrawer: React.FC<Props> = ({ open, onClose, alert
     <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 500 }, p: 3 } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">Alert Details</Typography>
-        <IconButton onClick={onClose}><CloseIcon /></IconButton>
+        <IconButton aria-label="閉じる" onClick={onClose}><CloseIcon /></IconButton>
       </Box>
 
       <Box sx={{ mb: 3 }}>

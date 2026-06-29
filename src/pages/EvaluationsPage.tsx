@@ -255,13 +255,13 @@ export default function EvaluationsPage() {
                 <TableCell>
                   <Box display="flex" gap={0.5}>
                     <Tooltip title="評価詳細を見る">
-                      <IconButton size="small"
+                      <IconButton size="small" aria-label="評価詳細を見る"
                         onClick={() => navigate(`/evaluations/${r.journalId}`)}>
                         <VisibilityIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="人間評価を入力">
-                      <IconButton size="small"
+                      <IconButton size="small" aria-label="人間評価を入力"
                         onClick={() => navigate(`/evaluations/${r.journalId}/human`)}>
                         <PersonIcon fontSize="small" />
                       </IconButton>
@@ -269,12 +269,12 @@ export default function EvaluationsPage() {
                     {['admin', 'researcher', 'collaborator', 'board_observer'].includes(user?.role || '') && (
                       <>
                         <Tooltip title="SCAT分析結果">
-                          <IconButton size="small" onClick={() => navigate(`/research/journals/${r.journalId}/scat`)}>
+                          <IconButton size="small" aria-label="SCAT分析結果" onClick={() => navigate(`/research/journals/${r.journalId}/scat`)}>
                             <Typography variant="caption" fontWeight="bold">SCAT</Typography>
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="ISM構造化結果">
-                          <IconButton size="small" onClick={() => navigate(`/research/journals/${r.journalId}/ism`)}>
+                          <IconButton size="small" aria-label="ISM構造化結果" onClick={() => navigate(`/research/journals/${r.journalId}/ism`)}>
                             <Typography variant="caption" fontWeight="bold">ISM</Typography>
                           </IconButton>
                         </Tooltip>

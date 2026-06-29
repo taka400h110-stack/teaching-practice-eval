@@ -175,7 +175,7 @@ export const AlertHistoryPanel: React.FC = () => {
           <Box sx={{ width: 400, p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">Event Details</Typography>
-              <IconButton onClick={() => setSelectedRow(null)}><Close /></IconButton>
+              <IconButton aria-label="閉じる" onClick={() => setSelectedRow(null)}><Close /></IconButton>
             </Box>
             {selectedRow && (
               <Stack spacing={2}>

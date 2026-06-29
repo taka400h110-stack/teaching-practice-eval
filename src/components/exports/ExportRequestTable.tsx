@@ -65,28 +65,28 @@ export const ExportRequestTable: React.FC<ExportRequestTableProps> = ({
               <TableCell>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   <Tooltip title="View Details">
-                    <IconButton size="small" onClick={() => onView(req)}>
+                    <IconButton size="small" aria-label="詳細を見る" onClick={() => onView(req)}>
                       <VisibilityIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                   
                   {isAdmin && req.status === 'pending' && onApprove && (
                     <Tooltip title="Approve">
-                      <IconButton size="small" color="success" onClick={() => onApprove(req)}>
+                      <IconButton size="small" color="success" aria-label="承認する" onClick={() => onApprove(req)}>
                         <CheckCircleIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   )}
                   {isAdmin && req.status === 'pending' && onReject && (
                     <Tooltip title="Reject">
-                      <IconButton size="small" color="error" onClick={() => onReject(req)}>
+                      <IconButton size="small" color="error" aria-label="却下する" onClick={() => onReject(req)}>
                         <CancelIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   )}
                   {isAdmin && (req.status === 'approved' || req.status === 'generated' || req.status === 'completed') && onRevoke && (
                     <Tooltip title="Revoke">
-                      <IconButton size="small" color="secondary" onClick={() => onRevoke(req)}>
+                      <IconButton size="small" color="secondary" aria-label="取り消す" onClick={() => onRevoke(req)}>
                         <BlockIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -94,7 +94,7 @@ export const ExportRequestTable: React.FC<ExportRequestTableProps> = ({
                   
                   {req.status === 'approved' && onGenerate && (
                     <Tooltip title="Generate Export">
-                      <IconButton size="small" color="primary" onClick={() => onGenerate(req)}>
+                      <IconButton size="small" color="primary" aria-label="エクスポートを生成" onClick={() => onGenerate(req)}>
                         <PlayArrowIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -102,7 +102,7 @@ export const ExportRequestTable: React.FC<ExportRequestTableProps> = ({
                   {(req.status === 'completed' || req.status === 'generated') && 
                    req.current_download_count < req.max_download_count && onDownload && (
                     <Tooltip title="Download">
-                      <IconButton size="small" color="primary" onClick={() => onDownload(req)}>
+                      <IconButton size="small" color="primary" aria-label="ダウンロード" onClick={() => onDownload(req)}>
                         <DownloadIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>

@@ -473,7 +473,7 @@ export default function LongitudinalAnalysisPage() {
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="subtitle1" fontWeight={700}>LGCM パラメータ推定値</Typography>
                   <Tooltip title="論文 χ²(203)=316.886, p<.01, CFI=0.938, RMSEA=0.065, SRMR=0.0615">
-                    <IconButton size="small"><InfoOutlinedIcon /></IconButton>
+                    <IconButton size="small" aria-label="モデル適合度の詳細"><InfoOutlinedIcon /></IconButton>
                   </Tooltip>
                 </Box>
                 <TableContainer component={Paper} variant="outlined">

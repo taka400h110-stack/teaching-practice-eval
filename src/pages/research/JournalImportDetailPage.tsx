@@ -196,7 +196,7 @@ export default function JournalImportDetailPage() {
           一覧に戻る
         </Button>
         <Tooltip title="再読み込み">
-          <IconButton size="small" onClick={() => detailQ.refetch()}>
+          <IconButton size="small" aria-label="再読み込み" onClick={() => detailQ.refetch()}>
             <RefreshIcon fontSize="small" />
           </IconButton>
         </Tooltip>

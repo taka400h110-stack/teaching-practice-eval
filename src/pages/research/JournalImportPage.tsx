@@ -549,6 +549,7 @@ export default function JournalImportPage() {
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <Tooltip title={filterOpen ? "検索を閉じる" : "検索/絞り込み"}>
             <IconButton
+              aria-label={filterOpen ? "検索を閉じる" : "検索/絞り込み"}
               onClick={() => setFilterOpen((v) => !v)}
               color={filterActive ? "primary" : "default"}
             >
@@ -558,6 +559,7 @@ export default function JournalImportPage() {
           <Tooltip title="エクスポート (CSV / JSON / 分析用)">
             <span>
               <IconButton
+                aria-label="エクスポート (CSV / JSON / 分析用)"
                 onClick={(e) => setExportMenuAnchor(e.currentTarget)}
                 disabled={totalCount === 0}
               >
@@ -583,7 +585,7 @@ export default function JournalImportPage() {
             </ToggleButton>
           </ToggleButtonGroup>
           <Tooltip title="一覧を更新">
-            <IconButton onClick={() => listQ.refetch()} disabled={listQ.isFetching}>
+            <IconButton aria-label="一覧を更新" onClick={() => listQ.refetch()} disabled={listQ.isFetching}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
