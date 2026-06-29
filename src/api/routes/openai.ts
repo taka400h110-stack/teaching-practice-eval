@@ -443,15 +443,42 @@ ${recentThemes.length > 0 ? recentThemes.map(t => `- ${t}`).join("\n") : "(分�
 }
 
 // ────────────────────────────────────────────────────────────────
+// OpenAI 互換エンドポイント / モデルの解決
+// 本番では OpenAI 公式 (api.openai.com / gpt-4o) を既定とし、
+// env.OPENAI_BASE_URL / env.OPENAI_MODEL が設定されていればそれで上書きする。
+// これにより GenSpark LLM プロキシ等の OpenAI 互換エンドポイントでも動作する。
+// ────────────────────────────────────────────────────────────────
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_MODEL = "gpt-4o";
+const DEFAULT_MODEL_MINI = "gpt-4o-mini";
+
+/** chat/completions の完全なエンドポイントURLを返す（末尾スラッシュを正規化） */
+export function getChatCompletionsUrl(env: any): string {
+  const base = (env?.OPENAI_BASE_URL || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
+  return `${base}/chat/completions`;
+}
+
+/** 使用モデルを解決する。env.OPENAI_MODEL があれば最優先、無ければ fallback。 */
+export function resolveModel(env: any, fallback: string = DEFAULT_MODEL): string {
+  return env?.OPENAI_MODEL || fallback;
+}
+
+// ────────────────────────────────────────────────────────────────
 // OpenAI API 呼び出し共通関数
 // ────────────────────────────────────────────────────────────────
 export async function callOpenAI(
   apiKey: string,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   temperature: number,
-  model: string = "gpt-4o"
+  model: string = DEFAULT_MODEL,
+  opts?: { baseUrl?: string; maxTokens?: number }
 ): Promise<string> {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const base = (opts?.baseUrl || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
+  // 40項目評価のJSONは長い。さらに gpt-5 系などの推論(reasoning)モデルは
+  // reasoning_tokens を completion 枠から消費するため、4096 では出力が途中で
+  // 切れて JSON パースに失敗する。既定値を 16384 に引き上げて両対応とする。
+  const maxTokens = opts?.maxTokens ?? 16384;
+  const response = await fetch(`${base}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -462,8 +489,7 @@ export async function callOpenAI(
       messages,
       temperature,
       response_format: { type: "json_object" },
-      // 40項目評価のJSONは長くなるため4096に拡張 (gpt-4o 上限内)
-      max_tokens: 4096,
+      max_tokens: maxTokens,
     }),
   });
 
@@ -496,12 +522,16 @@ openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher
     journal_id: string;
   };
 
+  const model = resolveModel(c.env);
+  const baseUrl = getChatCompletionsUrl(c.env).replace(/\/chat\/completions$/, "");
   try {
     const prompt = buildCoTAPrompt(extractJournalText(body.journal_content), body.student_name, body.week_number);
     const raw = await callOpenAI(
       apiKey,
       [{ role: "user", content: prompt }],
-      0.2
+      0.2,
+      model,
+      { baseUrl }
     );
     const result = JSON.parse(raw);
     
@@ -541,7 +571,7 @@ openaiRouter.post("/evaluate", requireRoles(["student", "teacher", "univ_teacher
       success: true,
       evaluation: result,
       journal_id: body.journal_id,
-      model: "gpt-4o",
+      model,
       prompt_version: "CoT-A-v1.0",
       temperature: 0.2,
     });
@@ -566,19 +596,23 @@ openaiRouter.post("/reflection-depth", requireRoles(["student", "teacher", "univ
     session_id: string;
   };
 
+  const model = resolveModel(c.env);
+  const baseUrl = getChatCompletionsUrl(c.env).replace(/\/chat\/completions$/, "");
   try {
     const prompt = buildCoTBPrompt(body.user_message, extractJournalText(body.journal_content));
     const raw = await callOpenAI(
       apiKey,
       [{ role: "user", content: prompt }],
-      0.1
+      0.1,
+      model,
+      { baseUrl }
     );
     const result = JSON.parse(raw);
     return c.json({
       success: true,
       reflection: result,
       session_id: body.session_id,
-      model: "gpt-4o",
+      model,
       prompt_version: "CoT-B-v1.0",
       temperature: 0.1,
     });
@@ -642,18 +676,22 @@ openaiRouter.post("/generate-goal", requireRoles(["student", "teacher", "univ_te
       }
     }
 
+    const model = resolveModel(c.env);
+    const baseUrl = getChatCompletionsUrl(c.env).replace(/\/chat\/completions$/, "");
     const prompt = buildCoTCPrompt(body.conversation, extractJournalText(body.journal_content), body.week_number, bfiScores);
     const raw = await callOpenAI(
       apiKey,
       [{ role: "user", content: prompt }],
-      0.3
+      0.3,
+      model,
+      { baseUrl }
     );
     const result = JSON.parse(raw);
     return c.json({
       success: true,
       goal: result,
       session_id: body.session_id,
-      model: "gpt-4o",
+      model,
       prompt_version: "CoT-C-v1.0",
       temperature: 0.3,
     });
@@ -705,20 +743,22 @@ ${extractJournalText(body.journal_content).slice(0, 600)}...
 省察を促すために、閉じた質問ではなく開かれた質問を使ってください。`;
 
   try {
-    const raw = await fetch("https://api.openai.com/v1/chat/completions", {
+    const raw = await fetch(getChatCompletionsUrl(c.env), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: resolveModel(c.env),
         messages: [
           { role: "system", content: systemPrompt },
           ...body.messages.slice(-10),
         ],
         temperature: 0.7,
-        max_tokens: 300,
+        // 応答自体は100字程度だが、reasoning モデルは reasoning_tokens を
+        // 消費するため余裕を持たせる（gpt-4o では出力上限としてそのまま機能）。
+        max_tokens: 2048,
       }),
     });
 
@@ -867,14 +907,14 @@ JSON形式で出力してください:
 }`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(getChatCompletionsUrl(c.env), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: resolveModel(c.env, DEFAULT_MODEL_MINI),
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         response_format: { type: "json_object" }
@@ -923,14 +963,14 @@ JSON形式で出力してください:
 }`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(getChatCompletionsUrl(c.env), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: resolveModel(c.env, DEFAULT_MODEL_MINI),
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         response_format: { type: "json_object" }
@@ -990,14 +1030,14 @@ openaiRouter.post("/scat-analysis", requireRoles(["researcher", "admin", "collab
   "notes": "..."
 }`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(getChatCompletionsUrl(c.env), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: resolveModel(c.env, DEFAULT_MODEL_MINI),
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: text }
@@ -1090,14 +1130,14 @@ openaiRouter.post("/scat-analysis/journal", requireRoles(["student", "researcher
   "theoretical_description": "..."
 }`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(getChatCompletionsUrl(c.env), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: resolveModel(c.env, DEFAULT_MODEL_MINI),
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: text }

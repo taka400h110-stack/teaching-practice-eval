@@ -85,4 +85,6 @@ export interface Env {
   // OpenAI API
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
+  // OpenAI 互換エンドポイント（例: GenSpark LLM プロキシ）。未設定時は OpenAI 公式。
+  OPENAI_BASE_URL?: string;
 }

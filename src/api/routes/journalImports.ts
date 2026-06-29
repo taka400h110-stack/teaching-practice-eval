@@ -2292,6 +2292,7 @@ journalImportsRouter.post(
         c.env.OPENAI_API_KEY,
         rec.raw_text,
         rec.filename,
+        c.env,
       );
       await updateImportRecord(db, id, {
         status: "structured",

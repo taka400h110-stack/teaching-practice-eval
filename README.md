@@ -104,6 +104,29 @@ npx wrangler d1 migrations apply teaching-practice-eval-db --remote
 npx wrangler d1 migrations list teaching-practice-eval-db --remote
 ```
 
+### AI評価の環境変数 (OpenAI / OpenAI互換エンドポイント)
+
+AI評価・対話・SCAT分析は OpenAI Chat Completions API を利用します。エンドポイントとモデルは環境変数で切り替え可能で、**未設定時は OpenAI 公式 (`https://api.openai.com/v1` / `gpt-4o`) を既定**とするため、既存の本番デプロイは無設定のまま従来通り動作します。
+
+| 変数 | 必須 | 既定値 | 説明 |
+| --- | --- | --- | --- |
+| `OPENAI_API_KEY` | ✅ | — | API キー。未設定時は AI 機能が `503 AI_NOT_CONFIGURED` を返す |
+| `OPENAI_BASE_URL` | 任意 | `https://api.openai.com/v1` | OpenAI 互換エンドポイントのベースURL。末尾に `/chat/completions` を付与して呼び出す |
+| `OPENAI_MODEL` | 任意 | `gpt-4o` | 使用モデル。GenSpark LLM プロキシ等では `gpt-5-mini` 等を指定 |
+
+```bash
+# ローカル開発 (.dev.vars — gitignore 済み、コミット禁止)
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://www.genspark.ai/api/llm_proxy/v1   # 省略時は OpenAI 公式
+OPENAI_MODEL=gpt-5-mini                                     # 省略時は gpt-4o
+
+# 本番 (Cloudflare Pages secrets)
+npx wrangler pages secret put OPENAI_API_KEY --project-name teaching-practice-eval
+# OPENAI_BASE_URL / OPENAI_MODEL は wrangler.jsonc の vars もしくは secret で設定
+```
+
+> **注意 (reasoning モデル)**: gpt-5 系の reasoning モデルは `reasoning_tokens` を completion 枠から消費するため、`callOpenAI` の既定 `max_tokens` を 16384 に設定しています。これにより 40 項目の CoT-A 評価 JSON が途中で切れずに生成されます。
+
 ## 開発履歴 (主要マイルストーン)
 
 ### Phase 6 (論文出力支援)
@@ -186,6 +209,11 @@ Phase 12 で導入した共通状態表示コンポーネント `StateViews` (Lo
 - **コード整理**: 未使用となった `CircularProgress` / `LinearProgress` の import を削除
 - **方針**: AI評価実行ボタンや「記録が見つかりません(戻る導線付き)」等のドメイン固有UIは破壊せず維持。フォールバックデータを持つページはローディング表記のみ統一
 - CI: 必須4チェック全パス
+
+### Phase 14 (モバイル/A11y 改善 + AI評価実機確認) (#30, #31)
+- **📱 モバイル横スクロール解消 (#30)**: `AppLayout` の `<main>` Box が flex-item の既定 `min-width:auto` のため幅375pxで縮まず横溢れしていた問題を `minWidth:0` (+ `maxWidth:100%` / `overflowX:hidden`) で解消。Dashboard / JournalWorkflow / JournalList / GrowthViz の4ページの溢れを一括修正。成長可視化の Tabs を `variant="scrollable"` 化。E2E モバイル溢れテスト 6件追加 (9/9 PASS)
+- **🛡️ AI評価エラーハンドリング (B-2) (#30)**: API キー未設定時を `500 → 503 + code:AI_NOT_CONFIGURED` に変更。`runEvaluation` (client.ts) が具体的エラーを保持して再throw。`JournalWorkflowPage` の AI タブに警告/エラー Alert + **再試行ボタン**を追加
+- **🤖 OpenAI互換エンドポイント対応 + reasoning対応 (D-2) (#31)**: AI評価フローを OpenAI 互換プロキシ (GenSpark LLM proxy / gpt-5-mini) で実機確認する過程で発見した2バグを修正。(1) エンドポイント/モデルを `OPENAI_BASE_URL` / `OPENAI_MODEL` で env 駆動化（既定は OpenAI 公式で後方互換）。(2) gpt-5 系 reasoning モデルの `reasoning_tokens` 消費で 40項目 JSON が切れる問題を `max_tokens` 4096→16384 で解消。`/api/ai/evaluate` `/chat` `/reflection-depth` すべて HTTP 200 で実機確認済み
 
 ## ライセンス / 引用
 

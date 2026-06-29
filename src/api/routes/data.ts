@@ -63,7 +63,7 @@ import { cors } from "hono/cors";
 import { requireRoles } from "../middleware/auth";
 import { getScopeContext, buildScopeFilter, assertCanAccessStudent } from "../middleware/scope";
 import { setAuditReadContext, setAuditWriteContext } from "../middleware/audit";
-import { callOpenAI, buildCoTAPrompt, buildSCATPrompt, buildBfiIntegratedPrompt, extractJournalText } from "./openai";
+import { callOpenAI, buildCoTAPrompt, buildSCATPrompt, buildBfiIntegratedPrompt, extractJournalText, resolveModel, getChatCompletionsUrl } from "./openai";
 
 type Bindings = {
   DB: D1Database;
@@ -636,16 +636,20 @@ async function resolveStudentSupervisors(db: D1Database, studentId: string): Pro
 async function runJournalAutoPipeline(
   db: D1Database,
   apiKey: string | undefined,
-  params: { journalId: string; studentId: string; studentName: string; weekNumber: number; content: string }
+  params: { journalId: string; studentId: string; studentName: string; weekNumber: number; content: string },
+  env?: any
 ): Promise<any> {
   const { journalId, studentId, studentName, weekNumber, content } = params;
   const pipelineResult: any = { evaluation_saved: false, scat_saved: false, notifications_sent: 0, cache_invalidated: false };
+  // OpenAI 互換エンドポイント / モデルを env から解決（未設定時は公式 gpt-4o）
+  const aiModel = resolveModel(env);
+  const aiBaseUrl = getChatCompletionsUrl(env).replace(/\/chat\/completions$/, "");
 
   // ① AI評価
   if (apiKey) {
     try {
       const prompt = buildCoTAPrompt(extractJournalText(content), studentName, weekNumber);
-      const raw = await callOpenAI(apiKey, [{ role: "user", content: prompt }], 0.2);
+      const raw = await callOpenAI(apiKey, [{ role: "user", content: prompt }], 0.2, aiModel, { baseUrl: aiBaseUrl });
       const aiResult = JSON.parse(raw);
 
       if (aiResult.items && Array.isArray(aiResult.items)) {
@@ -658,7 +662,7 @@ async function runJournalAutoPipeline(
           INSERT INTO evaluations (id, journal_id, eval_type, model_name, prompt_version, temperature, total_score, factor1_score, factor2_score, factor3_score, factor4_score, factor5_score, factor6_score, overall_comment, reasoning, token_count, duration_ms, created_at)
           VALUES (?, ?, 'ai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP)
         `).bind(
-          evalId, journalId, "gpt-4o", "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4, f5, f6,
+          evalId, journalId, aiModel, "CoT-A-v1.0", 0.2, totalScore, f1, f2, f3, f4, f5, f6,
           String((aiResult as any).overall_comment || ""),
           String(aiResult.reasoning || "")
         ).run();
@@ -696,7 +700,7 @@ async function runJournalAutoPipeline(
     if (apiKey && journalText.length > 30) {
       try {
         const scatPrompt = buildSCATPrompt(journalText, studentName, weekNumber);
-        const raw = await callOpenAI(apiKey, [{ role: "user", content: scatPrompt }], 0.4);
+        const raw = await callOpenAI(apiKey, [{ role: "user", content: scatPrompt }], 0.4, aiModel, { baseUrl: aiBaseUrl });
         llmResult = JSON.parse(raw);
         if (llmResult && Array.isArray(llmResult.segments) && llmResult.segments.length > 0
           && typeof llmResult.storyline === "string" && llmResult.storyline.length > 50) {
@@ -951,7 +955,7 @@ dataRouter.post("/journals", requireRoles(["student"] as UserRole[]), async (c) 
       const apiKey = (c.env as any)?.OPENAI_API_KEY;
       pipelineResult = await runJournalAutoPipeline(db, apiKey, {
         journalId: id, studentId, studentName, weekNumber, content,
-      });
+      }, c.env);
     }
 
     return c.json({
@@ -2524,7 +2528,7 @@ dataRouter.put("/journals/:id", requireRoles(["student"] as UserRole[]), async (
           studentName,
           weekNumber: updated.week_number || 1,
           content: updated.content || "",
-        });
+        }, c.env);
         auto_pipeline_triggered = true;
       } else {
         pipelineResult = { skipped: true, reason: "AI evaluation already exists", existing_evaluation_id: (existingEval as any).id };
@@ -3686,7 +3690,7 @@ dataRouter.get("/bfi/integrated-analysis/:userId", requireRoles(["student", "res
           recentThemes: uniqueThemes,
           factorAverages,
         });
-        const raw = await callOpenAI(apiKey, [{ role: "user", content: prompt }], 0.3);
+        const raw = await callOpenAI(apiKey, [{ role: "user", content: prompt }], 0.3, resolveModel(c.env), { baseUrl: getChatCompletionsUrl(c.env).replace(/\/chat\/completions$/, "") });
         llmInsights = JSON.parse(raw);
       } catch (eLlm) {
         console.error("BFI integrated LLM failed:", String(eLlm));
