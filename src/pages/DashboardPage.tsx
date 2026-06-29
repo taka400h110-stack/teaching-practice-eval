@@ -22,6 +22,7 @@ import { useQuery }    from "@tanstack/react-query";
 import apiClient from "../api/client";
 import type { JournalEntry, WeeklyScore } from "../types";
 import { RUBRIC_FACTORS } from "../constants/rubric";
+import { LoadingView, ErrorView } from "../components/StateViews";
 
 const FACTOR_LABELS = RUBRIC_FACTORS.map((f) => f.label);
 const FACTOR_COLORS = RUBRIC_FACTORS.map((f) => f.color);
@@ -51,7 +52,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const user = apiClient.getCurrentUser();
 
-  const { data: journals = [] } = useQuery({
+  const { data: journals = [], isLoading: loadingJournals, isError: journalsError, refetch: refetchJournals } = useQuery({
     queryKey: ["journals"],
     queryFn:  () => apiClient.getJournals(),
   });
@@ -115,6 +116,10 @@ export default function DashboardPage() {
       onClick: () => navigate("/self-evaluation"),
     },
   ];
+
+  // 主要データ (日誌) の取得状態をユーザーに明示し、空状態と取得失敗を区別する
+  if (loadingJournals) return <LoadingView label="ダッシュボードを読み込み中…" />;
+  if (journalsError) return <ErrorView message="ダッシュボードの読み込みに失敗しました。" onRetry={() => void refetchJournals()} />;
 
   return (
     <Box data-testid="student-dashboard-root">
