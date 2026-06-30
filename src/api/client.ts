@@ -203,18 +203,21 @@ const apiClient = {
     // サーバの /auth/login レスポンスには firstLogin が含まれないため、
     // デモユーザー定義 (DEMO_USERS, 全員 firstLogin:false) を参照して判定する。
     //
-    // デモユーザー (firstLogin:false) の場合は、ログイン時に pending_onboarding を
-    // 新規にセットしない（＝毎回オンボーディングを強制しない）。これにより、
-    // 通常のデモログインではダッシュボードへ直行できる。
-    // ただし、事前に明示的に pending_onboarding="true" がセットされている場合
-    // （例: E2E テストの onboardingIncomplete シナリオ）はそれを尊重し、上書き削除しない。
+    // デモユーザー (DEMO_USERS に存在し firstLogin:false) は、オンボーディングを
+    // 完全にスキップしてダッシュボードへ直行する。過去のセッションや事前に残った
+    // pending_onboarding フラグも明示的に解除し、二度とオンボーディングへ
+    // リダイレクトされないようにする（研究・デモ用途で即データ閲覧できるようにするため）。
     //
     // 本物の初回ユーザー (firstLogin:true, DEMO_USERS外) は従来通り、
     // 未完了なら pending_onboarding をセットしてオンボーディングへ誘導する。
     const demoDef = DEMO_USERS[user.email as string];
+    const isDemoUser = !!demoDef;
     const firstLogin = demoDef ? demoDef.firstLogin === true : !!user.firstLogin;
     const onboardingDone = localStorage.getItem(`onboarding_done_${user.id}`);
-    if (!onboardingDone && user.role === "student" && firstLogin) {
+    if (isDemoUser && !firstLogin) {
+      // デモユーザーはオンボーディング不要。残存フラグを解除して直行。
+      localStorage.removeItem("pending_onboarding");
+    } else if (!onboardingDone && user.role === "student" && firstLogin) {
       localStorage.setItem("pending_onboarding", "true");
     }
 
