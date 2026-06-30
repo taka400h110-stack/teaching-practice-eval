@@ -785,7 +785,7 @@ export function correctPValues(
 export interface Icc21Result {
   icc: number;
   ci95: [number, number];
-  f: number;
+  f: number | null;
   df1: number;
   df2: number;
   p: number;
@@ -832,25 +832,36 @@ export function computeICC21(ratings: number[][], alpha = 0.05): Icc21Result {
   const iccClamped = Math.max(0, Math.min(1, icc));
 
   // F 検定: F0 = MS_S / MS_E, 上側確率 (正確な F 分布)
-  const F0 = MS_E > 0 ? MS_S / MS_E : 0;
+  // MS_E = 0（被験者内で評価者完全一致）の場合は F→∞・p→0 が正しい。
   const df1 = df_S;          // n - 1
   const df2 = df_E;          // (n-1)(k-1)
-  const p = F0 > 0 ? fSF(F0, df1, df2) : 1;
+  const perfectAgreement = MS_E <= 0 && MS_S > 0;
+  const F0 = MS_E > 0 ? MS_S / MS_E : (perfectAgreement ? Infinity : 0);
+  const p = perfectAgreement ? 0 : (F0 > 0 && Number.isFinite(F0) ? fSF(F0, df1, df2) : 1);
 
-  // 95%CI — Shrout & Fleiss (1979), ICC(2,1) 絶対一致の標準形
-  //   FL = F0 / F(1-α/2; n-1, (n-1)(k-1))
-  //   FU = F0 * F(1-α/2; (n-1)(k-1), n-1)
-  //   L  = (FL - 1) / (FL + k - 1)
-  //   U  = (FU - 1) / (FU + k - 1)
+  // 95%CI — Shrout & Fleiss (1979), ICC(2,1)=ICC(A,1) 絶対一致の正しい区間
+  // McGraw & Wong (1996) / Shrout & Fleiss (1979) 式15。
+  // 絶対一致の CI は評価者間分散 (MS_R) を含むため、Satterthwaite 近似自由度 v を用いる:
+  //   a = kρ / (n(1−ρ))
+  //   b = 1 + kρ(n−1) / (n(1−ρ))
+  //   v = (a·MS_R + b·MS_E)² / [ (a·MS_R)²/(k−1) + (b·MS_E)²/((n−1)(k−1)) ]
+  //   F_L = F(1−α/2; n−1, v),  F_U = F(1−α/2; v, n−1)
+  //   L = n(MS_S − F_L·MS_E) / (F_L·(k·MS_R + (kn−k−n)·MS_E) + n·MS_S)
+  //   U = n(F_U·MS_S − MS_E) / (k·MS_R + (kn−k−n)·MS_E + n·F_U·MS_S)
   let L = 0;
   let U = 0;
-  if (F0 > 0) {
-    const Fq1 = fInv(1 - alpha / 2, df1, df2);
-    const Fq2 = fInv(1 - alpha / 2, df2, df1);
-    const FL = F0 / Fq1;
-    const FU = F0 * Fq2;
-    L = (FL - 1) / (FL + k - 1);
-    U = (FU - 1) / (FU + k - 1);
+  if (F0 > 0 && iccClamped > 0 && iccClamped < 1) {
+    const rho = iccClamped;
+    const a = (k * rho) / (n * (1 - rho));
+    const b = 1 + (k * rho * (n - 1)) / (n * (1 - rho));
+    const vNum = (a * MS_R + b * MS_E) ** 2;
+    const vDen = (a * MS_R) ** 2 / (k - 1) + (b * MS_E) ** 2 / ((n - 1) * (k - 1));
+    const v = vDen > 0 ? vNum / vDen : df_E;
+    const F_L = fInv(1 - alpha / 2, n - 1, v);
+    const F_U = fInv(1 - alpha / 2, v, n - 1);
+    const common = k * MS_R + (k * n - k - n) * MS_E;
+    L = (n * (MS_S - F_L * MS_E)) / (F_L * common + n * MS_S);
+    U = (n * (F_U * MS_S - MS_E)) / (common + n * F_U * MS_S);
   }
   const ci95: [number, number] = [
     Math.max(0, Math.round(L * 1000) / 1000),
@@ -866,7 +877,7 @@ export function computeICC21(ratings: number[][], alpha = 0.05): Icc21Result {
   return {
     icc: Math.round(iccClamped * 1000) / 1000,
     ci95,
-    f: Math.round(F0 * 100) / 100,
+    f: Number.isFinite(F0) ? Math.round(F0 * 100) / 100 : null,
     df1,
     df2,
     p: p < 0.001 ? Math.round(p * 1e6) / 1e6 : Math.round(p * 1000) / 1000,
