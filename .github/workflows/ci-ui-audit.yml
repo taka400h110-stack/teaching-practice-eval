@@ -269,6 +269,10 @@ jobs:
             npm run test:e2e:optional:mobile
           elif [ "${{ matrix.target }}" = "provider-health" ]; then
             npm run test:e2e:optional:provider-health
+          elif [ "${{ matrix.target }}" = "a11y" ]; then
+            npm run test:e2e:optional:a11y
+          elif [ "${{ matrix.target }}" = "keyboard" ]; then
+            npm run test:e2e:optional:keyboard
           else
             echo "Unknown matrix target: ${{ matrix.target }}"
             exit 1
