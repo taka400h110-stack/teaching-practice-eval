@@ -524,7 +524,7 @@ export default function LongitudinalAnalysisPage() {
                     </TableHead>
                     <TableBody>
                       {[
-                        { name: "χ²(df)", value: lgcmResult ? `${lgcmResult.chi2}(${lgcmResult.chi2_df})` : "", ref: "p<.05", ok: true, note: "p<.01" },
+                        { name: "χ²(df)", value: lgcmResult ? `${lgcmResult.chi2}(${lgcmResult.chi2_df})` : "", ref: "p≥.05", ok: typeof lgcmResult?.chi2_p === "number" ? lgcmResult.chi2_p >= 0.05 : false },
                         { name: "CFI", value: typeof lgcmResult?.cfi === "number" ? lgcmResult.cfi?.toFixed(3) : "", ref: "≥0.90", ok: typeof lgcmResult?.cfi === "number" ? lgcmResult.cfi >= 0.90 : false },
                         { name: "RMSEA", value: typeof lgcmResult?.rmsea === "number" ? lgcmResult.rmsea?.toFixed(3) : "", ref: "≤0.08", ok: typeof lgcmResult?.rmsea === "number" ? lgcmResult.rmsea <= 0.08 : false },
                         { name: "SRMR", value: typeof lgcmResult?.srmr === "number" ? lgcmResult.srmr?.toFixed(4) : "", ref: "≤0.08", ok: typeof lgcmResult?.srmr === "number" ? lgcmResult.srmr <= 0.08 : false },
