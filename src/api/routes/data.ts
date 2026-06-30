@@ -682,6 +682,12 @@ async function runJournalAutoPipeline(
         pipelineResult.evaluation_saved = true;
         pipelineResult.evaluation_id = evalId;
         pipelineResult.total_score = totalScore;
+
+        // AI評価が保存できたら日誌ステータスを 'evaluated' に更新する。
+        // これがないと研究者・教員の一覧で「AI評価済み」が反映されない。
+        await db.prepare(
+          "UPDATE journal_entries SET status = 'evaluated' WHERE id = ?"
+        ).bind(journalId).run().catch(() => {});
       }
     } catch (eAi) {
       console.error("Auto AI evaluation failed:", String(eAi));

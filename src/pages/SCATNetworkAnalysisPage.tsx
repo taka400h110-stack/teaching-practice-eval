@@ -37,6 +37,27 @@ export const SCATNetworkAnalysisPage: React.FC = () => {
     ]
   };
 
+  // ノードを円周上に配置する位置マップ（id -> {x, y, 半径}）
+  // 旧実装はノードIDが '1'〜'5' 前提のハードコードだったが、
+  // 実データのIDは日本語のテーマ名なので動的レイアウトに変更。
+  const posMap = React.useMemo(() => {
+    const m = new Map<string, { x: number; y: number; r: number }>();
+    const nodes = graphData.nodes;
+    const n = nodes.length;
+    const cx = 400, cy = 300;
+    const layoutR = Math.min(240, 110 + n * 10);
+    nodes.forEach((node, i) => {
+      const angle = (2 * Math.PI * i) / Math.max(n, 1) - Math.PI / 2;
+      const r = Math.min(Math.max((Number(node.val) || 1) * 1.6, 18), 42);
+      m.set(node.id, {
+        x: cx + layoutR * Math.cos(angle),
+        y: cy + layoutR * Math.sin(angle),
+        r,
+      });
+    });
+    return m;
+  }, [graphData]);
+
   const handleExportCSV = () => {
     const csvContent = "Source,Target,Weight\n" + 
       graphData.links.map((l: any) => `${l.source.id || l.source},${l.target.id || l.target},${l.val}`).join("\n");
@@ -85,71 +106,85 @@ export const SCATNetworkAnalysisPage: React.FC = () => {
       <Paper sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
         {isLoading ? (
           <LoadingView label="概念ネットワークを読み込み中…" minHeight="100%" />
+        ) : graphData.nodes.length === 0 ? (
+          <Typography color="text.secondary">表示できる概念ノードがありません。</Typography>
         ) : (
-          
+
           <Box sx={{ width: '100%', height: '100%', position: 'relative' }} data-testid="network-canvas">
             <svg width="100%" height="100%" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <marker
+                  id="scat-arrow"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+                </marker>
+              </defs>
+
               {/* Edges */}
               {graphData.links.map((link: any, i: number) => {
-                const sourceNode = graphData.nodes.find((n: any) => n.id === link.source);
-                const targetNode = graphData.nodes.find((n: any) => n.id === link.target);
-                if (!sourceNode || !targetNode) return null;
-                
-                // Simple static positioning for demo
-                const getPos = (id: string) => {
-                  switch(id) {
-                    case '1': return { x: 400, y: 150 };
-                    case '2': return { x: 250, y: 300 };
-                    case '3': return { x: 250, y: 450 };
-                    case '4': return { x: 550, y: 300 };
-                    case '5': return { x: 550, y: 450 };
-                    default: return { x: 400, y: 300 };
-                  }
-                };
-                
-                const src = getPos(sourceNode.id);
-                const tgt = getPos(targetNode.id);
-                
+                const sourceId = link.source?.id ?? link.source;
+                const targetId = link.target?.id ?? link.target;
+                const src = posMap.get(sourceId);
+                const tgt = posMap.get(targetId);
+                if (!src || !tgt) return null;
+
+                // ノード半径ぶんだけ端点を内側に寄せて矢印が円に重ならないようにする
+                const dx = tgt.x - src.x;
+                const dy = tgt.y - src.y;
+                const dist = Math.hypot(dx, dy) || 1;
+                const ux = dx / dist;
+                const uy = dy / dist;
+                const x1 = src.x + ux * src.r;
+                const y1 = src.y + uy * src.r;
+                const x2 = tgt.x - ux * (tgt.r + 8);
+                const y2 = tgt.y - uy * (tgt.r + 8);
+                const strokeWidth = Math.min(Math.max(Number(link.val) || 1, 1), 6);
+
                 return (
-                  <line 
+                  <line
                     key={`link-${i}`}
-                    x1={src.x} y1={src.y} 
-                    x2={tgt.x} y2={tgt.y} 
-                    stroke="#cbd5e1" 
-                    strokeWidth={link.val}
-                    opacity={0.6}
+                    x1={x1} y1={y1}
+                    x2={x2} y2={y2}
+                    stroke="#94a3b8"
+                    strokeWidth={strokeWidth}
+                    opacity={0.7}
+                    markerEnd="url(#scat-arrow)"
                   />
                 );
               })}
-              
+
               {/* Nodes */}
               {graphData.nodes.map((node: any) => {
-                const getPos = (id: string) => {
-                  switch(id) {
-                    case '1': return { x: 400, y: 150 };
-                    case '2': return { x: 250, y: 300 };
-                    case '3': return { x: 250, y: 450 };
-                    case '4': return { x: 550, y: 300 };
-                    case '5': return { x: 550, y: 450 };
-                    default: return { x: 400, y: 300 };
-                  }
-                };
-                const pos = getPos(node.id);
-                const radius = Math.min(Math.max(node.val * 2, 20), 50);
-                
+                const pos = posMap.get(node.id);
+                if (!pos) return null;
+                const labelOffset = pos.r + 14;
+                // ラベルは円の外側（中心に対して放射方向）に配置して重なりを避ける
+                const below = pos.y >= 300;
                 return (
                   <g key={`node-${node.id}`} transform={`translate(${pos.x}, ${pos.y})`}>
-                    <circle 
-                      r={radius} 
-                      fill="#1976d2" 
-                      opacity={0.8}
-                    />
-                    <text 
-                      textAnchor="middle" 
-                      dy=".3em" 
+                    <circle r={pos.r} fill="#1976d2" opacity={0.85} />
+                    <text
+                      textAnchor="middle"
+                      dy=".3em"
                       fill="white"
-                      fontSize={14}
+                      fontSize={11}
                       fontWeight="bold"
+                    >
+                      {Number(node.val) || ''}
+                    </text>
+                    <text
+                      textAnchor="middle"
+                      y={below ? labelOffset : -labelOffset}
+                      dy={below ? '.7em' : '0'}
+                      fill="#334155"
+                      fontSize={12}
+                      fontWeight={600}
                     >
                       {node.name}
                     </text>
