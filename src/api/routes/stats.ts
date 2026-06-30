@@ -617,6 +617,26 @@ function computeEM_FIML_LGCM(weeklyScores: (number | null)[][]): ReturnType<type
   return computeLGCMSummary(imputed);
 }
 
+/**
+ * 適合度指標のサニタイズ。
+ * 外部統計プロバイダ／内部計算のいずれの結果でも、CFI/TLI は理論上 0〜1、
+ * RMSEA/SRMR は 0 以上に制約される。数値誤差・近似により範囲外の値
+ * （例: CFI=1.022）が返ることがあるため、ここで丸め込み妥当域へクランプする。
+ */
+function sanitizeFitIndices<T extends Record<string, any>>(data: T): T {
+  if (!data || typeof data !== "object") return data;
+  const clamp01 = (v: any) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : v;
+  const clampNonNeg = (v: any) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.max(0, v) : v;
+  const out: any = { ...data };
+  if ("cfi" in out) out.cfi = Math.round(clamp01(out.cfi) * 1000) / 1000;
+  if ("tli" in out) out.tli = Math.round(clamp01(out.tli) * 1000) / 1000;
+  if ("rmsea" in out) out.rmsea = Math.round(clampNonNeg(out.rmsea) * 1000) / 1000;
+  if ("srmr" in out) out.srmr = Math.round(clampNonNeg(out.srmr) * 1000) / 1000;
+  return out;
+}
+
 function computeLGCMSummary(weeklyScores: any[]) {
   const n = weeklyScores.length;
   const t = weeklyScores[0]?.length ?? 0;
@@ -887,7 +907,7 @@ statsRouter.post("/lcga", requireRoles(["researcher", "admin", "collaborator", "
   try {
     const imputed = handleMissingData(body.weekly_scores, "mean_imputation");
     const result = await statsProvider.computeLCGA(imputed, body.max_classes || 5, () => computeLCGA(imputed, body.max_classes || 5));
-    return c.json({ success: true, ...result.data, _source: result.source });
+    return c.json({ success: true, ...sanitizeFitIndices(result.data), _source: result.source });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
@@ -898,7 +918,7 @@ statsRouter.post("/lgcm", requireRoles(["researcher", "admin", "collaborator", "
   try {
     const imputed = handleMissingData(body.weekly_scores, "mean_imputation");
     const result = await statsProvider.computeLGCM(imputed, body.factor || "total", () => computeEM_FIML_LGCM(body.weekly_scores));
-    return c.json({ success: true, ...result.data, _source: result.source });
+    return c.json({ success: true, ...sanitizeFitIndices(result.data), _source: result.source });
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   }
