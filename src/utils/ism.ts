@@ -119,8 +119,21 @@ export function transmissionIndex(R: Matrix): number {
  *   nodes: [{ id: "テーマA", name: "テーマA", val: 3 }, ...]
  *   edges: [{ source: "テーマA", target: "テーマB", weight: 2 }, ...]
  *
- * - 無向グラフを有向化: weight > 0 なら両方向に 1 を立てる
- *   (SCAT の共起は方向性を持たないため。将来方向付き SCAT が来たら差し替え)
+ * ## 方向付け (ism_spec.md §3.1 準拠)
+ * 仕様 §3.1 は A[i][j]=1 を「e_i から e_j へ方向性のある共起」と定義する。
+ * SCAT の共起そのものは対称だが, ISM 本来の目的 (省察が「どの概念から始まり,
+ * どこに到達したか」の階層化, §1) を満たすには方向付けが必須である。
+ * これがないと連結成分が 1 レベルに潰れ階層が出現しない。
+ *
+ * 本実装は **出現頻度に基づく方向付け規則** を採用する:
+ *   - より高頻度 (= より基盤的・一般的) なテーマを下位 (起点),
+ *     より低頻度 (= より特殊・派生的) なテーマを上位 (到達点) とみなし,
+ *     エッジを「高頻度テーマ → 低頻度テーマ」に向ける。
+ *   - 頻度が同点の場合は id の辞書順で決定論的に向きを決める。
+ * これにより到達可能行列が上三角的になり, Warfield レベル分割で階層が出現する。
+ *
+ * 頻度情報が無い (val 未指定) 場合は, 後方互換のため無向 (双方向) にフォールバックする。
+ * directed=false を明示すると常に無向化する。
  */
 export interface NetworkInput {
   nodes: Array<{ id: string; name?: string; val?: number }>;
@@ -131,13 +144,25 @@ export interface IsmInput {
   ids: string[];
   labels: string[];
   adjacency: Matrix;
+  /** 方向付けが行われたか (false=無向フォールバック) */
+  directed: boolean;
 }
 
-export function buildIsmInputFromNetwork(net: NetworkInput): IsmInput {
+export function buildIsmInputFromNetwork(net: NetworkInput, directed = true): IsmInput {
   const ids = net.nodes.map((n) => n.id);
   const labels = net.nodes.map((n) => n.name || n.id);
   const indexOf = new Map<string, number>();
   ids.forEach((id, i) => indexOf.set(id, i));
+
+  // ノード頻度 (val)。1 つでも val が定義されていれば方向付けに使う。
+  const freq = new Map<string, number>();
+  let hasFreq = false;
+  for (const node of net.nodes) {
+    if (typeof node.val === "number") hasFreq = true;
+    freq.set(node.id, typeof node.val === "number" ? node.val : 0);
+  }
+
+  const useDirected = directed && hasFreq;
 
   const n = ids.length;
   const A: Matrix = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
@@ -147,12 +172,33 @@ export function buildIsmInputFromNetwork(net: NetworkInput): IsmInput {
     const j = indexOf.get(e.target);
     if (i === undefined || j === undefined) continue;
     if (i === j) continue;
-    // 無向 → 双方向
-    A[i][j] = 1;
-    A[j][i] = 1;
+
+    if (!useDirected) {
+      // 無向 → 双方向 (後方互換フォールバック)
+      A[i][j] = 1;
+      A[j][i] = 1;
+      continue;
+    }
+
+    // 方向付け: 高頻度テーマ (起点) → 低頻度テーマ (到達点)
+    const fi = freq.get(e.source) ?? 0;
+    const fj = freq.get(e.target) ?? 0;
+    let from = i;
+    let to = j;
+    if (fi < fj) {
+      from = j;
+      to = i;
+    } else if (fi === fj) {
+      // 同点は id 辞書順で決定論化 (小さい id を起点)
+      if (e.source > e.target) {
+        from = j;
+        to = i;
+      }
+    }
+    A[from][to] = 1;
   }
 
-  return { ids, labels, adjacency: A };
+  return { ids, labels, adjacency: A, directed: useDirected };
 }
 
 /**
@@ -167,22 +213,25 @@ export interface IsmResult {
   transmissionScore: number;
   nodeCount: number;
   edgeCount: number;
+  /** 隣接行列が方向付けされているか */
+  directed: boolean;
 }
 
 export function computeIsm(input: IsmInput): IsmResult {
   const { ids, labels, adjacency } = input;
+  const directed = input.directed ?? false;
   const R = reachability(adjacency);
   const levels = levelPartition(R, ids);
   const T = transmissionIndex(R);
 
-  let edgeCount = 0;
+  let rawEdges = 0;
   for (let i = 0; i < adjacency.length; i++) {
     for (let j = 0; j < adjacency.length; j++) {
-      if (i !== j && adjacency[i][j]) edgeCount++;
+      if (i !== j && adjacency[i][j]) rawEdges++;
     }
   }
-  // 無向化されているので 2 倍カウントされている → 半分にする
-  edgeCount = Math.floor(edgeCount / 2);
+  // 有向: そのまま, 無向: 双方向で 2 倍カウントされるため半分にする
+  const edgeCount = directed ? rawEdges : Math.floor(rawEdges / 2);
 
   return {
     ids,
@@ -193,5 +242,6 @@ export function computeIsm(input: IsmInput): IsmResult {
     transmissionScore: T,
     nodeCount: ids.length,
     edgeCount,
+    directed,
   };
 }

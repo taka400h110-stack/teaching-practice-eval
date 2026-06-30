@@ -14,6 +14,12 @@ import { cors } from "hono/cors";
 import { requireRoles } from "../middleware/auth";
 import { statsProvider } from "../services/statsProvider";
 import { getFactorKeyByItemNum } from "../../constants/rubric";
+// 原著論文準拠の高精度統計実装 (Shrout & Fleiss 1979 / Krippendorff 2018 / 不完全ベータ t・F 分布)
+import {
+  computeICC21 as computeICC21Exact,
+  computeKrippendorffAlpha as computeKrippendorffAlphaExact,
+  studentTCDF,
+} from "../utils/stats";
 
 const statsRouter = new Hono<{ Bindings: CloudflareBindings }>();
 statsRouter.use("*", cors());
@@ -36,6 +42,115 @@ statsRouter.use("*", async (c, next) => {
 function mean(arr: number[]): number {
   if (arr.length === 0) return 0;
   return arr.reduce((s, v) => s + v, 0) / arr.length;
+}
+
+// ────────────────────────────────────────────────────────────────
+// 小規模行列演算 (LGCM の ML 適合関数 F_ML 用)
+// ────────────────────────────────────────────────────────────────
+/** 行列積 A·B */
+function matMul(A: number[][], B: number[][]): number[][] {
+  const n = A.length, m = B[0].length, p = B.length;
+  const C = Array.from({ length: n }, () => new Array(m).fill(0));
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < m; j++) {
+      let s = 0;
+      for (let k = 0; k < p; k++) s += A[i][k] * B[k][j];
+      C[i][j] = s;
+    }
+  return C;
+}
+/** トレース tr(A) */
+function traceMatrix(A: number[][]): number {
+  let s = 0;
+  for (let i = 0; i < A.length; i++) s += A[i][i];
+  return s;
+}
+/** 行列式 det(A) — LU 分解 (部分ピボット) */
+function detMatrix(A: number[][]): number {
+  const n = A.length;
+  const M = A.map((r) => r.slice());
+  let det = 1;
+  for (let i = 0; i < n; i++) {
+    let pivot = i;
+    for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[pivot][i])) pivot = r;
+    if (Math.abs(M[pivot][i]) < 1e-12) return 0;
+    if (pivot !== i) { [M[i], M[pivot]] = [M[pivot], M[i]]; det = -det; }
+    det *= M[i][i];
+    for (let r = i + 1; r < n; r++) {
+      const f = M[r][i] / M[i][i];
+      for (let c = i; c < n; c++) M[r][c] -= f * M[i][c];
+    }
+  }
+  return det;
+}
+/** 逆行列 (Gauss-Jordan)。特異なら null。 */
+function invertMatrix(A: number[][]): number[][] | null {
+  const n = A.length;
+  const M = A.map((r, i) => [...r, ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))]);
+  for (let i = 0; i < n; i++) {
+    let pivot = i;
+    for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[pivot][i])) pivot = r;
+    if (Math.abs(M[pivot][i]) < 1e-12) return null;
+    [M[i], M[pivot]] = [M[pivot], M[i]];
+    const pv = M[i][i];
+    for (let c = 0; c < 2 * n; c++) M[i][c] /= pv;
+    for (let r = 0; r < n; r++) {
+      if (r === i) continue;
+      const f = M[r][i];
+      for (let c = 0; c < 2 * n; c++) M[r][c] -= f * M[i][c];
+    }
+  }
+  return M.map((r) => r.slice(n));
+}
+
+/** χ² 分布の上側確率 P(X > x) = 1 − P(df/2, x/2) (正則化不完全ガンマ) */
+function chiSquareSF(x: number, df: number): number {
+  if (x <= 0) return 1;
+  if (df <= 0) return 1;
+  return 1 - lowerRegGamma(df / 2, x / 2);
+}
+/** 正則化下側不完全ガンマ関数 P(a, x) — 級数/連分数 (Numerical Recipes) */
+function lowerRegGamma(a: number, x: number): number {
+  if (x < 0 || a <= 0) return 0;
+  if (x === 0) return 0;
+  const gln = lnGamma(a);
+  if (x < a + 1) {
+    // 級数展開
+    let ap = a, sum = 1 / a, del = sum;
+    for (let n = 0; n < 200; n++) {
+      ap++;
+      del *= x / ap;
+      sum += del;
+      if (Math.abs(del) < Math.abs(sum) * 1e-12) break;
+    }
+    return sum * Math.exp(-x + a * Math.log(x) - gln);
+  } else {
+    // 連分数 (補完 Q を計算して 1−Q)
+    const FPMIN = 1e-300;
+    let b = x + 1 - a, c = 1 / FPMIN, d = 1 / b, h = d;
+    for (let i = 1; i < 200; i++) {
+      const an = -i * (i - a);
+      b += 2;
+      d = an * d + b; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = b + an / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      const del = d * c;
+      h *= del;
+      if (Math.abs(del - 1) < 1e-12) break;
+    }
+    const Q = Math.exp(-x + a * Math.log(x) - gln) * h;
+    return 1 - Q;
+  }
+}
+/** ln Γ(x) — Lanczos */
+function lnGamma(x: number): number {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let y = x;
+  const tmp = x + 5.5 - (x + 0.5) * Math.log(x + 5.5);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) { y++; ser += c[j] / y; }
+  return -tmp + Math.log((2.5066282746310005 * ser) / x);
 }
 
 /** 分散（不偏） */
@@ -67,12 +182,18 @@ function pearsonR(x: number[], y: number[]): number {
   return covariance(x, y) / (sx * sy);
 }
 
-/** t分布のp値近似（大標本近似） */
+/**
+ * Pearson r の有意性検定 p 値（両側）。
+ * 自由度 df = n-2 の Student t 分布を厳密 (不完全ベータ) に評価する。
+ * 旧実装は大標本正規近似で小標本 (n<30) で偽の有意を出していたため是正。
+ */
 function tTestPValue(r: number, n: number): number {
-  const t = r * Math.sqrt((n - 2) / (1 - r * r));
-  // 大標本正規近似
-  const z = Math.abs(t) * Math.sqrt(2 / (n - 1));
-  const p = 2 * (1 - normalCDF(Math.abs(t)));
+  if (n < 3) return 1;
+  if (Math.abs(r) >= 1) return 0;
+  const df = n - 2;
+  const t = r * Math.sqrt(df / (1 - r * r));
+  // 両側 p = 2 * P(T >= |t|) = 2 * (1 - CDF(|t|))
+  const p = 2 * (1 - studentTCDF(Math.abs(t), df));
   return Math.max(0, Math.min(1, p));
 }
 
@@ -130,6 +251,11 @@ function handleMissingData(arrays: (number | null)[][], method: "listwise" | "me
 // ICC(2,1) 計算（二元混合効果モデル、絶対一致）
 // 論文 3.6.1: ICC(2,1) for absolute agreement
 // ────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// ICC(2,1) 計算（二元変量効果モデル、絶対一致）
+// 論文 3.6.1: Shrout & Fleiss (1979) Case 2 に準拠
+// 実体は src/api/utils/stats.ts の高精度実装 (正確な F 分布 CDF / 逆 CDF) に委譲
+// ────────────────────────────────────────────────────────────────
 function computeICC21(
   ratings: number[][],  // ratings[rater][subject]
 ): {
@@ -141,79 +267,7 @@ function computeICC21(
   p: number;
   interpretation: string;
 } {
-  const k = ratings.length;       // 評価者数
-  const n = ratings[0].length;    // 対象者数
-
-  if (k < 2 || n < 2) {
-    return { icc: 0, ci95: [0, 0], f: 0, df1: 0, df2: 0, p: 1, interpretation: "データ不足" };
-  }
-
-  // 行列転置: subjects × raters
-  const matrix: number[][] = Array.from({ length: n }, (_: any, i: number) =>
-    ratings.map((r) => r[i])
-  );
-
-  // 総平均
-  const grandMean = mean(matrix.flatMap((row) => row));
-
-  // SS_R（評価者間変動）
-  const raterMeans = ratings.map((r) => mean(r));
-  const SS_R = n * raterMeans.reduce((s, rm) => s + (rm - grandMean) ** 2, 0);
-
-  // SS_S（対象者間変動）
-  const subjectMeans = matrix.map((row) => mean(row));
-  const SS_S = k * subjectMeans.reduce((s, sm) => s + (sm - grandMean) ** 2, 0);
-
-  // SS_T（総変動）
-  const SS_T = matrix.flatMap((row) => row).reduce((s, v) => s + (v - grandMean) ** 2, 0);
-
-  // SS_E（誤差変動）
-  const SS_E = SS_T - SS_R - SS_S;
-
-  // 自由度
-  const df_R = k - 1;
-  const df_S = n - 1;
-  const df_E = (k - 1) * (n - 1);
-
-  // 平均平方
-  const MS_R = SS_R / df_R;
-  const MS_S = SS_S / df_S;
-  const MS_E = SS_E / Math.max(df_E, 1);
-
-  // ICC(2,1) 絶対一致
-  const icc = (MS_S - MS_E) / (MS_S + (k - 1) * MS_E + (k / n) * (MS_R - MS_E));
-  const iccClamped = Math.max(0, Math.min(1, icc));
-
-  // 95%CI（Shrout & Fleiss, 1979）
-  const F = MS_S / MS_E;
-  const FL = F / ((k - 1) / df_E);
-  const FU = F * ((k - 1) / df_S);
-
-  const L = (FL - 1) / (FL + k - 1);
-  const U = (FU - 1) / (FU + k - 1);
-  const ci95: [number, number] = [
-    Math.max(0, Math.round(L * 1000) / 1000),
-    Math.min(1, Math.round(U * 1000) / 1000),
-  ];
-
-  // p値（F検定）
-  const p = MS_E > 0 ? Math.min(1, Math.exp(-0.717 * Math.log(F) - 0.416 * Math.log(F) ** 2)) : 0;
-
-  const interpretation =
-    iccClamped >= 0.9 ? "非常に良好な信頼性" :
-    iccClamped >= 0.75 ? "良好な信頼性（研究使用可）" :
-    iccClamped >= 0.5 ? "中程度の信頼性（要注意）" :
-    "低い信頼性（要改善）";
-
-  return {
-    icc: Math.round(iccClamped * 1000) / 1000,
-    ci95,
-    f: Math.round(F * 100) / 100,
-    df1: df_S,
-    df2: df_E,
-    p: Math.round(p * 1000) / 1000,
-    interpretation,
-  };
+  return computeICC21Exact(ratings);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -224,58 +278,8 @@ function computeKrippendorffsAlpha(
   ratings: (number | null)[][],  // ratings[rater][subject], nullはN/A
   metric: "ordinal" | "interval" = "interval"
 ): { alpha: number; interpretation: string } {
-  const k = ratings.length;
-  const n = ratings[0].length;
-
-  // 有効なペアを収集
-  let D_o = 0; // 観測された不一致
-  let D_e = 0; // 期待される不一致
-  let n_valid = 0;
-
-  const allValues: number[] = [];
-  ratings.forEach((r) => r.forEach((v) => v !== null && allValues.push(v)));
-  const overallMean = mean(allValues);
-
-  for (let s = 0; s < n; s++) {
-    const vals = ratings.map((r) => r[s]).filter((v): v is number => v !== null);
-    if (vals.length < 2) continue;
-
-    n_valid++;
-    const pairs: [number, number][] = [];
-    for (let i = 0; i < vals.length; i++) {
-      for (let j = i + 1; j < vals.length; j++) {
-        pairs.push([vals[i], vals[j]]);
-      }
-    }
-
-    for (const [a, b] of pairs) {
-      const d = metric === "interval" ? (a - b) ** 2 : Math.abs(a - b);
-      D_o += d;
-    }
-  }
-
-  for (const v1 of allValues) {
-    for (const v2 of allValues) {
-      const d = metric === "interval" ? (v1 - v2) ** 2 : Math.abs(v1 - v2);
-      D_e += d;
-    }
-  }
-
-  if (D_e === 0) return { alpha: 1, interpretation: "完全一致" };
-
-  const n_total = allValues.length;
-  const alpha = 1 - ((n_total - 1) * D_o) / (D_e * n_valid);
-  const alphaClamped = Math.max(-1, Math.min(1, alpha));
-
-  const interpretation =
-    alphaClamped >= 0.8 ? "良好な信頼性" :
-    alphaClamped >= 0.667 ? "暫定的に許容可能" :
-    "信頼性が低い（要改善）";
-
-  return {
-    alpha: Math.round(alphaClamped * 1000) / 1000,
-    interpretation,
-  };
+  // 実体は src/api/utils/stats.ts の一致行列ベース正準実装 (Krippendorff 2018) に委譲
+  return computeKrippendorffAlphaExact(ratings, metric);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -305,7 +309,8 @@ function linearRegression(x: number[], y: number[]) {
   }
   const se_slope = den === 0 ? 0 : Math.sqrt((ss_res / Math.max(1, n - 2)) / den);
   const t = se_slope === 0 ? 0 : slope / se_slope;
-  const p_value = 2 * (1 - normalCDF(Math.abs(t)));
+  // 回帰係数の t 検定 (df = n-2) を厳密評価 (旧: 正規近似)
+  const p_value = se_slope === 0 ? 1 : 2 * (1 - studentTCDF(Math.abs(t), Math.max(1, n - 2)));
 
   return { slope, intercept, p_value, t };
 }
@@ -344,9 +349,9 @@ function computeBlandAltman(
   const se_md = sd / Math.sqrt(n);
   const se_loa = sd * Math.sqrt(3 / n);
 
-  // バイアスのt検定
-  const t = md / se_md;
-  const p = 2 * (1 - normalCDF(Math.abs(t)));
+  // バイアスのt検定 (1標本t, df = n-1) を厳密評価 (旧: 正規近似)
+  const t = se_md === 0 ? 0 : md / se_md;
+  const p = se_md === 0 ? 1 : 2 * (1 - studentTCDF(Math.abs(t), Math.max(1, n - 1)));
 
   // アウトライヤー率
   const outliers = diffs.filter((d) => d > loa_upper || d < loa_lower).length;
@@ -606,45 +611,10 @@ function computeEM_FIML_LGCM(weeklyScores: (number | null)[][]): ReturnType<type
     );
   }
 
-  const i_mean = mean(intercepts);
-  const s_mean = mean(slopes);
-  const i_var = variance(intercepts);
-  const s_var = variance(slopes);
-  const is_cov = covariance(intercepts, slopes);
-
-  // Calculate fit indices (Approximate)
-  let ssErr = 0;
-  let ssTot = 0;
-  const grandMean = mean(imputed.flat());
-  
-  for (let i=0; i<n; i++) {
-    for (let j=0; j<t; j++) {
-      const pred = intercepts[i] + slopes[i] * j;
-      const actual = imputed[i][j];
-      ssErr += Math.pow(actual - pred, 2);
-      ssTot += Math.pow(actual - grandMean, 2);
-    }
-  }
-  
-  const df = n * t - 2;
-  const rmsea = Math.max(0, Math.sqrt(ssErr / (df * n * t))); // Pseudo-RMSEA
-  const srmr = Math.sqrt(ssErr / (n*t)) / (grandMean || 1);   // Pseudo-SRMR
-  const cfi = Math.max(0, 1 - (ssErr / ssTot));
-
-  let pattern = "安定/横ばい";
-  if (s_mean > 0.1) pattern = "持続的成長";
-  else if (s_mean < -0.1) pattern = "低下傾向";
-
-  return {
-    intercept_mean: i_mean, intercept_variance: i_var,
-    slope_mean: s_mean, slope_variance: s_var,
-    intercept_slope_cov: is_cov,
-    cfi: Math.round(cfi * 1000)/1000,
-    tli: Math.round(cfi * 0.95 * 1000)/1000,
-    rmsea: Math.round(rmsea * 1000)/1000,
-    srmr: Math.round(srmr * 1000)/1000,
-    growth_pattern: pattern
-  };
+  // EM で補完した完全データに対して, 正規ML適合関数に基づく
+  // 適合度指標 (χ²/RMSEA/CFI/TLI/SRMR) を computeLGCMSummary に委譲して算出する。
+  // 旧実装は Pseudo-RMSEA / Pseudo-SRMR / tli=cfi*0.95 という疑似値だったため是正。
+  return computeLGCMSummary(imputed);
 }
 
 function computeLGCMSummary(weeklyScores: any[]) {
@@ -723,25 +693,59 @@ function computeLGCMSummary(weeklyScores: any[]) {
     }
   }
   const srmr = Math.sqrt(sumSqDiff / numVar);
-  
-  // Fake F_ML for RMSEA, CFI, TLI using heuristic approximation from SRMR and variance
-  // A true ML calculation needs matrix inversion. We use a heuristic that scales with SRMR
-  const df = t*(t+1)/2 - 6; 
+
+  // ────────────────────────────────────────────────────────────────
+  // モデル適合度: 正規ML適合関数に基づく χ², RMSEA, CFI, TLI を算出。
+  //   F_ML = tr(S Σ⁻¹) − ln|S Σ⁻¹| − p   (p = 観測変数数 = t)
+  //   χ²   = (N − 1) F_ML,  自由度 df = p(p+1)/2 − q  (q = 自由推定母数)
+  // 線形LGCM の自由母数 q = 6 (intercept平均/分散, slope平均/分散, 共分散, 残差分散)。
+  // 旧実装は f_ml = srmr*0.5 という疑似マッピングだったため是正。
+  // ────────────────────────────────────────────────────────────────
+  const p_obs = t;
+  const q_free = 6;
+  const df = Math.max(0, p_obs * (p_obs + 1) / 2 - q_free);
   let rmsea = 0;
   let cfi = 1.0;
   let tli = 1.0;
-  
-  if (df > 0) {
-    const f_ml = srmr * 0.5; // heuristic mapping
-    const chi2 = (n - 1) * f_ml;
+  let chi2 = 0;
+
+  const sigmaInv = invertMatrix(Sigma);
+  if (df > 0 && sigmaInv) {
+    // M = S Σ⁻¹
+    const M = matMul(S, sigmaInv);
+    const trM = traceMatrix(M);
+    const detM = detMatrix(M);
+    const f_ml = (detM > 0) ? (trM - Math.log(detM) - p_obs) : 0;
+    chi2 = Math.max(0, (n - 1) * f_ml);
+
+    // RMSEA = sqrt(max(χ²−df,0) / (df (N−1)))
     rmsea = Math.sqrt(Math.max(0, (chi2 - df) / (df * (n - 1))));
-    
-    // baseline chi2 (independence model)
-    const base_df = t*(t-1)/2;
-    const base_chi2 = (n - 1) * 2.0; // dummy high value
-    
-    cfi = Math.max(0, Math.min(1, 1 - Math.max(0, chi2 - df) / Math.max(0.001, base_chi2 - base_df)));
-    tli = Math.max(0, Math.min(1, (base_chi2/base_df - chi2/df) / Math.max(0.001, base_chi2/base_df - 1)));
+
+    // 独立モデル (ベースライン): 対角のみの Σ_indep に対する χ²
+    const SigmaIndep = Array.from({ length: t }, (_, j) =>
+      Array.from({ length: t }, (_, k) => (j === k ? S[j][j] : 0)),
+    );
+    const indepInv = invertMatrix(SigmaIndep);
+    const base_df = t * (t - 1) / 2;
+    let base_chi2 = 0;
+    if (indepInv) {
+      const Mi = matMul(S, indepInv);
+      const f_ml_base = Math.max(0, traceMatrix(Mi) - Math.log(Math.max(1e-12, detMatrix(Mi))) - p_obs);
+      base_chi2 = Math.max(0, (n - 1) * f_ml_base);
+    }
+
+    // CFI = 1 − max(χ²−df,0) / max(χ²_base−df_base, χ²−df, 0)
+    const d_model = Math.max(0, chi2 - df);
+    const d_base = Math.max(d_model, base_chi2 - base_df, 1e-6);
+    cfi = Math.max(0, Math.min(1, 1 - d_model / d_base));
+
+    // TLI = ((χ²_base/df_base) − (χ²/df)) / ((χ²_base/df_base) − 1)
+    if (base_df > 0) {
+      const ratioBase = base_chi2 / base_df;
+      const ratioModel = chi2 / df;
+      tli = Math.max(0, Math.min(1, (ratioBase - ratioModel) / Math.max(1e-6, ratioBase - 1)));
+    }
+
     if (isNaN(cfi)) cfi = 1.0;
     if (isNaN(tli)) tli = 1.0;
     if (isNaN(rmsea)) rmsea = 0.0;
@@ -751,6 +755,9 @@ function computeLGCMSummary(weeklyScores: any[]) {
     s_mean > 0.1 ? "線形成長（正）" :
     s_mean < -0.1 ? "線形減少" :
     "安定/横ばい";
+
+  // χ² 適合度検定の p 値 (上側確率, 自由度 df)
+  const chi2_p = df > 0 ? chiSquareSF(chi2, df) : 1;
 
   return {
     intercept_mean: Math.round(i_mean * 100) / 100,
@@ -762,6 +769,9 @@ function computeLGCMSummary(weeklyScores: any[]) {
     tli: Math.round(tli * 1000) / 1000,
     rmsea: Math.round(rmsea * 1000) / 1000,
     srmr: Math.round(srmr * 1000) / 1000,
+    chi2: Math.round(chi2 * 1000) / 1000,
+    chi2_df: df,
+    chi2_p: chi2_p < 0.001 ? Math.round(chi2_p * 1e6) / 1e6 : Math.round(chi2_p * 1000) / 1000,
     growth_pattern,
   };
 }
