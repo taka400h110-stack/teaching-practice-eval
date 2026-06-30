@@ -200,8 +200,17 @@ const apiClient = {
     localStorage.setItem("user_info", JSON.stringify(user));
 
     // Onboarding 判定
+    // サーバの /auth/login レスポンスには firstLogin が含まれないため、
+    // デモユーザー定義 (DEMO_USERS, 全員 firstLogin:false) を参照して判定する。
+    // デモユーザーはオンボーディングをスキップし、ダッシュボードへ直行する
+    // (過去に残った pending_onboarding フラグも解除する)。
+    const demoDef = DEMO_USERS[user.email as string];
+    const isDemoUser = !!demoDef;
+    const firstLogin = demoDef ? demoDef.firstLogin === true : !!user.firstLogin;
     const onboardingDone = localStorage.getItem(`onboarding_done_${user.id}`);
-    if (!onboardingDone && user.role === "student") {
+    if (isDemoUser && !firstLogin) {
+      localStorage.removeItem("pending_onboarding");
+    } else if (!onboardingDone && user.role === "student" && firstLogin) {
       localStorage.setItem("pending_onboarding", "true");
     }
 
