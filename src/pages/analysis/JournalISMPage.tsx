@@ -115,6 +115,31 @@ export default function JournalISMPage() {
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
+                有向グラフ (ISM 構造モデル)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Warfield レベルごとに上位（Level 1）から下位へ配置し、隣接行列 A の関係を矢印で表します。
+              </Typography>
+              {ismQ.data.ids.length === 0 || ismQ.data.levels.length === 0 ? (
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  表示できる構造がありません。SCAT 分析でテーマを入力してください。
+                </Alert>
+              ) : (
+                <Box sx={{ overflowX: "auto", mt: 1 }}>
+                  <IsmDirectedGraph
+                    ids={ismQ.data.ids}
+                    labels={ismQ.data.labels}
+                    adjacency={ismQ.data.adjacency}
+                    levels={ismQ.data.levels}
+                  />
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
                 階層構造 (Warfield レベル分割)
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -203,6 +228,146 @@ function SummaryCard({ label, value, highlight }: { label: string; value: number
         </Typography>
       </CardContent>
     </Card>
+  );
+}
+
+function IsmDirectedGraph({
+  ids,
+  labels,
+  adjacency,
+  levels,
+}: {
+  ids: string[];
+  labels: string[];
+  adjacency: number[][];
+  levels: string[][];
+}) {
+  // ノードIDごとの表示ラベル
+  const labelById = React.useMemo(() => {
+    const m = new Map<string, string>();
+    ids.forEach((id, i) => m.set(id, labels?.[i] ?? id));
+    return m;
+  }, [ids, labels]);
+
+  // レイアウト定数
+  const levelGapY = 120;
+  const nodeW = 120;
+  const nodeH = 44;
+  const colGapX = 160;
+  const marginX = 40;
+  const marginY = 40;
+
+  // 各ノードの座標を Warfield レベルに基づき決定（Level 1 = 上端）
+  const positions = React.useMemo(() => {
+    const m = new Map<string, { x: number; y: number }>();
+    levels.forEach((level, levelIdx) => {
+      const count = level.length;
+      level.forEach((nodeId, i) => {
+        // 各レベルを水平方向に中央寄せで配置
+        const x = marginX + nodeW / 2 + i * colGapX;
+        const y = marginY + nodeH / 2 + levelIdx * levelGapY;
+        m.set(nodeId, { x, y });
+      });
+    });
+    return m;
+  }, [levels]);
+
+  const maxCols = Math.max(1, ...levels.map((l) => l.length));
+  const width = marginX * 2 + (maxCols - 1) * colGapX + nodeW;
+  const height = marginY * 2 + (levels.length - 1) * levelGapY + nodeH;
+
+  // 隣接行列からエッジを抽出（自己ループは除外）
+  const edges: { from: string; to: string }[] = [];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = 0; j < ids.length; j++) {
+      if (i !== j && adjacency[i]?.[j]) {
+        edges.push({ from: ids[i], to: ids[j] });
+      }
+    }
+  }
+
+  // 矩形の縁で線分を切り取り、矢印が枠に当たるようにする
+  const trimToRect = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    halfW: number,
+    halfH: number
+  ) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    if (dx === 0 && dy === 0) return to;
+    const scaleX = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
+    const scaleY = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
+    const t = Math.min(scaleX, scaleY);
+    return { x: to.x - dx * t, y: to.y - dy * t };
+  };
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      style={{ maxWidth: "100%", height: "auto", minWidth: 320 }}
+    >
+      <defs>
+        <marker
+          id="ism-arrow"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+        </marker>
+      </defs>
+
+      {/* エッジ */}
+      {edges.map((e, idx) => {
+        const from = positions.get(e.from);
+        const to = positions.get(e.to);
+        if (!from || !to) return null;
+        const start = trimToRect(to, from, nodeW / 2, nodeH / 2);
+        const end = trimToRect(from, to, nodeW / 2, nodeH / 2);
+        return (
+          <line
+            key={`ism-edge-${idx}`}
+            x1={start.x}
+            y1={start.y}
+            x2={end.x}
+            y2={end.y}
+            stroke="#64748b"
+            strokeWidth={1.5}
+            opacity={0.8}
+            markerEnd="url(#ism-arrow)"
+          />
+        );
+      })}
+
+      {/* ノード */}
+      {Array.from(positions.entries()).map(([nodeId, pos]) => {
+        const label = labelById.get(nodeId) ?? nodeId;
+        const display = label.length > 8 ? label.slice(0, 8) + "…" : label;
+        return (
+          <g key={`ism-node-${nodeId}`} transform={`translate(${pos.x}, ${pos.y})`}>
+            <rect
+              x={-nodeW / 2}
+              y={-nodeH / 2}
+              width={nodeW}
+              height={nodeH}
+              rx={8}
+              fill="#1976d2"
+              opacity={0.9}
+            />
+            <title>{label}</title>
+            <text textAnchor="middle" dy=".35em" fill="white" fontSize={13} fontWeight={600}>
+              {display}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
