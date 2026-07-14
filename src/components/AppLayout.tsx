@@ -8,6 +8,7 @@ import {
 import MenuIcon               from "@mui/icons-material/Menu";
 import DashboardIcon          from "@mui/icons-material/Dashboard";
 import MenuBookIcon           from "@mui/icons-material/MenuBook";
+import UploadFileIcon         from "@mui/icons-material/UploadFile";
 import SelfImprovementIcon    from "@mui/icons-material/SelfImprovement";
 import TimelineIcon           from "@mui/icons-material/Timeline";
 import TrackChangesIcon       from "@mui/icons-material/TrackChanges";
@@ -163,6 +164,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
         group: "データ取り込み",
         items: [
           { label: "過去日誌の取り込み", path: "/research/journal-import", icon: <CloudUploadIcon /> },
+          { label: "アンケートCSV取り込み", path: "/research/survey-import", icon: <UploadFileIcon /> },
         ],
       },
       {
@@ -186,6 +188,7 @@ function getNavGroupsForSingleRole(role: UserRole): NavGroup[] {
 
           { label: "エクスポート承認管理", path: "/admin/exports", icon: <VerifiedUserIcon /> },
           { label: "過去日誌の取り込み", path: "/research/journal-import", icon: <CloudUploadIcon /> },
+          { label: "アンケートCSV取り込み", path: "/research/survey-import", icon: <UploadFileIcon /> },
           { label: "データエクスポート", path: "/exports", icon: <DownloadIcon /> },
           { label: "学生別 AI対話ログ", path: "/student-chat-logs", icon: <ChatIcon /> },
 

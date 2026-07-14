@@ -174,6 +174,11 @@ export default function BFIPage() {
   return (
     <Box sx={{ p: 3, maxWidth: 1100, mx: "auto" }}>
       <Typography variant="h4" gutterBottom>BFI パーソナリティ診断 (Big Five 29項目)</Typography>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        本研究の<b>事前・事後アンケート</b>（批判的思考態度・省察的思考・生成AI活用の批判的吟味）は
+        <b>Google フォーム</b>で実施します。この BFI 診断は補助的な個人特性の把握用で、
+        研究アンケートとは別のものです。
+      </Alert>
       <Tabs value={tab} onChange={handleTabChange} sx={{ mb: 2 }}>
         <Tab label="① 回答 / スコア" />
         <Tab label="② 統合分析 (パーソナリティ × 省察深度)" />
