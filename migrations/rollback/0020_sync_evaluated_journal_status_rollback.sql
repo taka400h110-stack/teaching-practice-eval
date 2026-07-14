@@ -1,0 +1,55 @@
+-- ════════════════════════════════════════════════════════════════
+-- Rollback for Migration 0020: AI評価済みステータス backfill の撤回
+-- ════════════════════════════════════════════════════════════════
+--
+-- 対象: 0020_sync_evaluated_journal_status.sql が実行した
+--       UPDATE journal_entries SET status='evaluated'
+--         WHERE status='submitted' AND (AI評価が存在する)
+--       を巻き戻す。
+--
+-- ⚠️⚠️ 重大な非可逆性の警告 ⚠️⚠️
+--   0020 の UPDATE は「submitted → evaluated」への一方向変更である。
+--   ロールバック時に「現在 evaluated のもの」を単純に submitted へ戻すと、
+--   0020 とは無関係に元々 evaluated だったレコード
+--   (通常運用で AI 評価パイプラインが status='evaluated' に更新したもの) まで
+--   誤って submitted に戻してしまう。
+--   → 0020 で変更されたレコードと、それ以前から evaluated だったレコードを
+--     status カラムだけでは区別できない (0020 は変更履歴を残していないため)。
+--
+--   本番実データ (2026-07-14 read-only 確認時点):
+--     draft=2 / evaluated=10 / submitted=23、うち 0020 で変わる対象=23 件。
+--     → 適用後は evaluated=33 になるが、そのうち「元から evaluated=10」と
+--       「0020 で変わった=23」の区別が付かなくなる。
+--
+-- 【推奨ロールバック手順】
+--   0020 を安全に切り戻すには、適用直前に対象 journal_id 一覧を退避しておく:
+--     -- 適用前に実行 (対象IDの記録):
+--     SELECT id FROM journal_entries
+--       WHERE status='submitted'
+--         AND id IN (SELECT DISTINCT journal_id FROM evaluations
+--                    WHERE eval_type='ai' AND journal_id IS NOT NULL);
+--   この結果 (23件のID) を保存し、ロールバック時は以下のように「そのIDだけ」を戻す:
+--     UPDATE journal_entries SET status='submitted'
+--       WHERE id IN ( <退避した23件のID> ) AND status='evaluated';
+--
+-- ⚠️ したがって「対象IDを退避せずに適用した後」の完全なロールバックは不可能。
+--    その場合、AI評価データ (evaluations) との突合で復元する近似手段しかない。
+-- ────────────────────────────────────────────────────────────────
+
+-- ⚠️ 下記は「対象IDを退避していない場合」の近似ロールバックであり、
+--    元から evaluated だったレコードも巻き込むため既定では無効化(コメントアウト)している。
+--    本当に必要な場合のみ、影響を理解した上でコメントを外して実行すること。
+--
+-- UPDATE journal_entries
+-- SET status = 'submitted'
+-- WHERE status = 'evaluated'
+--   AND id IN (
+--     SELECT DISTINCT journal_id
+--     FROM evaluations
+--     WHERE eval_type = 'ai'
+--       AND journal_id IS NOT NULL
+--   );
+--
+-- ↑ この近似手段は「元から evaluated=10 件」も submitted に戻してしまうため
+--   データ破壊リスクがある。実行前に必ずバックアップを取得すること。
+-- ────────────────────────────────────────────────────────────────
