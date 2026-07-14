@@ -150,6 +150,13 @@ export default function SelfEvaluationPage() {
         自己評価
       </Typography>
 
+      <Alert severity="info" sx={{ mb: 2 }}>
+        本研究の<b>事前・事後アンケート</b>（批判的思考態度・省察的思考・生成AI活用の批判的吟味）は
+        <b>Google フォーム</b>で実施します。この自己評価画面は日々の振り返り記録用であり、
+        研究アンケートとは別のものです。Google フォームの回答は研究者が CSV
+        で研究システムに取り込みます。
+      </Alert>
+
       <Grid container spacing={2}>
         {/* 入力フォーム */}
         <Grid size={{ xs: 12, md: 7 }}>
