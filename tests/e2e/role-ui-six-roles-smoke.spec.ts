@@ -32,7 +32,7 @@ const ROLE_SPECS: RoleSpec[] = [
     role: 'student',
     label: '教育実習生',
     email: 'student@teaching-eval.jp',
-    paths: ['/dashboard', '/journals', '/self-evaluation', '/goals', '/growth', '/chat'],
+    paths: ['/dashboard', '/journals', '/self-evaluation', '/bfi', '/goals', '/growth', '/chat'],
   },
   {
     role: 'univ_teacher',
